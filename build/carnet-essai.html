@@ -2417,6 +2417,15 @@ function reviewImport(c, list, archers, stored = null) {
       if (!picked.length) { toast("Aucune ligne à importer"); return false; }
       const dup = picked.map((x) => x.aid).filter((id) => id !== "__new").find((id, k, arr) => arr.indexOf(id) !== k);
       if (dup) { toast(`${fullName(S.archers.find((a) => a.id === dup))} est choisi deux fois`); return false; }
+      const chg = picked.filter((x) => x.aid !== "__new").map((x) => { const r0 = (c.resultats || {})[x.aid]; const o = r0 && typeof r0 === "object" ? String(r0.score ?? "").trim() : ""; const d0 = det(x.r); const n = d0.length ? String(d0.reduce((t, y) => t + (Number(y.score) || 0), 0)) : String(x.total ?? "").trim(); return { a: S.archers.find((y) => y.id === x.aid), o, n }; }).filter((x) => x.o !== "" && x.o !== x.n);
+      const sb2 = document.querySelector("#sheet button[type=submit]");
+      if (chg.length && !sb2.dataset.confirm) {
+        sb2.dataset.confirm = 1; sb2.textContent = `Confirmer : remplacer ${chg.length} score${chg.length > 1 ? "s" : ""}`;
+        const w = document.getElementById("imp-warn") || Object.assign(document.createElement("div"), { id: "imp-warn", className: "notice" });
+        w.innerHTML = `<b>Attention, ${chg.length} score${chg.length > 1 ? "s" : ""} déjà enregistré${chg.length > 1 ? "s" : ""} vont changer :</b><br>${chg.map((x) => `${esc(fullName(x.a || {}))} : ${esc(x.o)} → ${esc(x.n || "vide")}`).join("<br>")}<br>Vérifie, puis clique à nouveau pour confirmer, ou décoche ces lignes.`;
+        w.style.borderColor = "var(--danger)"; sb2.closest(".acts").before(w); w.scrollIntoView({ block: "nearest" });
+        return false;
+      }
       let created = 0;
       picked.filter((x) => x.aid === "__new").forEach((x) => {
         const r = x.r, id = newId("archers"), clubId = fd.get(`imp-c-${x.i}`) || r.clubId || S.clubs[0]?.id;
@@ -2809,6 +2818,16 @@ function viewArchers() {
   if (staff.length) h += `<h2 class="sec">Encadrants et animateurs</h2><div class="list">${staff.map(row).join("")}</div>`;
   if (inactifs.length) h += `<h2 class="sec">Archers inactifs</h2><div class="list">${inactifs.map(row).join("")}</div>`;
   return h;
+}
+// Petite fenêtre de confirmation (les boîtes de dialogue du navigateur ne sont pas disponibles partout)
+function confirmSheet(title, body, okLabel, onOk, onCancel = () => {}) {
+  const el = $("#sheet");
+  el.innerHTML = `<div class="sheet-bg"><div class="sheet" role="alertdialog" aria-label="${esc(title)}"><h3>${esc(title)}</h3>${body}
+    <div class="acts"><button type="button" class="btn" id="cf-no">Annuler</button><button type="button" class="btn primary" id="cf-ok">${esc(okLabel)}</button></div></div></div>`;
+  const close = () => { el.innerHTML = ""; if (S.stale) { S.stale = false; render(); } };
+  $("#cf-no").onclick = () => { onCancel(); close(); };
+  $("#cf-ok").onclick = () => { close(); onOk(); };
+  setTimeout(() => $("#cf-ok")?.focus(), 30);
 }
 // Accès de l'archer (ou de ses parents) à son espace : invitation par code, retrait
 // Aperçu de l'espace archer : mêmes données que celles renvoyées à l'archer par la base (fonction espace_archer)
@@ -3773,8 +3792,17 @@ document.addEventListener("change", (e) => {
   const crs = e.target.dataset?.crs;
   if (crs && S.concoursId && S.canWrite) {
     const [aid, i, field] = crs.split("|"), v = e.target.value.trim();
-    setSeries(aid, (se) => { if (!se[i]) return false; se[i][field] = v; }); $("#sync").textContent = "Résultat enregistré";
-    if (field === "score" || field === "nbFleches") render();
+    const c = S.concours.find((x) => x.id === S.concoursId), old = String(seriesOf((c?.resultats || {})[aid] || {})[i]?.[field] ?? "").trim();
+    const apply = () => { setSeries(aid, (se) => { if (!se[i]) return false; se[i][field] = v; }); $("#sync").textContent = "Résultat enregistré"; if (field === "score" || field === "nbFleches") render(); };
+    // un score déjà saisi (à la main ou par l'import PDF) ne change qu'après confirmation
+    if (field === "score" && old !== "" && old !== v) {
+      const a = S.archers.find((x) => x.id === aid), inp = e.target;
+      confirmSheet("Modifier un score déjà enregistré ?", `<p class="notice">${esc(fullName(a || {}))} · ${esc(cTitle(c))}${seriesOf(c.resultats[aid]).length > 1 ? ` · distance n°${Number(i) + 1}` : ""}</p>
+        <div class="score" style="justify-content:center;gap:16px"><b style="color:var(--muted);text-decoration:line-through">${esc(old)}</b><span>→</span><b>${esc(v || "vide")}</b></div>`,
+        "Oui, modifier le score", apply, () => { inp.value = old; });
+      return;
+    }
+    apply();
     return;
   }
   const cr = e.target.dataset?.cr;
