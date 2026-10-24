@@ -5,6 +5,41 @@
   const VOL = [["paille", "Paille"], ["visuel", "Visuel"], ["blason", "Blason"], ["compte", "Tir compté"], ["compet", "Compét"], ["autre", "Autre"]];
   const EMOTIONS = ["Fierté", "Satisfaction", "Soulagement", "Espoir", "Tristesse", "Déception", "Honte", "Colère"];
   const TYPES = { salle: "Salle", exterieur: "Extérieur", ufolarc_court: "Ufolarc court", ufolarc_long: "Ufolarc long", safari: "Safari", campagne: "Campagne", "3d": "3D", nature: "Nature" };
+  // Grille d'évaluation technique (identique à celle de l'entraîneur)
+  const GRILLE = [
+    ["Posture", [
+      ["Pieds", ["Écartement dans l'alignement du bassin", "Parallèles à la ligne"]],
+      ["Jambes", ["Tendues et relâchées"]],
+      ["Bassin", ["Perpendiculaire à la ligne de tir"]],
+      ["Tronc", ["Gainé avec abaissement du sternum"]],
+      ["Épaules", ["Position basse, horizontales"]],
+      ["Tête", ["Dans le prolongement de la colonne, rotation sans inclinaison"]],
+      ["Axe vertical", ["Pieds, hanches, épaules alignés verticalement", "Le regard reste sur la cible du début à la fin", "Chercher à se grandir"]],
+      ["Bloc avant", ["Stable"]],
+    ]],
+    ["Placement avant", [
+      ["Prise d'arc", ["45°", "Gras du pouce qui épouse le grip", "Relâchement du poignet sur la main", "Utilisation d'une dragonne"]],
+      ["Bras d'arc", ["Tendu et relâché", "Coude tourné vers l'extérieur"]],
+    ]],
+    ["Placement arrière", [
+      ["Prise de corde", ["Franche à 3 doigts", "Dans le pli de la première phalange", "Main relâchée", "Dos de la main de corde plat", "Utilisation d'une palette"]],
+      ["Alignement", ["Main de corde / poignée / avant-bras", "Coude de corde dans le plan de l'arc"]],
+      ["Contact", ["Sous la mâchoire", "Corde sur le nez", "Contre le cou", "Tir régulier (6″ : 3″/3″)"]],
+    ]],
+    ["Mouvement", [
+      ["Orientation", ["Axe vertical", "Plan d'arc vertical"]],
+      ["Mise en tension", ["Du haut vers le bas, proche de la ligne des épaules", "Traction continue vers le visage", "Viseur dans le visuel à l'arrivée du contact visage", "Omoplate de l'épaule de corde en position basse", "Équilibre des forces"]],
+      ["Libération", ["Relâchement des fléchisseurs", "Dans le plan de l'arc", "Par une augmentation de l'effort des muscles du dos", "Maintien 2″ après le lâcher"]],
+      ["Timing", ["Rythme de tir soutenu et régulier : 2 min 30 / 6 flèches, 1 min 15 / 3 flèches"]],
+    ]],
+  ];
+  const PRIO = {
+    s0e0c0: "v", s0e0c1: "v", s0e1c0: "v", s0e2c0: "v", s0e3c0: "v", s0e4c0: "v", s0e5c0: "b", s0e6c0: "v", s0e6c1: "b", s0e6c2: "b", s0e7c0: "r",
+    s1e0c2: "r", s1e1c0: "r", s1e1c1: "r",
+    s2e0c0: "b", s2e0c1: "b", s2e0c2: "r", s2e1c1: "b", s2e2c3: "v",
+    s3e1c0: "b", s3e1c1: "b", s3e1c2: "v", s3e1c3: "r", s3e1c4: "r", s3e2c2: "v", s3e3c0: "b",
+  };
+  const NIV = ["À travailler", "En cours", "Acquis"];
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const dObj = (iso) => new Date(iso + "T12:00:00");
   const today = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
@@ -94,7 +129,8 @@
     const up = list.filter((c) => (c.dateFin || c.date) >= t).reverse(), past = list.filter((c) => (c.dateFin || c.date) < t);
     const row = (c) => { const r = c.resultat || {}; return `<div class="row"><span class="date"><span class="d">${dObj(c.date).getDate()}</span><span class="mo">${dObj(c.date).toLocaleDateString("fr-FR", { month: "short" }).replace(".", "")}</span></span>
       <span class="main"><span class="t">${esc(c.nom || c.lieu || "Concours")}</span><span class="m">${[(c.types || []).map((x) => TYPES[x] || x).join(", "), c.federation, r.distance ? r.distance + " m" : "", r.blason, r.place ? "place " + r.place : ""].filter(Boolean).map(esc).join(" · ")}</span></span>
-      <span class="count">${num(r.score) != null ? `${esc(r.score)}<small> pts</small>` : "<small>à venir</small>"}</span></div>`; };
+      <span class="count">${num(r.score) != null ? `${esc(r.score)}<small> pts</small>` : "<small>à venir</small>"}</span></div>
+      ${(c.classements || []).length ? `<div class="bar" style="margin:-4px 0 4px 66px;gap:6px">${c.classements.map((k) => `<a class="btn" href="_blob/${esc(k.assetId)}" target="_blank" rel="noopener">Classement PDF${c.classements.length > 1 ? " · " + esc(k.nom || "") : ""}</a>`).join("")}</div>` : ""}`; };
     let h = "";
     if (up.length) h += `<h2 class="sec">À venir</h2><div class="list">${up.map(row).join("")}</div>`;
     const seasons = [...new Set(past.map((c) => saisonOf(c.date)))];
@@ -114,14 +150,28 @@
   function vEvals() {
     const list = St.data.evaluations.slice().sort((a, b) => b.date.localeCompare(a.date));
     if (!list.length) return `<p class="notice">Aucune évaluation technique partagée pour l'instant.</p>`;
-    return `<div class="list">${list.map((e) => { const v = Object.values(e.notes || {}), ac = v.filter((x) => x === 2).length, ec = v.filter((x) => x === 1).length, na = v.filter((x) => x === 0).length;
-      return `<div class="card"><b>${esc(fmtLong(e.date))}</b><span class="legend"><span><i class="s-ac"></i>${ac} acquis</span><span><i class="s-ec"></i>${ec} en cours</span><span><i class="s-na"></i>${na} à travailler</span></span>${e.observation ? `<p class="prev">${esc(e.observation)}</p>` : ""}</div>`; }).join("")}</div>`;
+    const sel = list.find((e) => e.id === St.evalId) || list[0], prev = list.find((e) => e.date < sel.date);
+    const n = sel.notes || {}, pn = prev?.notes || {}, vals = Object.values(n);
+    const cnt = (x) => vals.filter((v) => v === x).length;
+    let h = list.length > 1 ? `<div class="chips" role="group" aria-label="Évaluation">${list.map((e) => `<button class="chip" data-eval="${esc(e.id)}" aria-pressed="${e.id === sel.id}">${esc(dObj(e.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }))}</button>`).join("")}</div>` : "";
+    h += `<div class="card"><b style="font-size:1.1rem">Évaluation du ${esc(fmtLong(sel.date))}</b>
+      <span class="legend"><span><i class="s-ac"></i>${cnt(2)} acquis</span><span><i class="s-ec"></i>${cnt(1)} en cours</span><span><i class="s-na"></i>${cnt(0)} à travailler</span></span>
+      ${prev ? `<span class="tirline">Les flèches comparent avec l'évaluation du ${esc(dObj(prev.date).toLocaleDateString("fr-FR"))}.</span>` : ""}
+      ${sel.observation ? `<div class="f">Le mot de ton entraîneur<p class="prev" style="color:var(--ink)">${esc(sel.observation)}</p></div>` : ""}</div>`;
+    h += GRILLE.map(([sec, els], i) => `<h2 class="sec">${esc(sec)}</h2><div class="card">${els.map(([el, cs], j) => `<div class="el"><h4>${esc(el)}</h4>${cs.map((c, k) => {
+      const key = `s${i}e${j}c${k}`, v = n[key], pv = pn[key], p = PRIO[key] || "n";
+      const evo = v == null || pv == null || v === pv ? "" : v > pv ? ' <b style="color:var(--ok)">▲</b>' : ' <b style="color:var(--danger)">▼</b>';
+      const badge = v == null ? `<span class="tag">non évalué</span>` : `<span class="tag" style="background:${v === 2 ? "color-mix(in srgb, var(--ok) 20%, transparent);color:var(--ok)" : v === 1 ? "color-mix(in srgb, var(--accent) 20%, transparent);color:var(--accent)" : "color-mix(in srgb, var(--danger) 18%, transparent);color:var(--danger)"}">${NIV[v]}</span>`;
+      return `<div class="crit p-${p}"><span class="lbl">${esc(c)}</span>${badge}${evo}</div>`;
+    }).join("")}</div>`).join("")}</div>`).join("");
+    return h;
   }
   // ---------- Événements ----------
   document.addEventListener("click", async (ev) => {
-    const t = ev.target.closest("[data-atab],[data-who],[data-act],[data-saison],[data-entry],#ar-out"); if (!t || t.closest("#sheet")) return;
+    const t = ev.target.closest("[data-atab],[data-who],[data-act],[data-saison],[data-entry],[data-eval],#ar-out"); if (!t || t.closest("#sheet")) return;
     if (t.id === "ar-out") return API.deconnexion();
     if (t.dataset.atab) { St.tab = t.dataset.atab; render(); return; }
+    if (t.dataset.eval) { St.evalId = t.dataset.eval; render(); return; }
     if (t.dataset.who) { St.cur = +t.dataset.who; load(); return; }
     if (t.dataset.saison) { St.saison += +t.dataset.saison; render(); return; }
     if (t.dataset.entry) { formEntry(St.data.entrees.find((e) => e.id === t.dataset.entry)); return; }
