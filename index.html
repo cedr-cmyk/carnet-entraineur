@@ -790,7 +790,7 @@ function render() {
   if (S.seance && S.quick) { v.innerHTML = viewQuick(); return; }
   if (S.seance && S.suivi) { v.innerHTML = viewSuivi(); return; }
   if (S.seance) { v.innerHTML = viewSeance(); return; }
-  if (S.archer) { v.innerHTML = viewArcher(); return; }
+  if (S.archer) { v.innerHTML = viewArcher(); if ($("#acc-box")) fillAcces(S.archer); return; }
   if (S.tab === "seances") { v.innerHTML = viewSeances(); if (S.clubs.length) { fab.hidden = false; fab.textContent = "+ Nouvelle séance"; fab.onclick = () => formSeance(); } }
   if (S.tab === "archers") { v.innerHTML = viewArchers(); if (S.clubs.length) { fab.hidden = false; fab.textContent = "+ Nouvel archer"; fab.onclick = () => formArcher(); } }
   if (S.tab === "clubs") { v.innerHTML = viewClubs(); fab.hidden = false; fab.textContent = "+ Nouveau club"; fab.onclick = () => formClub(); }
@@ -901,6 +901,7 @@ function attrItem(x, { pending = false } = {}) {
   return `<div class="attr ${x.fait ? "done" : ""}">
     <div class="bar" style="gap:8px">
       <label class="chk" title="Fait"><input type="checkbox" data-attr-fait="${x.id}" ${x.fait ? "checked" : ""} ${ro} aria-label="Exercice fait"><span>Fait</span></label>
+      ${window.carnetAcces ? `<label class="chk" title="Visible par l'archer"><input type="checkbox" data-attr-vis="${x.id}" ${x.visible ? "checked" : ""} ${ro} aria-label="Visible par l'archer"><span>Visible archer</span></label>` : ""}
       ${d ? `<button class="lnk" data-doc="${d.id}">${esc(d.titre || d.nomFichier)}</button>` : `<span class="tirline">Fiche supprimée</span>`}
       ${d && folderName(d.dossierId) ? `<span class="tag fed">${esc(folderName(d.dossierId))}</span>` : ""}
       <span class="grow"></span>
@@ -931,10 +932,10 @@ function pickAttr() {
   const body = (sess.length ? `<details class="pick" open><summary>Fiches de la séance <span class="tirline">${sess.length}</span></summary>${sess.map(line).join("")}</details>` : "")
     + block(null, "Exercices (racine)", false) + sorted.map((f) => block(f.id, folderPath(f.id).map((x) => x.nom).join(" › "), !sess.length && suggest.includes(f.id))).join("");
   sheet("Attribuer des fiches", (body || `<p class="notice">Ta bibliothèque est vide. Dépose d'abord tes fiches dans l'onglet Exercices.</p>`) +
-    `<label class="f" for="at-rem">Remarque (facultatif, pour toutes les fiches choisies)<textarea id="at-rem" name="remarque" placeholder="Ex. 3 séries de 6 flèches, garder le coude haut"></textarea></label>`, {
+    `<label class="f" for="at-rem">Remarque (facultatif, pour toutes les fiches choisies)<textarea id="at-rem" name="remarque" placeholder="Ex. 3 séries de 6 flèches, garder le coude haut"></textarea></label>${window.carnetAcces ? `<label class="chk" style="display:flex;gap:8px;align-items:center;border:0"><input type="checkbox" name="visible"> Visible par l'archer dans son espace</label>` : ""}`, {
     onSave(fd) {
       const ids = fd.getAll("doc").filter((id) => !have.has(id)); if (!ids.length) { toast("Choisis au moins une fiche"); return false; }
-      ids.forEach((documentId, i) => createAttr({ archerId: aid, documentId, seanceId: s.id, remarque: fd.get("remarque").trim() }, i));
+      ids.forEach((documentId, i) => createAttr({ archerId: aid, documentId, seanceId: s.id, remarque: fd.get("remarque").trim(), visible: !!fd.get("visible") }, i));
       toast(`${ids.length} fiche${ids.length > 1 ? "s" : ""} attribuée${ids.length > 1 ? "s" : ""}`); render();
     },
   });
@@ -954,13 +955,14 @@ function formAttrFromDoc(d) {
       ${l.map((a) => `<label><input type="checkbox" name="archer" value="${a.id}"> ${esc(fullName(a))}</label>`).join("")}</details>`).join("")}</div>
     <div class="f">Pour<div class="radio"><label><input type="radio" name="quand" value="next" checked> Sa prochaine séance</label><label><input type="radio" name="quand" value="none"> Sans date (à faire)</label></div></div>
     <label class="f" for="ad-rem">Remarque (facultatif)<textarea id="ad-rem" name="remarque" placeholder="Consigne ou point d'attention pour l'archer"></textarea></label>
+    ${window.carnetAcces ? `<label class="chk" style="display:flex;gap:8px;align-items:center;border:0"><input type="checkbox" name="visible"> Visible par l'archer dans son espace</label>` : ""}
     <span class="tirline" id="ad-hint">La fiche apparaîtra dans sa prochaine séance du club. S'il n'en a pas encore de prévue, elle restera « à faire » et s'affichera dans sa prochaine séance créée.</span>`, {
     onSave(fd) {
       const ids = [...new Set(fd.getAll("archer"))]; if (!ids.length) { toast("Choisis au moins un archer"); return false; }
       let planned = 0;
       ids.forEach((aid, i) => {
         const a = S.archers.find((x) => x.id === aid), nx = fd.get("quand") === "next" ? nextSeanceFor(a) : null; if (nx) planned++;
-        createAttr({ archerId: aid, documentId: d.id, seanceId: nx ? nx.id : null, remarque: fd.get("remarque").trim() }, i);
+        createAttr({ archerId: aid, documentId: d.id, seanceId: nx ? nx.id : null, remarque: fd.get("remarque").trim(), visible: !!fd.get("visible") }, i);
       });
       toast(`Fiche attribuée à ${ids.length} archer${ids.length > 1 ? "s" : ""}${fd.get("quand") === "next" && planned < ids.length ? ` (${ids.length - planned} sans séance prévue : en attente)` : ""}`);
       render();
@@ -1075,7 +1077,7 @@ function viewEval() {
   const inLvl = (p, l) => PRANK[p] <= l;
   const show = (key) => inLvl(PRIO[key] || "n", fil);
   const chips = `<span class="tirline"><span class="dot pdot-v" style="display:inline-block"></span> priorité 1 · <span class="dot pdot-b" style="display:inline-block"></span> priorité 2 · <span class="dot pdot-r" style="display:inline-block"></span> priorité 3 · en noir : à tout niveau, toujours affichés</span>`;
-  return `<div class="bar"><button class="btn ghost" data-act="back">← Retour</button><span class="grow"></span></div>
+  return `<div class="bar"><button class="btn ghost" data-act="back">← Retour</button><span class="grow"></span>${window.carnetAcces && S.canWrite ? `<button class="btn ${ev.partage ? "primary" : ""}" data-act="eval-share">${ev.partage ? "Partagée avec l'archer ✓" : "Partager avec l'archer"}</button>` : ""}</div>
     <div class="head"><span class="m">Évaluation technique${ev.clubId ? " · " + esc(clubName(ev.clubId)) : ""}</span><h2>${esc(a ? fullName(a) : "Archer supprimé")}</h2></div>
     <div class="card"><div class="grid2"><label class="f" for="eval-date">Date de l'évaluation<input type="date" id="eval-date" value="${esc(ev.date)}" ${S.canWrite ? "" : "readonly"}></label>
       <div style="display:grid;gap:6px;align-content:end">${sbar(st)}${legend(st)}</div></div>
@@ -1645,7 +1647,7 @@ function viewCarnet() {
       const at = e.atteint === "O" ? `<span class="tag" style="background:var(--ok-soft);color:var(--ok)">Objectif atteint</span>` : e.atteint === "N" ? `<span class="tag" style="background:var(--sunk)">Non atteint</span>` : "";
       return `<button class="row" data-centry="${e.id}"><span class="date"><span class="d">${dObj(e.date).getDate()}</span><span class="mo">${dObj(e.date).toLocaleDateString("fr-FR", { weekday: "short" }).replace(".", "")}</span></span>
         <span class="main"><span class="t">${esc(e.objectif || "Séance")} ${at}</span>
-        <span class="tirline">${[e.seanceId ? "séance du club" : e.concoursId ? "concours" : "", entVol(e) ? `${entVol(e)} flèches` : "", scoreOf(e, "scoreCompte") != null ? `tir compté ${scoreOf(e, "scoreCompte")}` : "", scoreOf(e, "scoreCompet") != null ? `compét. ${scoreOf(e, "scoreCompet")}` : "", e.emotion || ""].filter(Boolean).join(" · ")}</span>
+        <span class="tirline">${[e.saisiParArcher ? "noté par l'archer" : "", e.seanceId ? "séance du club" : e.concoursId ? "concours" : "", entVol(e) ? `${entVol(e)} flèches` : "", scoreOf(e, "scoreCompte") != null ? `tir compté ${scoreOf(e, "scoreCompte")}` : "", scoreOf(e, "scoreCompet") != null ? `compét. ${scoreOf(e, "scoreCompet")}` : "", e.emotion || ""].filter(Boolean).join(" · ")}</span>
         ${e.commentaire ? `<span class="m">${esc(e.commentaire.slice(0, 110))}${e.commentaire.length > 110 ? "…" : ""}</span>` : ""}</span>
         <span class="count">${num(e.note) != null ? `${e.note}<small>/10</small>` : ""}</span></button>`;
     }).join("")}</div>` : `<p class="notice">Aucune séance notée en ${MOIS_NOM[m].toLowerCase()}. « + Séance » ajoute une ligne du carnet ; tu peux la préremplir depuis une séance du club.</p>`}
@@ -2626,6 +2628,21 @@ function viewArchers() {
   if (inactifs.length) h += `<h2 class="sec">Archers inactifs</h2><div class="list">${inactifs.map(row).join("")}</div>`;
   return h;
 }
+// Accès de l'archer (ou de ses parents) à son espace : invitation par code, retrait
+let accCache = null;
+async function fillAcces(aid, force = false) {
+  const box = $("#acc-box"); if (!box || !window.carnetAcces) return;
+  if (!force && accCache && accCache.aid === aid) { box.innerHTML = accCache.html; return; }
+  let r; try { r = await window.carnetAcces.liste(aid); } catch (e) { box.innerHTML = `<span class="tirline">Accès indisponibles (vérifie que le script « accès des archers » a été exécuté dans Supabase).</span>`; return; }
+  if (!$("#acc-box") || S.archer !== aid) return;
+  const a = S.archers.find((x) => x.id === aid), mineur = ageSaison(a || {}) != null && ageSaison(a) < 18;
+  $("#acc-box").innerHTML = `<span class="tirline">Dans son espace, ${esc(a?.prenom || "l'archer")} voit seulement son carnet (qu'il peut remplir), ses concours, les fiches que tu rends « visibles » et les évaluations que tu partages.${mineur ? " Archer mineur : donne le code à un parent, qui créera le compte avec son e-mail." : ""}</span>
+    ${r.acces.length ? `<div class="list">${r.acces.map((x) => `<div class="row"><span class="main"><span class="t">${esc(x.email)}</span><span class="m">accès depuis le ${esc(new Date(x.depuis).toLocaleDateString("fr-FR"))}</span></span><button class="btn ghost" data-acc-del="${esc(x.user_id)}">Retirer</button></div>`).join("")}</div>` : `<span class="tirline">Personne n'a encore accès à son espace.</span>`}
+    ${r.codes.length ? `<div class="f">Code${r.codes.length > 1 ? "s" : ""} en attente (valable une fois)${r.codes.map((c) => `<b style="font-size:1.5rem;letter-spacing:.18em;font-family:var(--font-mono)">${esc(c.code)}</b>`).join("")}</div>` : ""}
+    <div class="bar"><button class="btn primary" data-act="acc-invite">Créer un code d'invitation</button>${r.acces.length || r.codes.length ? `<button class="btn danger" data-act="acc-all">Tout retirer</button>` : ""}</div>
+    <span class="tirline">À donner avec l'adresse de l'appli : ${esc(location.origin + location.pathname)}. La personne crée son compte, puis tape le code.</span>`;
+  accCache = { aid, html: $("#acc-box").innerHTML };
+}
 function viewArcher() {
   const a = S.archers.find((x) => x.id === S.archer);
   if (!a) { S.archer = null; return viewArchers(); }
@@ -2650,6 +2667,7 @@ function viewArcher() {
       }).join("")}</div>`;
     })()}
     ${(() => { const ms = pretsOf(a.id); return ms.length ? `<div class="notice" style="font-family:var(--font-body)">Matériel prêté : ${ms.map((m) => `${esc(matShort(m))} (${[tailleTxt(m), m.puissance ? m.puissance + " lbs" : "", m.modele, clubName(m.clubId)].filter(Boolean).map(esc).join(", ")})`).join(" · ")}</div>` : ""; })()}
+    ${window.carnetAcces && S.canWrite ? `<h2 class="sec">Espace de l'archer</h2><div class="card" id="acc-box"><span class="tirline">Chargement des accès…</span></div>` : ""}
     ${equipCard(a)}
     ${archerConcours(a)}
     ${progressScores(a)}
@@ -3382,7 +3400,7 @@ function formSeance(s = null) {
 
 // ---------- Événements ----------
 document.addEventListener("click", (e) => {
-  const t = e.target.closest("[data-tab],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab]");
+  const t = e.target.closest("[data-tab],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del]");
   if (!t || t.closest("#sheet")) return;
   if (t.dataset.dashSuivi) { const [sid, aid] = t.dataset.dashSuivi.split("|"); S.seance = sid; S.suivi = aid; S.tirOpen = null; render(); window.scrollTo(0, 0); return; }
   if (t.dataset.tab) { go(t.dataset.tab); try { history.replaceState(null, "", "#" + t.dataset.tab); } catch (_) {} return; }
@@ -3447,7 +3465,11 @@ document.addEventListener("click", (e) => {
   if (t.dataset.pf) { S.evalFilter = t.dataset.pf; render(); return; }
   if (t.dataset.crit) { setCrit(t.dataset.crit, Number(t.dataset.v)); return; }
   if (t.dataset.eval) { openEval(t.dataset.eval); return; }
+  if (t.dataset.act === "acc-invite" && window.carnetAcces) { window.carnetAcces.inviter(S.archer).then(() => fillAcces(S.archer, true)).catch((e) => toast(e.message)); return; }
+  if (t.dataset.act === "acc-all" && window.carnetAcces) { if (!t.dataset.confirm) { t.dataset.confirm = 1; t.textContent = "Confirmer : tout retirer"; return; } window.carnetAcces.retirer(null, S.archer).then(() => { toast("Accès retirés"); fillAcces(S.archer, true); }).catch((e) => toast(e.message)); return; }
+  if (t.dataset.accDel && window.carnetAcces) { if (!t.dataset.confirm) { t.dataset.confirm = 1; t.textContent = "Confirmer"; return; } window.carnetAcces.retirer(t.dataset.accDel, S.archer).then(() => { toast("Accès retiré"); fillAcces(S.archer, true); }).catch((e) => toast(e.message)); return; }
   if (t.dataset.act === "new-eval") { newEval(); return; }
+  if (t.dataset.act === "eval-share") { const ev = S.evaluations.find((x) => x.id === S.evaluation); if (ev) { ev.partage = !ev.partage; patch("evaluations", ev.id, { partage: ev.partage }); toast(ev.partage ? "Évaluation visible dans l'espace de l'archer" : "Évaluation retirée de son espace"); render(); } return; }
   if (t.dataset.act === "open-carnet") { openCarnet(S.archer); return; }
   if (t.dataset.act === "open-carnet-from-suivi") {
     const s = S.seances.find((x) => x.id === S.seance), aid = S.suivi; if (!s) return;
@@ -3568,6 +3590,10 @@ document.addEventListener("change", (e) => {
     const s = S.seances.find((x) => x.id === S.seance); if (!s) return;
     const set = new Set(s.presents || []); e.target.checked ? set.add(qp) : set.delete(qp);
     s.presents = [...set]; patch("seances", s.id, { presents: s.presents }); e.target.closest("tr")?.classList.toggle("absent", !e.target.checked); return;
+  }
+  if (e.target.dataset?.attrVis) {
+    const x = S.attributions.find((y) => y.id === e.target.dataset.attrVis); if (!x || !S.canWrite) return;
+    x.visible = e.target.checked; patch("attributions", x.id, { visible: x.visible }); toast(x.visible ? "Fiche visible dans l'espace de l'archer" : "Fiche masquée pour l'archer"); return;
   }
   if (e.target.dataset?.attrFait) {
     const x = S.attributions.find((y) => y.id === e.target.dataset.attrFait); if (!x || !S.canWrite) return;

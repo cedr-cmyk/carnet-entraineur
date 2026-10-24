@@ -146,9 +146,10 @@
     async delete(id) { const r = await bucket().remove([`${session.user.id}/${id}`]); if (r.error) throw r.error; return { deleted: true }; },
   };
   // Le service worker sert les fichiers à l'adresse _blob/<id> : on lui transmet la clé de session
+  let filesOwner = null; // dossier des fichiers : celui de l'entraîneur (pour un archer, celui de son entraîneur)
   function tellSW() {
     if (!navigator.serviceWorker?.controller || !session || session.offline) return;
-    navigator.serviceWorker.controller.postMessage({ type: "auth", url: CFG.supabaseUrl, key: CFG.supabaseAnonKey, token: session.access_token, uid: session.user.id });
+    navigator.serviceWorker.controller.postMessage({ type: "auth", url: CFG.supabaseUrl, key: CFG.supabaseAnonKey, token: session.access_token, uid: filesOwner || session.user.id });
   }
   navigator.serviceWorker?.addEventListener("message", (e) => { if (e.data?.type === "need-auth") tellSW(); });
 
@@ -162,17 +163,68 @@
   };
   const user = { can: async () => true, isOwner: () => true, canEdit: () => true };
 
+  // ---------- Accès des archers (côté entraîneur) ----------
+  const rpc = async (fn, args) => { const r = await sb.rpc(fn, args); if (r.error) throw new Error(r.error.message); return r.data; };
+  window.carnetAcces = {
+    inviter: (archerId) => rpc("creer_invitation", { p_archer: archerId }),
+    liste: (archerId) => rpc("acces_archer", { p_archer: archerId }),
+    retirer: (userId, archerId) => rpc("retirer_acces", { p_user: userId, p_archer: archerId }),
+  };
+
+  // ---------- Espace archer ----------
+  async function codeScreen(msg = "") {
+    await domReady();
+    return new Promise((resolve) => {
+      const el = document.createElement("div"); el.id = "login";
+      el.innerHTML = `<form class="sheet" style="position:fixed;inset:auto 0 0 0;margin:auto;top:0;height:fit-content;max-width:420px;border-radius:24px;z-index:50">
+        <h3>Ton espace archer</h3>
+        <p class="notice">Tape le code d'invitation donné par ton entraîneur.${msg ? "<br><b>" + msg + "</b>" : ""}</p>
+        <label class="f">Code d'invitation<input type="text" name="code" required autocomplete="off" style="text-transform:uppercase;letter-spacing:.15em;font-size:1.3rem"></label>
+        <div class="acts"><button type="button" class="btn" id="cd-out">Se déconnecter</button><button class="btn primary">Valider</button></div>
+        <span class="tirline" id="cd-msg"></span></form>`;
+      document.body.appendChild(el);
+      const f = el.querySelector("form"), m = el.querySelector("#cd-msg");
+      el.querySelector("#cd-out").onclick = () => window.carnetLogout();
+      f.addEventListener("submit", async (e) => {
+        e.preventDefault(); m.textContent = "…";
+        try { await rpc("utiliser_invitation", { p_code: f.code.value }); el.remove(); resolve(); }
+        catch (err) { m.textContent = /invalide/.test(err.message) ? "Code invalide ou déjà utilisé" : err.message; }
+      });
+    });
+  }
+  async function archerMode() {
+    let list = await rpc("mes_acces");
+    if (!list.length) { await codeScreen(); list = await rpc("mes_acces"); }
+    await domReady();
+    window.carnetArcherAPI = {
+      list,
+      charger: (a) => rpc("espace_archer", { p_owner: a.owner, p_archer: a.archer_id }),
+      ecrire: (a, id, data) => rpc("archer_ecrire_entree", { p_owner: a.owner, p_archer: a.archer_id, p_id: id, p_data: data }),
+      supprimer: (a, id) => rpc("archer_supprimer_entree", { p_owner: a.owner, p_archer: a.archer_id, p_id: id }),
+      fichiers: (a) => { filesOwner = a.owner; tellSW(); },
+      ajouterCode: async (code) => { await rpc("utiliser_invitation", { p_code: code }); return rpc("mes_acces"); },
+      deconnexion: () => window.carnetLogout(),
+    };
+    const sc = document.createElement("script"); sc.src = "archer.js"; document.body.appendChild(sc);
+    return new Promise(() => {}); // l'application de l'entraîneur ne démarre pas
+  }
+
   // ---------- Démarrage ----------
   const ready = (async () => {
     session = await ensureSession();
     ls.set("uid", session.user.id);
+    if (!session.offline) {
+      let coach = ls.get("coach", null);
+      try { coach = await rpc("est_coach"); ls.set("coach", coach); } catch (e) { console.warn(e); }
+      if (coach === false) { sb.auth.onAuthStateChange((_e, s) => { if (s) { session = s; tellSW(); } }); return archerMode(); }
+    } else if (ls.get("coach", true) === false) { await domReady(); document.body.innerHTML = '<p class="notice" style="margin:20px">Ton espace archer a besoin d\'une connexion internet.</p>'; return new Promise(() => {}); }
     if (!session.offline) {
       sb.auth.onAuthStateChange((_e, s) => { if (s) { session = s; tellSW(); } });
       tellSW();
       try { await flush(); await pull(); realtime(); } catch (e) { console.warn("hors connexion : copie locale", e); online = false; }
     }
   })();
-  window.carnetLogout = async () => { await sb.auth.signOut(); localStorage.removeItem(LSK("cache")); localStorage.removeItem(LSK("uid")); location.reload(); };
+  window.carnetLogout = async () => { try { await flush(); } catch (e) {} if (Object.keys(pending).length && !confirm("Des modifications ne sont pas encore envoyées (pas de réseau). Se déconnecter quand même ?")) return; await sb.auth.signOut(); ["cache", "uid", "coach", "pending"].forEach((k) => localStorage.removeItem(LSK(k))); location.reload(); };
   window.claude = {
     use: async (name) => {
       await ready;
