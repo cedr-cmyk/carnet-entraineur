@@ -2996,23 +2996,60 @@ function espaceArchersCard(inC) {
         : `<p class="notice">Aucun entraînement proposé. Dans une séance (ou en créant les séances du mois), choisis « Proposée aux » adultes, jeunes ou les deux : les archers concernés pourront dire s'ils viennent.</p>`}</div>
   </div>`;
 }
+// Modèles d'infos : les passages entre [crochets] sont à compléter
+const INFO_MODELES = [
+  { nom: "Organisation du concours", titre: "Organisation de notre concours le [date]", texte: "Le club organise son concours le [date] à [lieu].\nNous avons besoin de bénévoles pour l'installation ([jour et heure]), le greffe, la buvette et le rangement.\nDites-moi vos disponibilités, même pour une heure. Merci !", important: true },
+  { nom: "Pas d'entraînement", titre: "Pas d'entraînement le [date]", texte: "Il n'y aura pas d'entraînement le [date] ([raison : gymnase indisponible, jour férié, vacances…]).\nReprise le [date de reprise] aux horaires habituels.", important: true },
+  { nom: "Changement d'horaire ou de lieu", titre: "Changement pour l'entraînement du [date]", texte: "Exceptionnellement, l'entraînement du [date] aura lieu de [heure] à [heure] à [lieu].", important: true },
+  { nom: "Inscriptions à un concours", titre: "Inscriptions au concours de [lieu]", texte: "Les inscriptions au concours de [lieu] du [date] sont ouvertes jusqu'au [date limite].\nPréviens-moi si tu veux y participer, avec ton arc et ta distance.", important: false },
+  { nom: "Licences", titre: "Renouvellement des licences", texte: "Pense à renouveler ta licence pour la saison [saison] avant le [date].\nDocuments à fournir : [questionnaire de santé ou certificat médical, autorisation parentale…].", important: false },
+  { nom: "Matériel à rendre", titre: "Retour du matériel du club", texte: "Merci de rapporter le matériel prêté par le club (arc, flèches, carquois, protections) avant le [date].", important: false },
+  { nom: "Réunion du club", titre: "[Assemblée générale / réunion] du club", texte: "Rendez-vous le [date] à [heure] à [lieu].\nOrdre du jour : [points abordés].\nVotre présence compte !", important: false },
+];
+const mesModeles = () => (Array.isArray(prm().infoModeles) ? prm().infoModeles : []);
 function formAnnonce(n = null) {
   const ids = n?.clubIds || (S.club !== "all" ? [S.club] : []);
+  const mods = [...INFO_MODELES.map((m, i) => ["d" + i, m]), ...mesModeles().map((m, i) => ["m" + i, m])];
   sheet(n ? "Modifier l'info" : "Nouvelle info pour les archers", `
+    ${n ? "" : `<div class="f">Partir d'un modèle<div class="chips" id="an-mods">${mods.map(([k, m]) => `<button type="button" class="chip" data-mod="${k}">${esc(m.nom)}</button>`).join("")}</div>
+      <span class="tirline" id="an-hint">Complète ensuite les passages entre [crochets].</span></div>`}
     <label class="f" for="an-t">Titre<input type="text" id="an-t" name="titre" required value="${esc(n?.titre)}" placeholder="Ex. Concours du club le 15 novembre"></label>
     <label class="f" for="an-x">Message<textarea id="an-x" name="texte" placeholder="Ex. Nous cherchons des bénévoles pour l'installation le samedi matin.">${esc(n?.texte)}</textarea></label>
     <div class="f">Clubs concernés<div class="checks">${S.clubs.map((c) => `<label><input type="checkbox" name="club" value="${c.id}" ${ids.includes(c.id) ? "checked" : ""}>${esc(c.nom)}</label>`).join("")}</div><span class="tirline">Aucun club coché : l'info s'affiche dans tous les clubs.</span></div>
     <div class="grid2"><label class="f" for="an-j">Afficher jusqu'au (facultatif)<input type="date" id="an-j" name="jusquau" value="${esc(n?.jusquau)}"></label>
-      <div class="f">Mise en avant<div class="checks"><label><input type="checkbox" name="important" ${n?.important ? "checked" : ""}>Important</label></div></div></div>`, {
+      <div class="f">Mise en avant<div class="checks"><label><input type="checkbox" name="important" ${n?.important ? "checked" : ""}>Important</label></div></div></div>
+    <div class="bar"><button type="button" class="btn ghost" id="an-save-mod">Enregistrer comme modèle</button>${mesModeles().length ? `<button type="button" class="btn ghost" id="an-del-mod">Gérer mes modèles</button>` : ""}</div>`, {
     onSave(fd) {
       const titre = fd.get("titre").trim(); if (!titre) { toast("Donne un titre à l'info"); return false; }
+      const reste = /\[[^\]]+\]/.test(titre + " " + fd.get("texte"));
+      if (reste && !$("#an-t").dataset.ok) { $("#an-t").dataset.ok = 1; toast("Il reste des passages entre [crochets] à compléter. Enregistre à nouveau pour publier quand même."); return false; }
       const id = n?.id || newId("annonces");
       save("annonces", id, { titre, texte: fd.get("texte").trim(), clubIds: fd.getAll("club"), jusquau: fd.get("jusquau") || "", important: !!fd.get("important"), date: n?.date || todayISO(), createdAt: n?.createdAt || Date.now() });
       toast(n ? "Info enregistrée" : "Info publiée pour les archers"); render();
     },
     onDelete: n ? () => { remove("annonces", n.id); toast("Info supprimée"); render(); } : null, deleteLabel: "Supprimer l'info",
   });
+  const mod = (k) => (k[0] === "d" ? INFO_MODELES : mesModeles())[+k.slice(1)];
+  const chipsHtml = () => [...INFO_MODELES.map((m, i) => ["d" + i, m]), ...mesModeles().map((m, i) => ["m" + i, m])].map(([k, m]) => `<button type="button" class="chip" data-mod="${k}">${esc(m.nom)}</button>`).join("");
+  $("#an-mods")?.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-mod]"); if (!b) return; const m = mod(b.dataset.mod); if (!m) return;
+    $("#an-t").value = m.titre || ""; $("#an-x").value = m.texte || ""; $("#sheet-form").important.checked = !!m.important;
+    document.querySelectorAll("#an-mods .chip").forEach((c) => c.setAttribute("aria-pressed", c === b));
+    const t = $("#an-t"), i = t.value.indexOf("["); t.focus(); if (i >= 0) t.setSelectionRange(i, t.value.indexOf("]", i) + 1);
+  });
+  $("#an-save-mod").addEventListener("click", () => {
+    const titre = $("#an-t").value.trim(), texte = $("#an-x").value.trim(); if (!titre && !texte) { toast("Écris d'abord l'info à garder comme modèle"); return; }
+    const nom = (prompt("Nom du modèle", titre.slice(0, 40)) || "").trim(); if (!nom) return;
+    setParam({ infoModeles: [...mesModeles().filter((m) => m.nom !== nom), { nom, titre, texte, important: $("#sheet-form").important.checked }] }); if ($("#an-mods")) $("#an-mods").innerHTML = chipsHtml(); toast(`Modèle « ${nom} » enregistré`);
+  });
+  $("#an-del-mod")?.addEventListener("click", () => {
+    const box = $("#an-del-mod").parentElement;
+    const list = () => { box.innerHTML = mesModeles().length ? `<div class="f">Mes modèles (touche pour supprimer)<div class="chips">${mesModeles().map((m, i) => `<button type="button" class="chip" data-delmod="${i}">${esc(m.nom)} ×</button>`).join("")}</div></div>` : `<span class="tirline">Plus aucun modèle personnel.</span>`; };
+    list();
+    box.addEventListener("click", (e) => { const c = e.target.closest("[data-delmod]"); if (!c) return; const l = mesModeles().slice(); const [m] = l.splice(+c.dataset.delmod, 1); setParam({ infoModeles: l }); list(); if ($("#an-mods")) $("#an-mods").innerHTML = chipsHtml(); toast(`Modèle « ${m.nom} » supprimé`); });
+  });
 }
+
 function formPartage(d = null) {
   const ids = d?.partageClubs || [];
   const choix = S.documents.slice().sort((a, b) => (a.titre || a.nomFichier || "").localeCompare(b.titre || b.nomFichier || "", "fr"));
