@@ -205,7 +205,7 @@
       ajouterCode: async (code) => { await rpc("utiliser_invitation", { p_code: code }); return rpc("mes_acces"); },
       deconnexion: () => window.carnetLogout(),
     };
-    const sc = document.createElement("script"); sc.src = "archer.js"; document.body.appendChild(sc);
+    window.CarnetArcherUI(window.carnetArcherAPI);
     return new Promise(() => {}); // l'application de l'entraîneur ne démarre pas
   }
 

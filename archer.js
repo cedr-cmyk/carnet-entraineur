@@ -1,7 +1,8 @@
 // Espace archer : l'archer (ou son parent) voit uniquement ses propres informations,
 // telles que les renvoie la base (fonction espace_archer), et remplit son carnet.
-(() => {
-  const API = window.carnetArcherAPI;
+// window.CarnetArcherUI(API, { preview }) : preview = aperçu ouvert par l'entraîneur, en lecture seule.
+window.CarnetArcherUI = (API, opts = {}) => {
+  const PREVIEW = !!opts.preview, BLOB = window.CARNET_BLOB_BASE || "/_blob/";
   const VOL = [["paille", "Paille"], ["visuel", "Visuel"], ["blason", "Blason"], ["compte", "Tir compté"], ["compet", "Compét"], ["autre", "Autre"]];
   const EMOTIONS = ["Fierté", "Satisfaction", "Soulagement", "Espoir", "Tristesse", "Déception", "Honte", "Colère"];
   const TYPES = { salle: "Salle", exterieur: "Extérieur", ufolarc_court: "Ufolarc court", ufolarc_long: "Ufolarc long", safari: "Safari", campagne: "Campagne", "3d": "3D", nature: "Nature" };
@@ -55,12 +56,12 @@
   const who = () => St.list[St.cur];
   const name = (a) => `${a.prenom || ""} ${a.nom || ""}`.trim() || "Archer";
 
-  // On remplace l'interface de l'entraîneur par l'espace archer
-  document.querySelector("header.top")?.setAttribute("hidden", "");
-  document.querySelector("#fab")?.setAttribute("hidden", "");
-  const main = document.querySelector("main");
-  const top = document.createElement("header"); top.className = "top"; document.body.insertBefore(top, main);
-  const view = $("#view");
+  // Espace archer : remplace l'interface de l'entraîneur ; aperçu : s'ouvre par-dessus, en plein écran
+  const root = document.createElement("div"); root.className = "ar-root" + (PREVIEW ? " ar-preview" : "");
+  root.innerHTML = `${PREVIEW ? `<div class="test-band ar-band" role="note">Aperçu : voici exactement ce que voit l'archer dans son espace (lecture seule) <button class="btn" data-act="close-preview">Fermer l'aperçu</button></div>` : ""}<header class="top"></header><main><div class="wrap"></div></main>`;
+  if (!PREVIEW) { document.querySelector("header.top")?.setAttribute("hidden", ""); document.querySelector("#fab")?.setAttribute("hidden", ""); document.querySelector("main")?.setAttribute("hidden", ""); }
+  document.body.appendChild(root);
+  const top = root.querySelector("header.top"), view = root.querySelector(".wrap");
 
   async function load() {
     St.err = ""; St.data = null; render();
@@ -71,13 +72,14 @@
   function header() {
     const tabs = [["carnet", "Mon carnet"], ["concours", "Mes concours"], ["exercices", "Mes exercices"], ["evaluations", "Évaluations"]];
     top.innerHTML = `<div class="top-in"><div class="brand"><span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/></svg></span>
-      <h1>Espace <em>${esc(St.data?.archer ? name(St.data.archer) : name(who()))}</em></h1><span class="sub"><button class="btn ghost" id="ar-out">Se déconnecter</button></span></div>
+      <h1>Espace <em>${esc(St.data?.archer ? name(St.data.archer) : name(who()))}</em></h1><span class="sub">${PREVIEW ? "" : `<button class="btn ghost" id="ar-out">Se déconnecter</button>`}</span></div>
       <nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" aria-selected="${St.tab === k}" data-atab="${k}">${l}</button>`).join("")}</nav></div>`;
   }
   function render() {
     header();
     let h = "";
-    if (St.list.length > 1) h += `<div class="chips" role="group" aria-label="Archer">${St.list.map((a, i) => `<button class="chip" data-who="${i}" aria-pressed="${i === St.cur}">${esc(name(a))}</button>`).join("")}<button class="chip" data-act="add-code">+ Code</button></div>`;
+    if (PREVIEW) h += "";
+    else if (St.list.length > 1) h += `<div class="chips" role="group" aria-label="Archer">${St.list.map((a, i) => `<button class="chip" data-who="${i}" aria-pressed="${i === St.cur}">${esc(name(a))}</button>`).join("")}<button class="chip" data-act="add-code">+ Code</button></div>`;
     else h += `<div class="bar"><span class="grow"></span><button class="btn ghost" data-act="add-code">J'ai un autre code (frère, sœur…)</button></div>`;
     if (St.err) h += `<p class="notice">${esc(St.err)}</p><button class="btn" data-act="reload">Réessayer</button>`;
     else if (!St.data) h += `<p class="notice">Chargement…</p>`;
@@ -115,7 +117,8 @@
     const del = $("#ar-del");
     if (del) del.onclick = async () => { if (!del.dataset.ok) { del.dataset.ok = 1; del.textContent = "Confirmer"; return; } try { await API.supprimer(who(), e.id); el.innerHTML = ""; toast("Séance supprimée"); load(); } catch (err) { toast(err.message); } };
     $("#ar-form").addEventListener("submit", async (ev) => {
-      ev.preventDefault(); const fd = new FormData(ev.target), date = fd.get("date"); if (!date) return;
+      ev.preventDefault();
+      if (PREVIEW) { toast("Aperçu : l'archer pourra enregistrer ici, pas toi"); return; } const fd = new FormData(ev.target), date = fd.get("date"); if (!date) return;
       const data = { date, saison: `${saisonOf(date) - 1}-${saisonOf(date)}` };
       ["objectif", "atteint", "note", "emotion", "commentaire", "scoreCompte", "scoreCompet", ...VOL.map(([k]) => k)].forEach((k) => (data[k] = String(fd.get(k) ?? "").trim()));
       const id = e?.id || "a_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -130,7 +133,7 @@
     const row = (c) => { const r = c.resultat || {}; return `<div class="row"><span class="date"><span class="d">${dObj(c.date).getDate()}</span><span class="mo">${dObj(c.date).toLocaleDateString("fr-FR", { month: "short" }).replace(".", "")}</span></span>
       <span class="main"><span class="t">${esc(c.nom || c.lieu || "Concours")}</span><span class="m">${[(c.types || []).map((x) => TYPES[x] || x).join(", "), c.federation, r.distance ? r.distance + " m" : "", r.blason, r.place ? "place " + r.place : ""].filter(Boolean).map(esc).join(" · ")}</span></span>
       <span class="count">${num(r.score) != null ? `${esc(r.score)}<small> pts</small>` : "<small>à venir</small>"}</span></div>
-      ${(c.classements || []).length ? `<div class="bar" style="margin:-4px 0 4px 66px;gap:6px">${c.classements.map((k) => `<a class="btn" href="_blob/${esc(k.assetId)}" target="_blank" rel="noopener">Classement PDF${c.classements.length > 1 ? " · " + esc(k.nom || "") : ""}</a>`).join("")}</div>` : ""}`; };
+      ${(c.classements || []).length ? `<div class="bar" style="margin:-4px 0 4px 66px;gap:6px">${c.classements.map((k) => `<a class="btn" href="${BLOB}${esc(k.assetId)}" target="_blank" rel="noopener">Classement PDF${c.classements.length > 1 ? " · " + esc(k.nom || "") : ""}</a>`).join("")}</div>` : ""}`; };
     let h = "";
     if (up.length) h += `<h2 class="sec">À venir</h2><div class="list">${up.map(row).join("")}</div>`;
     const seasons = [...new Set(past.map((c) => saisonOf(c.date)))];
@@ -144,7 +147,7 @@
     return `<div class="list">${list.map((x) => { const d = x.document;
       return `<div class="row"><span class="thumb">${d && (d.contentType || "").startsWith("image/") ? "IMG" : "PDF"}</span><span class="main"><span class="t">${esc(d ? d.titre || d.nomFichier : "Fiche retirée")}${x.fait ? ' <span class="tag">fait</span>' : ""}</span>
         <span class="m">${[x.date ? "pour le " + fmtLong(x.date) : "", x.remarque].filter(Boolean).map(esc).join(" · ")}</span>${d?.description ? `<span class="m">${esc(d.description.slice(0, 140))}</span>` : ""}</span>
-        ${d ? `<a class="btn" href="_blob/${esc(d.assetId)}" target="_blank" rel="noopener">Ouvrir</a>` : ""}</div>`; }).join("")}</div>`;
+        ${d ? `<a class="btn" href="${BLOB}${esc(d.assetId)}" target="_blank" rel="noopener">Ouvrir</a>` : ""}</div>`; }).join("")}</div>`;
   }
   // ---------- Évaluations ----------
   function vEvals() {
@@ -167,8 +170,10 @@
     return h;
   }
   // ---------- Événements ----------
-  document.addEventListener("click", async (ev) => {
-    const t = ev.target.closest("[data-atab],[data-who],[data-act],[data-saison],[data-entry],[data-eval],#ar-out"); if (!t || t.closest("#sheet")) return;
+  root.addEventListener("click", async (ev) => {
+    const t = ev.target.closest("[data-atab],[data-who],[data-act],[data-saison],[data-entry],[data-eval],#ar-out"); if (!t) return;
+    ev.stopPropagation();
+    if (t.dataset.act === "close-preview") { root.remove(); return; }
     if (t.id === "ar-out") return API.deconnexion();
     if (t.dataset.atab) { St.tab = t.dataset.atab; render(); return; }
     if (t.dataset.eval) { St.evalId = t.dataset.eval; render(); return; }
@@ -181,6 +186,7 @@
       const code = prompt("Code d'invitation (pour suivre un autre archer)"); if (!code) return;
       try { St.list = await API.ajouterCode(code); St.cur = St.list.length - 1; load(); } catch (e) { toast("Code invalide ou déjà utilisé"); }
     }
-  }, true);
+  });
   load();
-})();
+};
+if (window.carnetArcherAPI) window.CarnetArcherUI(window.carnetArcherAPI);

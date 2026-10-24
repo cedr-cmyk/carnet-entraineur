@@ -4,6 +4,10 @@
 import os
 root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 s = open(os.path.join(root, 'source/carnet.html'), encoding='utf8').read()
+# l'espace archer (archer.js) est intégré à toutes les versions, pour l'aperçu côté entraîneur
+ar = open(os.path.join(root, 'archer.js'), encoding='utf8').read()
+i = s.index('<script>\n(() => {')
+s = s[:i] + '<script>\n' + ar + '\n</script>\n' + s[i:]
 os.makedirs(os.path.join(root, 'build'), exist_ok=True)
 open(os.path.join(root, 'build/carnet-essai.html'), 'w', encoding='utf8').write(s)
 main = s.replace("<title>Carnet d'essai</title>", "<title>Carnet de l'entraîneur</title>", 1)
