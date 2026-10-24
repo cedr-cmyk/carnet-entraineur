@@ -2476,7 +2476,16 @@ document.addEventListener("click", (e) => {
 let dashCache = { at: 0, entries: [] };
 async function loadDashEntries() {
   if (!S.db || Date.now() - dashCache.at < 60000) return;
-  try { const snap = await S.db.collection("carnetEntrees").get(); dashCache = { at: Date.now(), entries: snap.docs.map((d) => ({ id: d.id, ...d.data() })) }; if (S.tab === "accueil") render(); } catch (e) { console.error(e); }
+  try { const snap = await S.db.collection("carnetEntrees").get(); dashCache = { at: Date.now(), entries: snap.docs.map((d) => ({ id: d.id, ...d.data() })) }; cleanConcoursLines(); if (S.tab === "accueil") render(); } catch (e) { console.error(e); }
+}
+// Lignes « Concours » restées dans un carnet alors que l'archer n'est plus inscrit (concours supprimé ou archer retiré) :
+// retirées automatiquement, sauf si l'archer y a écrit un ressenti ou un commentaire.
+function cleanConcoursLines() {
+  if (!S.canWrite || !S.loaded.concours || !S.loaded.archers) return;
+  const orph = dashCache.entries.filter((e) => String(e.id).startsWith("c_") && e.concoursId && (() => { const c = S.concours.find((x) => x.id === e.concoursId), r = c && (c.resultats || {})[e.archerId]; return !r || typeof r !== "object"; })()
+    && !e.note && !e.emotion && !String(e.commentaire || "").trim());
+  orph.forEach((e) => remove("carnetEntrees", e.id));
+  if (orph.length) dashCache.entries = dashCache.entries.filter((e) => !orph.includes(e));
 }
 const ICON = {
   target: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/></svg>',

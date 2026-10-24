@@ -721,16 +721,32 @@ window.CarnetArcherUI = (API, opts = {}) => {
       <div class="hub-stat"><div class="hub-stat-top"><span>Séances notées</span></div><b class="c-cyan">${list.length}</b><small>ressenti moyen ${moy} / 10</small></div></div>`;
     if (o.processus || o.classement || o.score) h += `<div class="card"><h3 class="hub-h">Mes objectifs de la saison</h3>${[["processus", "Processus"], ["classement", "Classement"], ["score", "Score"]].filter(([k]) => o[k]).map(([k, l]) => `<div class="eq-l"><span>${l}</span><b>${esc(o[k])}</b></div>`).join("")}</div>`;
     h += list.length ? `<div class="list">${list.map((e) => `<button class="row" data-entry="${esc(e.id)}"><span class="date"><span class="d">${dObj(e.date).getDate()}</span><span class="mo">${dObj(e.date).toLocaleDateString("fr-FR", { month: "short" }).replace(".", "")}</span></span>
-      <span class="main"><span class="t">${esc(e.objectif || (e.concoursId ? "Concours" : "Séance"))}</span><span class="m">${[vol(e) ? vol(e) + " flèches" : "", e.emotion || "", e.seanceId ? "séance du club" : e.concoursId ? "concours" : "noté par moi"].filter(Boolean).map(esc).join(" · ")}</span>${e.commentaire ? `<span class="m">${esc(e.commentaire.slice(0, 100))}</span>` : ""}</span>
+      <span class="main"><span class="t">${esc(e.objectif || (e.concoursId ? "Concours" : "Séance"))}</span><span class="m">${[e.concoursId && num(e.scoreCompet) != null ? e.scoreCompet + " pts" : "", vol(e) ? vol(e) + " flèches" : "", e.emotion || "", e.seanceId ? "séance du club" : e.concoursId ? "concours" : "noté par moi"].filter(Boolean).map(esc).join(" · ")}</span>${e.commentaire ? `<span class="m">${esc(e.commentaire.slice(0, 100))}</span>` : ""}</span>
       <span class="count">${num(e.note) != null ? `${e.note}<small>/10</small>` : ""}</span></button>`).join("")}</div>` : `<p class="notice">Rien de noté cette saison. « Noter une séance » ajoute une ligne à ton carnet : ton entraîneur la verra.</p>`;
     return h;
   }
+  // Ligne de carnet créée par un concours : on montre le concours (résultat, lieu) plutôt qu'un formulaire vide
+  function concoursSheet(e) {
+    const c = St.data.concours.find((x) => x.id === e.concoursId), r = c?.resultat || {}, el = $("#sheet");
+    const line = (l, v) => (v ? `<div class="eq-l"><span>${l}</span><b>${esc(v)}</b></div>` : "");
+    el.innerHTML = `<div class="sheet-bg" data-close><div class="sheet ar-root-sheet" role="dialog" aria-label="Concours"><h3>${esc(c ? c.nom || c.lieu || "Concours" : (e.objectif || "Concours").replace(/^Concours · /, ""))}</h3>
+      ${c ? `<div class="card" style="gap:4px">${line("Date", fmtLong(c.date) + (c.dateFin && c.dateFin !== c.date ? " au " + fmtLong(c.dateFin) : ""))}${line("Lieu", c.lieu)}${line("Type", (c.types || []).map((x) => TYPES[x] || x).join(", "))}${line("Fédération", c.federation)}
+        ${line("Distance", r.distance ? r.distance + " m" : "")}${line("Blason", r.blason)}${line("Arc", r.arc)}${line("Score", num(r.score) != null ? r.score + " pts" : "pas encore saisi")}${line("Place", r.place)}${line("Remarque", r.remarque)}</div>`
+        : `<p class="notice">Ce concours n'est plus dans ta liste : ton entraîneur t'en a peut-être retiré. La ligne disparaîtra de ton carnet à sa prochaine connexion.</p>`}
+      ${(c?.classements || []).map((k) => `<a class="btn" href="${BLOB}${esc(k.assetId)}" target="_blank" rel="noopener">Classement PDF${c.classements.length > 1 ? " · " + esc(k.nom || "") : ""}</a>`).join("")}
+      <span class="tirline">Cette ligne vient du concours enregistré par ton entraîneur : le score et les flèches s'y ajoutent tout seuls. Tu peux y noter ton ressenti.</span>
+      <div class="acts"><button type="button" class="btn" data-close>Fermer</button>${c ? `<button type="button" class="btn" id="co-voir">Mes concours</button>` : ""}<button type="button" class="btn primary" id="co-res">Mon ressenti</button></div></div></div>`;
+    el.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", (ev) => { if (ev.target === b) el.innerHTML = ""; }));
+    $("#co-res").onclick = () => formEntry(e);
+    const v = $("#co-voir"); if (v) v.onclick = () => { el.innerHTML = ""; St.tab = "concours"; render(); window.scrollTo(0, 0); };
+  }
   function formEntry(e = null) {
     const d = e || { date: today() }, el = $("#sheet");
+    const lock = e?.concoursId ? "readonly" : ""; // flèches et score d'un concours : saisis par l'entraîneur
     el.innerHTML = `<div class="sheet-bg" data-close><form class="sheet" id="ar-form"><h3>${e ? "Ma séance" : "Noter une séance"}</h3>
       <div class="grid2"><label class="f">Date<input type="date" name="date" required value="${esc(d.date)}" ${e?.seanceId || e?.concoursId ? "readonly" : ""}></label><label class="f">Objectif<input type="text" name="objectif" value="${esc(d.objectif)}"></label></div>
-      <div class="f">Flèches tirées<div class="grid5">${VOL.map(([k, l]) => `<label class="f" style="font-weight:500">${l}<input type="number" inputmode="numeric" min="0" name="${k}" value="${esc(d[k])}" placeholder="${d.auto?.[k] ? "+" + d.auto[k] : "0"}"></label>`).join("")}</div>${e?.auto ? `<span class="tirline">Les chiffres grisés viennent des feuilles de marque de ton entraîneur.</span>` : ""}</div>
-      <div class="grid2"><label class="f">Score tir compté<input type="number" inputmode="numeric" min="0" name="scoreCompte" value="${esc(d.scoreCompte)}"></label><label class="f">Score compétition<input type="number" inputmode="numeric" min="0" name="scoreCompet" value="${esc(d.scoreCompet)}"></label></div>
+      <div class="f">Flèches tirées<div class="grid5">${VOL.map(([k, l]) => `<label class="f" style="font-weight:500">${l}<input type="number" inputmode="numeric" min="0" name="${k}" value="${esc(d[k])}" placeholder="${d.auto?.[k] ? "+" + d.auto[k] : "0"}" ${lock}></label>`).join("")}</div>${e?.auto ? `<span class="tirline">Les chiffres grisés viennent des feuilles de marque de ton entraîneur.</span>` : ""}</div>
+      <div class="grid2"><label class="f">Score tir compté<input type="number" inputmode="numeric" min="0" name="scoreCompte" value="${esc(d.scoreCompte)}" ${lock}></label><label class="f">Score compétition<input type="number" inputmode="numeric" min="0" name="scoreCompet" value="${esc(d.scoreCompet)}" ${lock}></label></div>
       <div class="f">Objectif atteint<div class="radio">${[["", "Je ne sais pas"], ["O", "Oui"], ["N", "Non"]].map(([v, l]) => `<label><input type="radio" name="atteint" value="${v}" ${(d.atteint || "") === v ? "checked" : ""}> ${l}</label>`).join("")}</div></div>
       <div class="grid2"><label class="f">Ressenti (0 à 10)<select name="note"><option value="">—</option>${Array.from({ length: 11 }, (_, i) => `<option ${String(d.note ?? "") === String(i) ? "selected" : ""}>${i}</option>`).join("")}</select></label>
         <label class="f">Émotion<select name="emotion"><option value="">—</option>${EMOTIONS.map((x) => `<option ${d.emotion === x ? "selected" : ""}>${x}</option>`).join("")}</select></label></div>
@@ -831,7 +847,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     if (t.dataset.arcombo) { St.combo = t.dataset.arcombo; render(); return; }
     if (t.dataset.who) { St.cur = +t.dataset.who; load(); return; }
     if (t.dataset.saison) { St.saison += +t.dataset.saison; render(); return; }
-    if (t.dataset.entry) { formEntry(St.data.entrees.find((e) => e.id === t.dataset.entry)); return; }
+    if (t.dataset.entry) { const e = St.data.entrees.find((x) => x.id === t.dataset.entry); if (e?.concoursId) concoursSheet(e); else formEntry(e); return; }
     if (t.dataset.act === "new") { formEntry(); return; }
     if (t.dataset.act === "reload") { load(); return; }
     if (t.dataset.act === "add-code") {
@@ -2744,7 +2760,16 @@ document.addEventListener("click", (e) => {
 let dashCache = { at: 0, entries: [] };
 async function loadDashEntries() {
   if (!S.db || Date.now() - dashCache.at < 60000) return;
-  try { const snap = await S.db.collection("carnetEntrees").get(); dashCache = { at: Date.now(), entries: snap.docs.map((d) => ({ id: d.id, ...d.data() })) }; if (S.tab === "accueil") render(); } catch (e) { console.error(e); }
+  try { const snap = await S.db.collection("carnetEntrees").get(); dashCache = { at: Date.now(), entries: snap.docs.map((d) => ({ id: d.id, ...d.data() })) }; cleanConcoursLines(); if (S.tab === "accueil") render(); } catch (e) { console.error(e); }
+}
+// Lignes « Concours » restées dans un carnet alors que l'archer n'est plus inscrit (concours supprimé ou archer retiré) :
+// retirées automatiquement, sauf si l'archer y a écrit un ressenti ou un commentaire.
+function cleanConcoursLines() {
+  if (!S.canWrite || !S.loaded.concours || !S.loaded.archers) return;
+  const orph = dashCache.entries.filter((e) => String(e.id).startsWith("c_") && e.concoursId && (() => { const c = S.concours.find((x) => x.id === e.concoursId), r = c && (c.resultats || {})[e.archerId]; return !r || typeof r !== "object"; })()
+    && !e.note && !e.emotion && !String(e.commentaire || "").trim());
+  orph.forEach((e) => remove("carnetEntrees", e.id));
+  if (orph.length) dashCache.entries = dashCache.entries.filter((e) => !orph.includes(e));
 }
 const ICON = {
   target: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/></svg>',
