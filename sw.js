@@ -1,5 +1,5 @@
 // Service worker : appli disponible hors connexion, et fichiers servis à l'adresse _blob/<id>
-const SHELL = "carnet-shell-v5", FILES = "carnet-fichiers-v1";
+const SHELL = "carnet-shell-v6", FILES = "carnet-fichiers-v1";
 const ASSETS = ["./", "./index.html", "./backend.js", "./config.js", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 let auth = null;
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(SHELL).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting())); });
@@ -25,7 +25,7 @@ self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET") return;
   if (u.origin === location.origin) {
     // l'appli d'abord depuis le réseau (pour les mises à jour), sinon depuis la copie locale
-    e.respondWith(fetch(e.request).then((r) => { if (r.ok) caches.open(SHELL).then((c) => c.put(e.request, r.clone())); return r; }).catch(() => caches.match(e.request).then((r) => r || caches.match("./index.html"))));
+    e.respondWith(fetch(e.request, { cache: "no-store" }).then((r) => { if (r.ok) caches.open(SHELL).then((c) => c.put(e.request, r.clone())); return r; }).catch(() => caches.match(e.request).then((r) => r || caches.match("./index.html"))));
   } else if (/cdnjs|jsdelivr|fonts\.(googleapis|gstatic)/.test(u.host)) {
     e.respondWith(caches.match(e.request).then((hit) => hit || fetch(e.request).then((r) => { if (r.ok || r.type === "opaque") caches.open(SHELL).then((c) => c.put(e.request, r.clone())); return r; })));
   }
