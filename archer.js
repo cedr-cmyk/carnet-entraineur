@@ -106,7 +106,10 @@ window.CarnetArcherUI = (API, opts = {}) => {
       <div class="ar-rep" role="group" aria-label="Ma réponse"><button class="btn${e.reponse === "present" ? " primary" : ""}" data-rep="${esc(e.id)}|present" aria-pressed="${e.reponse === "present"}">✓ Présent</button>
         <button class="btn${e.reponse === "absent" ? " on-abs" : ""}" data-rep="${esc(e.id)}|absent" aria-pressed="${e.reponse === "absent"}">✗ Absent</button>
         <span class="tirline">${e.reponse === "present" ? "Réponse envoyée : présent" : e.reponse === "absent" ? "Réponse envoyée : absent" : "Pas encore répondu"}</span></div>
-      ${ENC() && e.presents ? `<div class="ar-who"><span><b class="c-green">${e.presents.length} présent${e.presents.length > 1 ? "s" : ""} annoncé${e.presents.length > 1 ? "s" : ""}</b> ${esc(e.presents.join(", ") || "—")}</span>${(e.absents || []).length ? `<span><b class="c-red">${e.absents.length} absent${e.absents.length > 1 ? "s" : ""}</b> ${esc(e.absents.join(", "))}</span>` : ""}</div>` : ""}
+      ${ENC() && e.presents ? (() => { const enc = new Set(e.presentsEnc || []), pres = e.presents.filter((n) => !enc.has(n)), encs = e.presents.filter((n) => enc.has(n));
+        return `<div class="ar-who"><b>Liste des présents · ${e.presents.length} personne${e.presents.length > 1 ? "s" : ""}</b>
+        ${e.presents.length ? `<ol class="ar-plist">${pres.map((n) => `<li>${esc(n)}</li>`).join("")}${encs.map((n) => `<li>${esc(n)} <span class="tag">encadrant</span></li>`).join("")}</ol>` : `<span class="tirline">Personne n'a encore dit qu'il venait.</span>`}
+        <span class="tirline">${[(e.absents || []).length ? `Absents : ${e.absents.map(esc).join(", ")}` : "", e.sansReponse ? `${e.sansReponse} sans réponse` : ""].filter(Boolean).join(" · ")}</span></div>`; })() : ""}
     </div>`).join("")}</div>`;
     return h;
   }

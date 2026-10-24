@@ -65,7 +65,13 @@ begin
           where r.owner = p_owner and r.col = 'reponses' and r.data->>'seanceId' = s.id and r.data->>'reponse' = 'present'), '[]'::jsonb) end,
         'absents', case when enc then coalesce((select jsonb_agg(trim(coalesce(a.data->>'prenom', '') || ' ' || coalesce(a.data->>'nom', '')) order by a.data->>'nom', a.data->>'prenom')
           from docs r join docs a on a.owner = r.owner and a.col = 'archers' and a.id = r.data->>'archerId'
-          where r.owner = p_owner and r.col = 'reponses' and r.data->>'seanceId' = s.id and r.data->>'reponse' = 'absent'), '[]'::jsonb) end)
+          where r.owner = p_owner and r.col = 'reponses' and r.data->>'seanceId' = s.id and r.data->>'reponse' = 'absent'), '[]'::jsonb) end,
+        -- parmi les présents, ceux qui encadrent ; et combien de personnes concernées n'ont pas encore répondu
+        'presentsEnc', case when enc then coalesce((select jsonb_agg(trim(coalesce(a.data->>'prenom', '') || ' ' || coalesce(a.data->>'nom', '')))
+          from docs r join docs a on a.owner = r.owner and a.col = 'archers' and a.id = r.data->>'archerId'
+          where r.owner = p_owner and r.col = 'reponses' and r.data->>'seanceId' = s.id and r.data->>'reponse' = 'present' and coalesce(a.data->>'role', '') in ('encadrant', 'les-deux')), '[]'::jsonb) end,
+        'sansReponse', case when enc then (select count(*) from docs a where a.owner = p_owner and a.col = 'archers' and coalesce(a.data->>'actif', '') <> 'false' and seance_pour(s.data, a.data)
+          and not exists (select 1 from docs r where r.owner = p_owner and r.col = 'reponses' and r.id = 'r_' || s.id || '_' || a.id)) end)
         order by s.data->>'date', s.data->>'heure')
       from docs s where s.owner = p_owner and s.col = 'seances' and seance_pour(s.data, ar) and s.data->>'date' >= jour and s.data->>'date' <= fin), '[]'::jsonb));
 end $$;

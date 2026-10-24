@@ -529,7 +529,9 @@ svg.chart .szl { stroke: var(--line-2, var(--line)); stroke-dasharray: 3 3; }
 .ar-rep { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .ar-rep .btn { min-height: 44px; min-width: 110px; }
 .ar-rep .btn.on-abs { background: color-mix(in srgb, var(--danger) 22%, transparent); border-color: var(--danger); color: var(--ink); }
-.ar-who { display: grid; gap: 4px; font-size: .92rem; color: var(--ink); }
+.ar-who { display: grid; gap: 6px; font-size: .95rem; color: var(--ink); border-top: 1px solid var(--line); padding-top: 10px; }
+.ar-plist { margin: 0; padding-left: 1.6em; }
+.ar-plist li { break-inside: avoid; margin-bottom: 4px; }
 .ar-preview { position: fixed; inset: 0; z-index: 15; overflow: auto; background: var(--bg); }
 .ar-band { position: sticky; top: 0; z-index: 6; display: flex; gap: 12px; align-items: center; justify-content: center; flex-wrap: wrap; }
 .ar-band .btn { padding: 4px 12px; color: #fff; border-color: rgba(255,255,255,.5); background: rgba(0,0,0,.25); }
@@ -2672,7 +2674,9 @@ async function previewArcher(aid) {
       entrainements: S.seances.filter((s) => s.public && s.date >= todayISO() && s.date <= addDaysISO(todayISO(), 42) && concerne(s, a)).sort((p, q) => (p.date + (p.heure || "")).localeCompare(q.date + (q.heure || ""))).map((s) => {
         const rs = repsOf(s.id), names = (v) => rs.filter((r) => r.reponse === v).map((r) => S.archers.find((x) => x.id === r.archerId)).sort(byName).map(fullName);
         return { id: s.id, date: s.date, heure: s.heure, groupe: s.groupe, theme: s.theme, lieu: s.lieu, clubId: s.clubId, public: s.public, reponse: rs.find((r) => r.archerId === aid)?.reponse || null,
-          presents: ["encadrant", "les-deux"].includes(roleOf(a)) ? names("present") : null, absents: ["encadrant", "les-deux"].includes(roleOf(a)) ? names("absent") : null }; }),
+          presents: ["encadrant", "les-deux"].includes(roleOf(a)) ? names("present") : null, absents: ["encadrant", "les-deux"].includes(roleOf(a)) ? names("absent") : null,
+          presentsEnc: rs.filter((r) => r.reponse === "present").map((r) => S.archers.find((x) => x.id === r.archerId)).filter((x) => ["encadrant", "les-deux"].includes(roleOf(x))).map(fullName),
+          sansReponse: S.archers.filter((x) => concerne(s, x) && !rs.some((r) => r.archerId === x.id)).length }; }),
     };
   };
   window.CarnetArcherUI({ list: [{ owner: "", archer_id: aid, prenom: a.prenom, nom: a.nom }], charger: build, fichiers() {}, ecrire: async () => {}, supprimer: async () => {}, repondre: async () => {}, ajouterCode: async () => [], deconnexion() {} }, { preview: true });
