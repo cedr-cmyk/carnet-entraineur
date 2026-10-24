@@ -19,3 +19,8 @@ L'import des classements PDF se fait avec Claude : l'appli prépare un texte à 
 ## Reprise des données
 Dans le carnet Claude : Paramètres › Données › Télécharger la sauvegarde (ZIP « Données et fichiers »).
 Dans cette appli : Paramètres › Données › Restaurer une sauvegarde.
+
+## Modifier l'appli
+Toute modification se fait dans `source/carnet.html` (source unique), puis `python3 source/build.py` régénère :
+`index.html` (cette appli), `build/carnet-claude.html` et `build/carnet-essai.html` (versions Claude).
+Les règles de la base sont dans `supabase/` : un nouveau script n'est à exécuter dans Supabase › SQL Editor que s'il est ajouté.
