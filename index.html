@@ -535,6 +535,20 @@ svg.chart .szl { stroke: var(--line-2, var(--line)); stroke-dasharray: 3 3; }
 .sz-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 4px 2px 0; border-bottom: 1px solid var(--line); padding-bottom: 6px; margin-top: 4px; }
 .sz-head b { font-size: 1.05rem; } .sz-head span { color: var(--muted); font-size: .88rem; }
 .ptabs { flex-wrap: wrap; } .ptabs button { padding: 8px 16px; }
+.rep-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.rep-cols > div { display: grid; gap: 4px; align-content: start; }
+.rep-cols span { color: var(--ink); line-height: 1.5; }
+.tag.imp { background: color-mix(in srgb, var(--danger) 20%, transparent); color: var(--danger); }
+.ann-row.past { opacity: .55; }
+.ar-infos { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.ar-info { display: grid; gap: 4px; padding: 10px 0; border-top: 1px solid var(--line); }
+.ar-info:first-of-type { border-top: 0; padding-top: 0; }
+.ar-info p { margin: 0; color: var(--ink); line-height: 1.5; }
+.ar-ent { gap: 10px; }
+.ar-rep { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.ar-rep .btn { min-height: 44px; min-width: 110px; }
+.ar-rep .btn.on-abs { background: color-mix(in srgb, var(--danger) 22%, transparent); border-color: var(--danger); color: var(--ink); }
+.ar-who { display: grid; gap: 4px; font-size: .92rem; color: var(--ink); }
 .ar-preview { position: fixed; inset: 0; z-index: 15; overflow: auto; background: var(--bg); }
 .ar-band { position: sticky; top: 0; z-index: 6; display: flex; gap: 12px; align-items: center; justify-content: center; flex-wrap: wrap; }
 .ar-band .btn { padding: 4px 12px; color: #fff; border-color: rgba(255,255,255,.5); background: rgba(0,0,0,.25); }
@@ -632,7 +646,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
   const $ = (q) => document.querySelector(q);
   const toast = (m) => { const t = $("#toast"); if (!t) return; t.textContent = m; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => (t.hidden = true), 2400); };
 
-  const St = { list: API.list, cur: 0, data: null, tab: "carnet", saison: saisonOf(today()), err: "" };
+  const St = { list: API.list, cur: 0, data: null, tab: "accueil", saison: saisonOf(today()), err: "" };
   const who = () => St.list[St.cur];
   const name = (a) => `${a.prenom || ""} ${a.nom || ""}`.trim() || "Archer";
 
@@ -650,7 +664,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     render();
   }
   function header() {
-    const tabs = [["carnet", "Mon carnet"], ["concours", "Mes concours"], ["exercices", "Mes exercices"], ["evaluations", "Évaluations"]];
+    const tabs = [["accueil", "Accueil"], ["carnet", "Mon carnet"], ["concours", "Mes concours"], ["documents", "Documents"], ["evaluations", "Évaluations"]];
     top.innerHTML = `<div class="top-in"><div class="brand"><span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/></svg></span>
       <h1>Espace <em>${esc(St.data?.archer ? name(St.data.archer) : name(who()))}</em></h1><span class="sub">${PREVIEW ? "" : `<button class="btn ghost" id="ar-out">Se déconnecter</button>`}</span></div>
       <nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" aria-selected="${St.tab === k}" data-atab="${k}">${l}</button>`).join("")}</nav></div>`;
@@ -663,8 +677,32 @@ window.CarnetArcherUI = (API, opts = {}) => {
     else h += `<div class="bar"><span class="grow"></span><button class="btn ghost" data-act="add-code">J'ai un autre code (frère, sœur…)</button></div>`;
     if (St.err) h += `<p class="notice">${esc(St.err)}</p><button class="btn" data-act="reload">Réessayer</button>`;
     else if (!St.data) h += `<p class="notice">Chargement…</p>`;
-    else h += { carnet: vCarnet, concours: vConcours, exercices: vExos, evaluations: vEvals }[St.tab]();
+    else h += ({ accueil: vAccueil, carnet: vCarnet, concours: vConcours, documents: vDocs, evaluations: vEvals }[St.tab] || vAccueil)();
     view.innerHTML = h;
+  }
+  // ---------- Accueil : infos du club et entraînements proposés ----------
+  const ENC = () => ["encadrant", "les-deux"].includes(St.data.archer?.role);
+  const clubNom = (id) => (St.data.clubs || []).find((c) => c.id === id)?.nom || "";
+  function vAccueil() {
+    const ann = (St.data.annonces || []).slice().sort((a, b) => (b.important ? 1 : 0) - (a.important ? 1 : 0) || (b.date || "").localeCompare(a.date || ""));
+    const ent = St.data.entrainements, prenom = St.data.archer?.prenom || "";
+    let h = `<div class="card ar-infos"><h3 class="hub-h">Infos du club</h3>${ann.length ? ann.map((n) => `<div class="ar-info${n.important ? " imp" : ""}">
+      <b>${n.important ? '<span class="tag imp">Important</span> ' : ""}${esc(n.titre || "Info")}</b>${n.texte ? `<p>${esc(n.texte).replace(/\n/g, "<br>")}</p>` : ""}
+      <span class="tirline">${[n.date ? "Publiée le " + dObj(n.date).toLocaleDateString("fr-FR") : "", (n.clubIds || []).length ? n.clubIds.map(clubNom).filter(Boolean).join(", ") : ""].filter(Boolean).map(esc).join(" · ")}</span></div>`).join("")
+      : `<p class="tirline">Pas d'info particulière en ce moment.</p>`}</div>`;
+    if (!ent) return h;
+    h += `<h2 class="sec">Prochains entraînements</h2>`;
+    if (!ent.length) return h + `<p class="notice">Aucun entraînement proposé pour l'instant. Ton entraîneur les ajoute au fil de la saison.</p>`;
+    h += `<span class="tirline">${ENC() ? "Dis si tu seras là. Comme encadrant, tu vois aussi qui a prévu de venir." : `Dis à ton entraîneur si ${St.list.length > 1 || PREVIEW ? esc(prenom) + " sera là" : "tu seras là"} : ça l'aide à préparer la séance.`}</span>`;
+    h += `<div class="list">${ent.map((e) => `<div class="card ar-ent"><div class="bar"><span class="date"><span class="d">${dObj(e.date).getDate()}</span><span class="mo">${dObj(e.date).toLocaleDateString("fr-FR", { month: "short" }).replace(".", "")}</span></span>
+      <span class="main" style="flex:1;min-width:0"><b>${esc(dObj(e.date).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }))}${e.heure ? " · " + esc(e.heure) : ""}</b>
+        <span class="tirline" style="display:block">${[clubNom(e.clubId), e.groupe, e.theme, e.lieu].filter(Boolean).map(esc).join(" · ")}</span></span></div>
+      <div class="ar-rep" role="group" aria-label="Ma réponse"><button class="btn${e.reponse === "present" ? " primary" : ""}" data-rep="${esc(e.id)}|present" aria-pressed="${e.reponse === "present"}">✓ Présent</button>
+        <button class="btn${e.reponse === "absent" ? " on-abs" : ""}" data-rep="${esc(e.id)}|absent" aria-pressed="${e.reponse === "absent"}">✗ Absent</button>
+        <span class="tirline">${e.reponse === "present" ? "Réponse envoyée : présent" : e.reponse === "absent" ? "Réponse envoyée : absent" : "Pas encore répondu"}</span></div>
+      ${ENC() && e.presents ? `<div class="ar-who"><span><b class="c-green">${e.presents.length} présent${e.presents.length > 1 ? "s" : ""} annoncé${e.presents.length > 1 ? "s" : ""}</b> ${esc(e.presents.join(", ") || "—")}</span>${(e.absents || []).length ? `<span><b class="c-red">${e.absents.length} absent${e.absents.length > 1 ? "s" : ""}</b> ${esc(e.absents.join(", "))}</span>` : ""}</div>` : ""}
+    </div>`).join("")}</div>`;
+    return h;
   }
   // ---------- Carnet ----------
   function vCarnet() {
@@ -732,7 +770,14 @@ window.CarnetArcherUI = (API, opts = {}) => {
     seasons.forEach((z) => { h += `<div class="sz-head"><b>Saison ${z - 1}-${z}</b><span>${past.filter((c) => saisonOf(c.date) === z && num(c.resultat?.score) != null).length} concours</span></div><div class="list">${past.filter((c) => saisonOf(c.date) === z).map(row).join("")}</div>`; });
     return h;
   }
-  // ---------- Exercices ----------
+  // ---------- Documents : partagés avec le club + fiches d'exercices de l'archer ----------
+  function vDocs() {
+    const docs = (St.data.documents || []).slice().sort((a, b) => (b.partageLe || 0) - (a.partageLe || 0));
+    let h = `<h2 class="sec">Documents du club</h2>`;
+    h += docs.length ? `<div class="list">${docs.map((d) => `<div class="row"><span class="thumb">${(d.contentType || "").startsWith("image/") ? "IMG" : "PDF"}</span><span class="main"><span class="t">${esc(d.titre || d.nomFichier)}</span>${d.description ? `<span class="m">${esc(d.description.slice(0, 140))}</span>` : ""}</span>
+      <a class="btn" href="${BLOB}${esc(d.assetId)}" target="_blank" rel="noopener">Ouvrir</a></div>`).join("")}</div>` : `<p class="notice">Aucun document partagé pour l'instant (calendrier des concours, règlement…).</p>`;
+    return h + `<h2 class="sec">Mes exercices</h2>` + vExos();
+  }
   function vExos() {
     const list = St.data.exercices.slice().sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.createdAt || 0) - (a.createdAt || 0));
     if (!list.length) return `<p class="notice">Ton entraîneur ne t'a pas encore partagé de fiche d'exercice.</p>`;
@@ -763,12 +808,21 @@ window.CarnetArcherUI = (API, opts = {}) => {
   }
   // ---------- Événements ----------
   root.addEventListener("click", async (ev) => {
-    const t = ev.target.closest("[data-atab],[data-who],[data-act],[data-saison],[data-entry],[data-eval],[data-arcombo],#ar-out"); if (!t) return;
+    const t = ev.target.closest("[data-atab],[data-who],[data-act],[data-saison],[data-entry],[data-eval],[data-arcombo],[data-rep],#ar-out"); if (!t) return;
     ev.stopPropagation();
     if (t.dataset.act === "close-preview") { root.remove(); return; }
     if (t.id === "ar-out") return API.deconnexion();
     if (t.dataset.atab) { St.tab = t.dataset.atab; render(); return; }
     if (t.dataset.eval) { St.evalId = t.dataset.eval; render(); return; }
+    if (t.dataset.rep) {
+      const [sid, val] = t.dataset.rep.split("|"), e = (St.data.entrainements || []).find((x) => x.id === sid); if (!e) return;
+      if (PREVIEW) { toast("Aperçu : l'archer répondra ici, pas toi"); return; }
+      const next = e.reponse === val ? "" : val, before = e.reponse;
+      e.reponse = next; render();
+      try { await API.repondre(who(), sid, next); toast(next === "present" ? "C'est noté : présent" : next === "absent" ? "C'est noté : absent" : "Réponse retirée"); if (ENC()) { St.data = await API.charger(who()); render(); } }
+      catch (err) { e.reponse = before; render(); toast("Réponse non envoyée : " + err.message); }
+      return;
+    }
     if (t.dataset.arcombo) { St.combo = t.dataset.arcombo; render(); return; }
     if (t.dataset.who) { St.cur = +t.dataset.who; load(); return; }
     if (t.dataset.saison) { St.saison += +t.dataset.saison; render(); return; }
@@ -810,7 +864,7 @@ const PALETTE = [
   ["#6aa84f", "Vert pomme"], ["#8a9a3b", "Olive"], ["#8b5a2b", "Marron"], ["#a8896c", "Sable"], ["#7d8a96", "Gris"], ["#3a4652", "Ardoise"],
 ];
 const COLORS = PALETTE.map(([c]) => c);
-const S = { clubs: [], archers: [], seances: [], tab: "accueil", club: "all", q: "", seance: null, archer: null, loaded: {}, db: null, canWrite: true, past: false, suivi: null, tirOpen: null, overlay: {}, tt: {}, stale: false, evaluations: [], evaluation: null, evalFrom: null, evalOv: {}, evalT: {}, dossiers: [], documents: [], folder: null, assets: null, uploading: 0, parametres: [], attributions: [], concours: [], materiel: [], matEtat: "all", concoursId: null, coSaison: null, carnets: [], centrees: [], carnet: null, cSaison: null, cTab: null, cMonth: 9 };
+const S = { clubs: [], archers: [], seances: [], tab: "accueil", club: "all", q: "", seance: null, archer: null, loaded: {}, db: null, canWrite: true, past: false, suivi: null, tirOpen: null, overlay: {}, tt: {}, stale: false, evaluations: [], evaluation: null, evalFrom: null, evalOv: {}, evalT: {}, dossiers: [], documents: [], folder: null, assets: null, uploading: 0, parametres: [], attributions: [], concours: [], materiel: [], matEtat: "all", concoursId: null, coSaison: null, carnets: [], centrees: [], annonces: [], reponses: [], carnet: null, cSaison: null, cTab: null, cMonth: 9 };
 const $ = (s) => document.querySelector(s);
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const todayISO = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
@@ -1068,7 +1122,8 @@ function viewSeance() {
     <div class="head club-edge" style="--club:${esc(clubColor(s.clubId))}"><span class="m" style="display:flex;gap:6px;align-items:center"><span class="dot" style="background:${esc(clubColor(s.clubId))}"></span>${esc(clubName(s.clubId))}</span>
       <h2>${esc(s.theme || "Entraînement")}</h2>
       <span class="m">${esc(fmtLong(s.date))}${s.heure ? " · " + esc(s.heure) : ""}${s.groupe ? " · " + esc(s.groupe) : ""}${s.lieu ? " · " + esc(s.lieu) : ""}</span>
-      ${s.periodeId && folderName(s.periodeId) ? `<span><span class="tag fed">${esc(folderName(s.periodeId))}</span></span>` : ""}</div>
+      ${s.periodeId && folderName(s.periodeId) ? `<span><span class="tag fed">${esc(folderName(s.periodeId))}</span></span>` : ""}${s.public ? `<span><span class="tag">Proposée : ${esc(pubLab(s.public).toLowerCase())}</span></span>` : ""}</div>
+    ${s.public ? reponsesBlock(s) : ""}
     ${(() => { const enc = roster.filter((a) => pres.has(a.id) && encadre(s, a.id)).length, arc = pres.size - enc; return `<div class="bar"><div class="score"><b>${arc}</b><span>archer${arc > 1 ? "s" : ""}${enc ? ` · ${enc} encadrant${enc > 1 ? "s" : ""}` : ""} sur ${roster.length} personnes</span></div><span class="grow"></span>`; })()}
       ${S.canWrite && roster.length ? `<button class="btn" data-act="all-present">Tous présents</button><button class="btn" data-act="none-present">Tout décocher</button>` : ""}</div>
     ${roster.length ? (() => {
@@ -1345,6 +1400,7 @@ function formMonth() {
     <div class="grid2"><label class="f" for="g-club">Club<select id="g-club" name="clubId">${clubs.map((c) => `<option value="${c.id}" ${c.id === cid ? "selected" : ""}>${esc(c.nom)}</option>`).join("")}</select></label>
       <label class="f" for="g-mois">Mois<input type="month" id="g-mois" name="mois" value="${ym}" required></label></div>
     <div class="f">Créneaux à planifier<div id="g-crens" style="display:grid;gap:6px"></div></div>
+    <div class="f">Proposer ces séances aux archers<div class="checks"><label><input type="checkbox" name="proposer" ${prm().co?.proposer === false ? "" : "checked"}>Oui, ils pourront dire s'ils viennent</label></div><span class="tirline">Adultes ou jeunes selon le nom du groupe du créneau (ex. « Jeunes »), sinon les deux. Modifiable ensuite dans chaque séance.</span></div>
     <span class="tirline" id="g-sum"></span>`,
     {
       onSave(fd) {
@@ -1357,7 +1413,7 @@ function formMonth() {
           monthDates(mois, k.jour).forEach((date) => {
             if (S.seances.some((s) => s.clubId === c.id && s.date === date && (s.heure || "") === heure)) return;
             const id = newId("seances");
-            const data = { clubId: c.id, date, heure, groupe: k.groupe || "", theme: "", lieu: "", periodeId: defaultPeriode(c.id, k.groupe || "") || null, exercices: [], presents: [], notes: "", createdAt: Date.now() + n };
+            const data = { clubId: c.id, date, heure, groupe: k.groupe || "", public: fd.get("proposer") ? guessPublic(k.groupe) : "", theme: "", lieu: "", periodeId: defaultPeriode(c.id, k.groupe || "") || null, exercices: [], presents: [], notes: "", createdAt: Date.now() + n };
             S.seances.push({ id, ...data }); save("seances", id, data); n++;
           });
         });
@@ -2734,6 +2790,7 @@ function viewAccueil() {
         ${lastCo ? `<span class="tirline">${esc(fmtLong(lastCo.date))} · comparé à la moyenne de ses concours précédents${lastTypes.length ? " du même type" : ""}</span><div class="list">${lastRes.map(dashResRow).join("")}</div><button class="btn ghost" data-concours="${lastCo.id}">Voir le concours ›</button>` : `<p class="notice">Aucun score saisi pour l'instant.</p>`}
       </div>
     </div>
+    ${espaceArchersCard(inC)}
     ${todoL.length ? `<details class="card hub-todo"><summary><i class="hub-ico c-cyan">${ICON.list}</i><b>${todoL.length} exercice${todoL.length > 1 ? "s" : ""} attribué${todoL.length > 1 ? "s" : ""} pas encore fait${todoL.length > 1 ? "s" : ""}</b><span class="grow"></span><span class="hub-chev" aria-hidden="true">›</span></summary>
       <div class="list">${todoL.map((x) => { const d = docOf(x.documentId), se = S.seances.find((y) => y.id === x.seanceId), a = S.archers.find((y) => y.id === x.archerId);
         return `<div class="row"><span class="main"><span class="t">${esc(fullName(a))} · ${d ? `<button class="lnk" data-doc="${d.id}">${esc(d.titre || d.nomFichier)}</button>` : "Fiche supprimée"}</span>
@@ -2867,7 +2924,7 @@ async function previewArcher(aid) {
   const build = async () => {
     const entrees = S.db ? (await S.db.collection("carnetEntrees").where("archerId", "==", aid).get()).docs.map((d) => ({ id: d.id, ...d.data() })) : [];
     return {
-      archer: { id: aid, prenom: a.prenom, nom: a.nom, arcs: a.arcs, clubIds: a.clubIds, federations: a.federations },
+      archer: { id: aid, prenom: a.prenom, nom: a.nom, arcs: a.arcs, clubIds: a.clubIds, federations: a.federations, role: roleOf(a) },
       clubs: S.clubs.filter((c) => (a.clubIds || []).includes(c.id)).map((c) => ({ id: c.id, nom: c.nom, couleur: c.couleur })),
       entrees,
       carnets: S.carnets.filter((c) => c.archerId === aid).map((c) => ({ id: c.id, saison: c.saison, objectifs: c.objectifs, dates: c.dates })),
@@ -2875,9 +2932,103 @@ async function previewArcher(aid) {
       exercices: S.attributions.filter((x) => x.archerId === aid && x.visible === true).map((x) => { const d = docOf(x.documentId), se = S.seances.find((y) => y.id === x.seanceId);
         return { id: x.id, remarque: x.remarque, fait: x.fait, seanceId: x.seanceId, date: se?.date || null, createdAt: x.createdAt, document: d ? { id: d.id, titre: d.titre, description: d.description, assetId: d.assetId, contentType: d.contentType, nomFichier: d.nomFichier } : null }; }),
       evaluations: S.evaluations.filter((e) => e.archerId === aid && e.partage === true).map((e) => ({ id: e.id, date: e.date, notes: e.notes, observation: e.observation })),
+      annonces: S.annonces.filter((n) => annActive(n) && (!(n.clubIds || []).length || n.clubIds.some((id) => (a.clubIds || []).includes(id)))),
+      documents: S.documents.filter((d) => (d.partageClubs || []).some((id) => id === "*" || (a.clubIds || []).includes(id))).map((d) => ({ id: d.id, titre: d.titre, description: d.description, assetId: d.assetId, contentType: d.contentType, nomFichier: d.nomFichier, partageLe: d.partageLe })),
+      entrainements: S.seances.filter((s) => s.public && s.date >= todayISO() && s.date <= addDaysISO(todayISO(), 42) && concerne(s, a)).sort((p, q) => (p.date + (p.heure || "")).localeCompare(q.date + (q.heure || ""))).map((s) => {
+        const rs = repsOf(s.id), names = (v) => rs.filter((r) => r.reponse === v).map((r) => S.archers.find((x) => x.id === r.archerId)).sort(byName).map(fullName);
+        return { id: s.id, date: s.date, heure: s.heure, groupe: s.groupe, theme: s.theme, lieu: s.lieu, clubId: s.clubId, public: s.public, reponse: rs.find((r) => r.archerId === aid)?.reponse || null,
+          presents: ["encadrant", "les-deux"].includes(roleOf(a)) ? names("present") : null, absents: ["encadrant", "les-deux"].includes(roleOf(a)) ? names("absent") : null }; }),
     };
   };
-  window.CarnetArcherUI({ list: [{ owner: "", archer_id: aid, prenom: a.prenom, nom: a.nom }], charger: build, fichiers() {}, ecrire: async () => {}, supprimer: async () => {}, ajouterCode: async () => [], deconnexion() {} }, { preview: true });
+  window.CarnetArcherUI({ list: [{ owner: "", archer_id: aid, prenom: a.prenom, nom: a.nom }], charger: build, fichiers() {}, ecrire: async () => {}, supprimer: async () => {}, repondre: async () => {}, ajouterCode: async () => [], deconnexion() {} }, { preview: true });
+}
+// ---------- Espace des archers : infos du club, documents partagés, entraînements proposés ----------
+const PUBLICS = [["", "Non proposée aux archers"], ["tous", "Adultes et jeunes"], ["adultes", "Adultes"], ["jeunes", "Jeunes"]];
+const pubLab = (p) => (PUBLICS.find(([k]) => k === (p || "")) || PUBLICS[0])[1];
+// public deviné d'après le nom du groupe du créneau (modifiable ensuite)
+const guessPublic = (g) => (/jeune|enfant|ado|poussin|benjamin|minime|cadet|u1\d/i.test(g || "") ? "jeunes" : /adulte|senior|loisir/i.test(g || "") ? "adultes" : "tous");
+// jeune = 17 ans ou moins dans la saison de la séance (U18 et moins), même règle que dans l'espace archer
+const jeuneAt = (a, date) => (a?.naissance ? saisonOfDate(date) - Number(a.naissance.slice(0, 4)) <= 17 : null);
+const concerne = (s, a) => (a.clubIds || []).includes(s.clubId) && a.actif !== false && (s.public === "tous" || ["encadrant", "les-deux"].includes(roleOf(a)) || jeuneAt(a, s.date) == null || jeuneAt(a, s.date) === (s.public === "jeunes"));
+const repsOf = (sid) => S.reponses.filter((r) => r.seanceId === sid && S.archers.some((a) => a.id === r.archerId));
+const clubsLab = (ids) => (!ids || !ids.length || ids.includes("*") ? "Tous les clubs" : ids.map(clubName).join(", "));
+const addDaysISO = (iso, n) => { const d = dObj(iso); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+const annActive = (n) => !n.jusquau || n.jusquau >= todayISO();
+function reponsesBlock(s) {
+  const rs = repsOf(s.id), who = (r) => S.archers.find((a) => a.id === r.archerId);
+  const pres = rs.filter((r) => r.reponse === "present").map(who).sort(byName), abs = rs.filter((r) => r.reponse === "absent").map(who).sort(byName);
+  const sans = S.archers.filter((a) => concerne(s, a) && !rs.some((r) => r.archerId === a.id)).sort(byName);
+  const nm = (a) => esc(fullName(a)) + (roleOf(a) === "encadrant" ? " <small>(encadrant)</small>" : "");
+  const manque = pres.filter((a) => !(s.presents || []).includes(a.id));
+  return `<div class="card rep-card"><div class="hub-bar"><h3 class="hub-h">Réponses des archers</h3></div>
+    <div class="rep-cols"><div><b class="c-green">${pres.length} présent${pres.length > 1 ? "s" : ""} annoncé${pres.length > 1 ? "s" : ""}</b><span>${pres.map(nm).join(", ") || "—"}</span></div>
+      <div><b class="c-red">${abs.length} absent${abs.length > 1 ? "s" : ""}</b><span>${abs.map(nm).join(", ") || "—"}</span></div></div>
+    ${sans.length ? `<details><summary class="tirline">${sans.length} sans réponse</summary><span class="tirline">${sans.map(nm).join(", ")}</span></details>` : ""}
+    ${S.canWrite && manque.length ? `<div><button class="btn" data-act="rep-cocher">${manque.length > 1 ? `Cocher les ${manque.length} présents annoncés` : "Cocher le présent annoncé"}</button></div>` : ""}
+    <span class="tirline">Les archers répondent depuis leur espace. Les encadrants y voient aussi la liste des présents.</span></div>`;
+}
+function espaceArchersCard(inC) {
+  const today = todayISO();
+  const ann = S.annonces.filter((n) => S.club === "all" || !(n.clubIds || []).length || n.clubIds.includes(S.club)).sort((a, b) => (annActive(b) ? 1 : 0) - (annActive(a) ? 1 : 0) || (b.important ? 1 : 0) - (a.important ? 1 : 0) || (b.date || "").localeCompare(a.date || ""));
+  const docs = S.documents.filter((d) => (d.partageClubs || []).length && (S.club === "all" || d.partageClubs.includes("*") || d.partageClubs.includes(S.club))).sort((a, b) => (b.partageLe || 0) - (a.partageLe || 0));
+  const prop = S.seances.filter((s) => s.public && s.date >= today && inC(s.clubId)).sort((a, b) => (a.date + (a.heure || "")).localeCompare(b.date + (b.heure || ""))).slice(0, 6);
+  return `<h2 class="sec">Espace des archers</h2><div class="hub-grid">
+    <div class="card"><div class="hub-bar"><h3 class="hub-h">Infos importantes</h3>${S.canWrite ? `<button class="btn" data-act="new-annonce">+ Nouvelle info</button>` : ""}</div>
+      ${ann.length ? `<div class="list">${ann.map((n) => `<button class="row ann-row${annActive(n) ? "" : " past"}" data-annonce="${n.id}"><span class="main"><span class="t">${n.important ? '<span class="tag imp">Important</span> ' : ""}${esc(n.titre || "Info")}</span>
+        ${n.texte ? `<span class="m">${esc(n.texte.slice(0, 120))}${n.texte.length > 120 ? "…" : ""}</span>` : ""}<span class="m">${esc(clubsLab(n.clubIds))}${n.jusquau ? ` · ${annActive(n) ? "jusqu'au" : "terminée le"} ${esc(dObj(n.jusquau).toLocaleDateString("fr-FR"))}` : ""}</span></span><span class="count" aria-hidden="true">›</span></button>`).join("")}</div>`
+        : `<p class="notice">Les infos que tu écris ici s'affichent en haut de l'accueil des archers de chaque club concerné (date du concours du club, fermeture du gymnase, licences à renouveler…).</p>`}
+      <div class="hub-bar" style="margin-top:6px"><h3 class="hub-h">Documents partagés</h3>${S.canWrite ? `<button class="btn" data-act="new-partage">+ Partager un document</button>` : ""}</div>
+      ${docs.length ? `<div class="list">${docs.map((d) => `<div class="row"><span class="thumb">${KIND_LAB[kind(d.contentType)] || "DOC"}</span><span class="main"><button class="lnk" data-doc="${d.id}">${esc(d.titre || d.nomFichier)}</button><span class="m">${esc(clubsLab(d.partageClubs))}</span></span>
+        ${S.canWrite ? `<button class="btn ghost" data-partage="${d.id}">Modifier</button>` : ""}</div>`).join("")}</div>`
+        : `<p class="notice">Calendrier des concours, règlement intérieur, fiche d'inscription… Les documents partagés sont visibles par tous les archers des clubs choisis, dans l'onglet « Documents » de leur espace.</p>`}</div>
+    <div class="card"><div class="hub-bar"><h3 class="hub-h">Entraînements proposés</h3><button class="btn ghost" data-tab="seances">Séances</button></div>
+      ${prop.length ? `<div class="list">${prop.map((s) => { const rs = repsOf(s.id), p = rs.filter((r) => r.reponse === "present").length, ab = rs.filter((r) => r.reponse === "absent").length;
+        return `<button class="row club-edge" data-seance="${s.id}" style="--club:${esc(clubColor(s.clubId))}"><span class="date"><span class="d">${dObj(s.date).getDate()}</span><span class="mo">${dObj(s.date).toLocaleDateString("fr-FR", { month: "short" }).replace(".", "")}</span></span>
+          <span class="main"><span class="t">${esc(s.theme || s.groupe || "Entraînement")}</span><span class="m">${esc([clubName(s.clubId), s.heure, pubLab(s.public)].filter(Boolean).join(" · "))}</span></span>
+          <span class="count"><span class="c-green">${p}</span><small> présent${p > 1 ? "s" : ""}${ab ? ` · ${ab} abs.` : ""}</small></span></button>`; }).join("")}</div>`
+        : `<p class="notice">Aucun entraînement proposé. Dans une séance (ou en créant les séances du mois), choisis « Proposée aux » adultes, jeunes ou les deux : les archers concernés pourront dire s'ils viennent.</p>`}</div>
+  </div>`;
+}
+function formAnnonce(n = null) {
+  const ids = n?.clubIds || (S.club !== "all" ? [S.club] : []);
+  sheet(n ? "Modifier l'info" : "Nouvelle info pour les archers", `
+    <label class="f" for="an-t">Titre<input type="text" id="an-t" name="titre" required value="${esc(n?.titre)}" placeholder="Ex. Concours du club le 15 novembre"></label>
+    <label class="f" for="an-x">Message<textarea id="an-x" name="texte" placeholder="Ex. Nous cherchons des bénévoles pour l'installation le samedi matin.">${esc(n?.texte)}</textarea></label>
+    <div class="f">Clubs concernés<div class="checks">${S.clubs.map((c) => `<label><input type="checkbox" name="club" value="${c.id}" ${ids.includes(c.id) ? "checked" : ""}>${esc(c.nom)}</label>`).join("")}</div><span class="tirline">Aucun club coché : l'info s'affiche dans tous les clubs.</span></div>
+    <div class="grid2"><label class="f" for="an-j">Afficher jusqu'au (facultatif)<input type="date" id="an-j" name="jusquau" value="${esc(n?.jusquau)}"></label>
+      <div class="f">Mise en avant<div class="checks"><label><input type="checkbox" name="important" ${n?.important ? "checked" : ""}>Important</label></div></div></div>`, {
+    onSave(fd) {
+      const titre = fd.get("titre").trim(); if (!titre) { toast("Donne un titre à l'info"); return false; }
+      const id = n?.id || newId("annonces");
+      save("annonces", id, { titre, texte: fd.get("texte").trim(), clubIds: fd.getAll("club"), jusquau: fd.get("jusquau") || "", important: !!fd.get("important"), date: n?.date || todayISO(), createdAt: n?.createdAt || Date.now() });
+      toast(n ? "Info enregistrée" : "Info publiée pour les archers"); render();
+    },
+    onDelete: n ? () => { remove("annonces", n.id); toast("Info supprimée"); render(); } : null, deleteLabel: "Supprimer l'info",
+  });
+}
+function formPartage(d = null) {
+  const ids = d?.partageClubs || [];
+  const choix = S.documents.slice().sort((a, b) => (a.titre || a.nomFichier || "").localeCompare(b.titre || b.nomFichier || "", "fr"));
+  sheet(d ? "Partage du document" : "Partager un document avec les archers", `
+    ${d ? `<b>${esc(d.titre || d.nomFichier)}</b>` : `<label class="f" for="pa-doc">Document de ta bibliothèque<select id="pa-doc" name="docId"><option value="">— choisir —</option>${choix.map((x) => `<option value="${x.id}">${esc(x.titre || x.nomFichier)}</option>`).join("")}</select></label>
+      ${S.assets ? `<label class="f" for="pa-file">Ou un nouveau fichier (PDF, image)<input type="file" id="pa-file" name="file" accept="application/pdf,image/*"></label>` : ""}`}
+    <div class="f">Visible par les archers de<div class="checks"><label><input type="checkbox" name="club" value="*" ${ids.includes("*") || (!d && !ids.length) ? "checked" : ""}>Tous les clubs</label>${S.clubs.map((c) => `<label><input type="checkbox" name="club" value="${c.id}" ${ids.includes(c.id) ? "checked" : ""}>${esc(c.nom)}</label>`).join("")}</div></div>`, {
+    onSave(fd) {
+      const clubs = fd.getAll("club"), cl = clubs.includes("*") ? ["*"] : clubs;
+      if (!cl.length) { toast("Coche au moins un club, ou utilise « Ne plus partager »"); return false; }
+      const f = fd.get("file");
+      if (!d && f && f.size) {
+        const type = guessType(f); if (!type) { toast("Format non accepté. Enregistre-le en PDF."); return false; }
+        (async () => { try { const r = await S.assets.upload(f, { type }); const id = newId("documents");
+          await save("documents", id, { dossierId: null, titre: f.name.replace(/\.[^.]+$/, ""), description: "", assetId: r.id, nomFichier: f.name, contentType: r.contentType, taille: r.sizeBytes, createdAt: Date.now(), partageClubs: cl, partageLe: Date.now() });
+          toast("Document partagé avec les archers"); render(); } catch (e) { console.error(e); toast("Envoi impossible"); } })();
+        return;
+      }
+      const doc = d || S.documents.find((x) => x.id === fd.get("docId")); if (!doc) { toast("Choisis un document ou un fichier"); return false; }
+      doc.partageClubs = cl; doc.partageLe = doc.partageLe || Date.now(); patch("documents", doc.id, { partageClubs: cl, partageLe: doc.partageLe }); toast("Document partagé avec les archers"); render();
+    },
+    onDelete: d && (d.partageClubs || []).length ? () => { d.partageClubs = []; patch("documents", d.id, { partageClubs: [] }); toast("Le document n'est plus partagé"); render(); } : null, deleteLabel: "Ne plus partager",
+  });
 }
 let accCache = null;
 async function fillAcces(aid, force = false) {
@@ -3131,7 +3282,7 @@ function openDoc(d) {
     ${d.description ? `<p class="prev">${esc(d.description)}</p>` : ""}
     <div class="acts">
       <button type="button" class="btn" id="doc-dl">Télécharger</button>
-      ${S.canWrite ? `<button type="button" class="btn" id="doc-attr">Attribuer à un archer</button><button type="button" class="btn" id="doc-edit">Modifier</button>` : ""}
+      ${S.canWrite ? `<button type="button" class="btn" id="doc-share">${(d.partageClubs || []).length ? "Partagé avec les archers" : "Partager avec les archers"}</button><button type="button" class="btn" id="doc-attr">Attribuer à un archer</button><button type="button" class="btn" id="doc-edit">Modifier</button>` : ""}
       <button type="button" class="btn primary" data-close>Fermer</button></div></div></div>`;
   const close = () => { el.innerHTML = ""; if (S.stale) { S.stale = false; render(); } };
   el.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", (e) => { if (e.target === b) close(); }));
@@ -3142,6 +3293,7 @@ function openDoc(d) {
   });
   const ed = $("#doc-edit"); if (ed) ed.addEventListener("click", () => formDoc(d));
   const at = $("#doc-attr"); if (at) at.addEventListener("click", () => formAttrFromDoc(d));
+  const sh = $("#doc-share"); if (sh) sh.addEventListener("click", () => formPartage(d));
   if (k === "pdf") {
     let zoom = 1; const box = $("#pdfbox");
     renderPdf(d, box, zoom);
@@ -3302,7 +3454,7 @@ async function showStorage() {
   } catch (e) { console.error(e); }
 }
 // ---------- Restauration d'une sauvegarde ----------
-const BK_COLS = [["clubs", "clubs"], ["archers", "archers"], ["seances", "séances"], ["evaluations", "évaluations"], ["carnets", "carnets de saison"], ["carnetEntrees", "lignes de carnet"], ["dossiers", "dossiers"], ["documents", "fiches"], ["parametres", "paramètres"], ["attributions", "exercices attribués"], ["concours", "concours"], ["materiel", "matériel"]];
+const BK_COLS = [["clubs", "clubs"], ["archers", "archers"], ["seances", "séances"], ["evaluations", "évaluations"], ["carnets", "carnets de saison"], ["carnetEntrees", "lignes de carnet"], ["dossiers", "dossiers"], ["documents", "fiches"], ["parametres", "paramètres"], ["attributions", "exercices attribués"], ["concours", "concours"], ["materiel", "matériel"], ["annonces", "infos du club"], ["reponses", "réponses aux entraînements"]];
 function startRestore() {
   const inp = document.createElement("input"); inp.type = "file"; inp.accept = "application/json,.json,application/zip,.zip";
   inp.addEventListener("change", async () => {
@@ -3612,6 +3764,7 @@ function formSeance(s = null) {
     <div class="grid2"><label class="f" for="f-date">Date<input type="date" id="f-date" name="date" required value="${esc(s?.date || todayISO())}"></label>
       <label class="f" for="f-heure">Horaire<input type="text" id="f-heure" name="heure" value="${esc(s?.heure)}" placeholder="Ex. 18h–20h"></label></div>
     <label class="f" for="f-groupe">Groupe<input type="text" id="f-groupe" name="groupe" value="${esc(s?.groupe)}" placeholder="Ex. Jeunes, Adultes, Compétiteurs"></label>
+    <label class="f" for="f-pub">Proposée aux archers (ils disent s'ils viennent)<select id="f-pub" name="public">${PUBLICS.map(([k, l]) => `<option value="${k}" ${(s?.public || "") === k ? "selected" : ""}>${l}</option>`).join("")}</select></label>
     <label class="f" for="f-theme">Thème de la séance<input type="text" id="f-theme" name="theme" value="${esc(s?.theme)}" placeholder="Ex. Placement de l'épaule d'arc, tir à 18 m"></label>
     <label class="f" for="f-per">Période<select id="f-per" name="periodeId">${periodOptions(s ? s.periodeId : defaultPeriode(cid, ""))}</select></label>
     <label class="f" for="f-slieu">Lieu (si différent du lieu habituel)<input type="text" id="f-slieu" name="lieu" value="${esc(s?.lieu)}" placeholder="${esc(c?.lieu || "")}"></label>`,
@@ -3619,7 +3772,7 @@ function formSeance(s = null) {
       onSave(fd) {
         const date = fd.get("date"); if (!date) { toast("Choisis une date"); return false; }
         const id = s?.id || newId("seances");
-        const data = { clubId: fd.get("clubId"), date, heure: fd.get("heure").trim(), groupe: fd.get("groupe").trim(), theme: fd.get("theme").trim(), lieu: fd.get("lieu").trim(), periodeId: fd.get("periodeId") || null, exercices: s?.exercices || [], presents: s?.presents || [], notes: s?.notes || "", createdAt: s?.createdAt || Date.now() };
+        const data = { clubId: fd.get("clubId"), date, heure: fd.get("heure").trim(), groupe: fd.get("groupe").trim(), theme: fd.get("theme").trim(), lieu: fd.get("lieu").trim(), public: fd.get("public") || "", periodeId: fd.get("periodeId") || null, exercices: s?.exercices || [], presents: s?.presents || [], notes: s?.notes || "", createdAt: s?.createdAt || Date.now() };
         if (s && s.clubId !== data.clubId) data.presents = [];
         save("seances", id, data); S.seance = id; S.archer = null; render(); toast(s ? "Séance enregistrée" : "Séance créée");
       },
@@ -3651,7 +3804,7 @@ function formSeance(s = null) {
 
 // ---------- Événements ----------
 document.addEventListener("click", (e) => {
-  const t = e.target.closest("[data-tab],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del]");
+  const t = e.target.closest("[data-tab],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-annonce],[data-partage]");
   if (!t || t.closest("#sheet")) return;
   if (t.dataset.dashSuivi) { const [sid, aid] = t.dataset.dashSuivi.split("|"); S.seance = sid; S.suivi = aid; S.tirOpen = null; render(); window.scrollTo(0, 0); return; }
   if (t.dataset.tab) { go(t.dataset.tab); try { history.replaceState(null, "", "#" + t.dataset.tab); } catch (_) {} return; }
@@ -3661,6 +3814,8 @@ document.addEventListener("click", (e) => {
     const presents = [...set]; s.presents = presents; render(); patch("seances", s.id, { presents }); return;
   }
   if (t.dataset.folder !== undefined) { S.folder = t.dataset.folder || null; render(); window.scrollTo(0, 0); return; }
+  if (t.dataset.annonce) { const n = S.annonces.find((x) => x.id === t.dataset.annonce); if (n && S.canWrite) formAnnonce(n); return; }
+  if (t.dataset.partage) { const d = S.documents.find((x) => x.id === t.dataset.partage); if (d) formPartage(d); return; }
   if (t.dataset.doc) { const d = S.documents.find((x) => x.id === t.dataset.doc); if (d) openDoc(d); return; }
   if (t.dataset.act === "new-folder") { formFolder(); return; }
   if (t.dataset.act === "edit-folder") { formFolder(S.dossiers.find((x) => x.id === S.folder)); return; }
@@ -3783,6 +3938,13 @@ document.addEventListener("click", (e) => {
   if (a === "export") exportData();
   if (a === "restore") startRestore();
   if (a === "logout" && window.carnetLogout) window.carnetLogout();
+  if (a === "new-annonce") formAnnonce();
+  if (a === "new-partage") formPartage();
+  if (a === "rep-cocher") {
+    const s = S.seances.find((x) => x.id === S.seance); if (!s) return;
+    const presents = [...new Set([...(s.presents || []), ...repsOf(s.id).filter((r) => r.reponse === "present").map((r) => r.archerId)])];
+    s.presents = presents; render(); patch("seances", s.id, { presents }); toast("Présents annoncés cochés");
+  }
   if (a === "all-present" || a === "none-present") {
     const s = S.seances.find((x) => x.id === S.seance); if (!s) return;
     const presents = a === "all-present" ? [...new Set([...(s.presents || []).filter((id) => roleOf(S.archers.find((x) => x.id === id)) === "encadrant"), ...S.archers.filter((x) => (x.clubIds || []).includes(s.clubId) && x.actif !== false && tire(x)).map((x) => x.id)])] : [];
@@ -3919,7 +4081,7 @@ render();
   S.db = db;
   if (user) { const w = await user.can("data.write"); if (w === false) S.canWrite = false; }
   S.seesData = user ? (user.isOwner() || user.canEdit()) : null;
-  ["clubs", "archers", "seances", "evaluations", "dossiers", "documents", "carnets", "parametres", "attributions", "concours", "materiel"].forEach(subscribe);
+  ["clubs", "archers", "seances", "evaluations", "dossiers", "documents", "carnets", "parametres", "attributions", "concours", "materiel", "annonces", "reponses"].forEach(subscribe);
   claude.use("assets").then((as) => { S.assets = as; render(); });
   render();
 })();

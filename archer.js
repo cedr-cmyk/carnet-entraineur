@@ -52,7 +52,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
   const $ = (q) => document.querySelector(q);
   const toast = (m) => { const t = $("#toast"); if (!t) return; t.textContent = m; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => (t.hidden = true), 2400); };
 
-  const St = { list: API.list, cur: 0, data: null, tab: "carnet", saison: saisonOf(today()), err: "" };
+  const St = { list: API.list, cur: 0, data: null, tab: "accueil", saison: saisonOf(today()), err: "" };
   const who = () => St.list[St.cur];
   const name = (a) => `${a.prenom || ""} ${a.nom || ""}`.trim() || "Archer";
 
@@ -70,7 +70,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     render();
   }
   function header() {
-    const tabs = [["carnet", "Mon carnet"], ["concours", "Mes concours"], ["exercices", "Mes exercices"], ["evaluations", "Évaluations"]];
+    const tabs = [["accueil", "Accueil"], ["carnet", "Mon carnet"], ["concours", "Mes concours"], ["documents", "Documents"], ["evaluations", "Évaluations"]];
     top.innerHTML = `<div class="top-in"><div class="brand"><span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/></svg></span>
       <h1>Espace <em>${esc(St.data?.archer ? name(St.data.archer) : name(who()))}</em></h1><span class="sub">${PREVIEW ? "" : `<button class="btn ghost" id="ar-out">Se déconnecter</button>`}</span></div>
       <nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" aria-selected="${St.tab === k}" data-atab="${k}">${l}</button>`).join("")}</nav></div>`;
@@ -83,8 +83,32 @@ window.CarnetArcherUI = (API, opts = {}) => {
     else h += `<div class="bar"><span class="grow"></span><button class="btn ghost" data-act="add-code">J'ai un autre code (frère, sœur…)</button></div>`;
     if (St.err) h += `<p class="notice">${esc(St.err)}</p><button class="btn" data-act="reload">Réessayer</button>`;
     else if (!St.data) h += `<p class="notice">Chargement…</p>`;
-    else h += { carnet: vCarnet, concours: vConcours, exercices: vExos, evaluations: vEvals }[St.tab]();
+    else h += ({ accueil: vAccueil, carnet: vCarnet, concours: vConcours, documents: vDocs, evaluations: vEvals }[St.tab] || vAccueil)();
     view.innerHTML = h;
+  }
+  // ---------- Accueil : infos du club et entraînements proposés ----------
+  const ENC = () => ["encadrant", "les-deux"].includes(St.data.archer?.role);
+  const clubNom = (id) => (St.data.clubs || []).find((c) => c.id === id)?.nom || "";
+  function vAccueil() {
+    const ann = (St.data.annonces || []).slice().sort((a, b) => (b.important ? 1 : 0) - (a.important ? 1 : 0) || (b.date || "").localeCompare(a.date || ""));
+    const ent = St.data.entrainements, prenom = St.data.archer?.prenom || "";
+    let h = `<div class="card ar-infos"><h3 class="hub-h">Infos du club</h3>${ann.length ? ann.map((n) => `<div class="ar-info${n.important ? " imp" : ""}">
+      <b>${n.important ? '<span class="tag imp">Important</span> ' : ""}${esc(n.titre || "Info")}</b>${n.texte ? `<p>${esc(n.texte).replace(/\n/g, "<br>")}</p>` : ""}
+      <span class="tirline">${[n.date ? "Publiée le " + dObj(n.date).toLocaleDateString("fr-FR") : "", (n.clubIds || []).length ? n.clubIds.map(clubNom).filter(Boolean).join(", ") : ""].filter(Boolean).map(esc).join(" · ")}</span></div>`).join("")
+      : `<p class="tirline">Pas d'info particulière en ce moment.</p>`}</div>`;
+    if (!ent) return h;
+    h += `<h2 class="sec">Prochains entraînements</h2>`;
+    if (!ent.length) return h + `<p class="notice">Aucun entraînement proposé pour l'instant. Ton entraîneur les ajoute au fil de la saison.</p>`;
+    h += `<span class="tirline">${ENC() ? "Dis si tu seras là. Comme encadrant, tu vois aussi qui a prévu de venir." : `Dis à ton entraîneur si ${St.list.length > 1 || PREVIEW ? esc(prenom) + " sera là" : "tu seras là"} : ça l'aide à préparer la séance.`}</span>`;
+    h += `<div class="list">${ent.map((e) => `<div class="card ar-ent"><div class="bar"><span class="date"><span class="d">${dObj(e.date).getDate()}</span><span class="mo">${dObj(e.date).toLocaleDateString("fr-FR", { month: "short" }).replace(".", "")}</span></span>
+      <span class="main" style="flex:1;min-width:0"><b>${esc(dObj(e.date).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }))}${e.heure ? " · " + esc(e.heure) : ""}</b>
+        <span class="tirline" style="display:block">${[clubNom(e.clubId), e.groupe, e.theme, e.lieu].filter(Boolean).map(esc).join(" · ")}</span></span></div>
+      <div class="ar-rep" role="group" aria-label="Ma réponse"><button class="btn${e.reponse === "present" ? " primary" : ""}" data-rep="${esc(e.id)}|present" aria-pressed="${e.reponse === "present"}">✓ Présent</button>
+        <button class="btn${e.reponse === "absent" ? " on-abs" : ""}" data-rep="${esc(e.id)}|absent" aria-pressed="${e.reponse === "absent"}">✗ Absent</button>
+        <span class="tirline">${e.reponse === "present" ? "Réponse envoyée : présent" : e.reponse === "absent" ? "Réponse envoyée : absent" : "Pas encore répondu"}</span></div>
+      ${ENC() && e.presents ? `<div class="ar-who"><span><b class="c-green">${e.presents.length} présent${e.presents.length > 1 ? "s" : ""} annoncé${e.presents.length > 1 ? "s" : ""}</b> ${esc(e.presents.join(", ") || "—")}</span>${(e.absents || []).length ? `<span><b class="c-red">${e.absents.length} absent${e.absents.length > 1 ? "s" : ""}</b> ${esc(e.absents.join(", "))}</span>` : ""}</div>` : ""}
+    </div>`).join("")}</div>`;
+    return h;
   }
   // ---------- Carnet ----------
   function vCarnet() {
@@ -152,7 +176,14 @@ window.CarnetArcherUI = (API, opts = {}) => {
     seasons.forEach((z) => { h += `<div class="sz-head"><b>Saison ${z - 1}-${z}</b><span>${past.filter((c) => saisonOf(c.date) === z && num(c.resultat?.score) != null).length} concours</span></div><div class="list">${past.filter((c) => saisonOf(c.date) === z).map(row).join("")}</div>`; });
     return h;
   }
-  // ---------- Exercices ----------
+  // ---------- Documents : partagés avec le club + fiches d'exercices de l'archer ----------
+  function vDocs() {
+    const docs = (St.data.documents || []).slice().sort((a, b) => (b.partageLe || 0) - (a.partageLe || 0));
+    let h = `<h2 class="sec">Documents du club</h2>`;
+    h += docs.length ? `<div class="list">${docs.map((d) => `<div class="row"><span class="thumb">${(d.contentType || "").startsWith("image/") ? "IMG" : "PDF"}</span><span class="main"><span class="t">${esc(d.titre || d.nomFichier)}</span>${d.description ? `<span class="m">${esc(d.description.slice(0, 140))}</span>` : ""}</span>
+      <a class="btn" href="${BLOB}${esc(d.assetId)}" target="_blank" rel="noopener">Ouvrir</a></div>`).join("")}</div>` : `<p class="notice">Aucun document partagé pour l'instant (calendrier des concours, règlement…).</p>`;
+    return h + `<h2 class="sec">Mes exercices</h2>` + vExos();
+  }
   function vExos() {
     const list = St.data.exercices.slice().sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.createdAt || 0) - (a.createdAt || 0));
     if (!list.length) return `<p class="notice">Ton entraîneur ne t'a pas encore partagé de fiche d'exercice.</p>`;
@@ -183,12 +214,21 @@ window.CarnetArcherUI = (API, opts = {}) => {
   }
   // ---------- Événements ----------
   root.addEventListener("click", async (ev) => {
-    const t = ev.target.closest("[data-atab],[data-who],[data-act],[data-saison],[data-entry],[data-eval],[data-arcombo],#ar-out"); if (!t) return;
+    const t = ev.target.closest("[data-atab],[data-who],[data-act],[data-saison],[data-entry],[data-eval],[data-arcombo],[data-rep],#ar-out"); if (!t) return;
     ev.stopPropagation();
     if (t.dataset.act === "close-preview") { root.remove(); return; }
     if (t.id === "ar-out") return API.deconnexion();
     if (t.dataset.atab) { St.tab = t.dataset.atab; render(); return; }
     if (t.dataset.eval) { St.evalId = t.dataset.eval; render(); return; }
+    if (t.dataset.rep) {
+      const [sid, val] = t.dataset.rep.split("|"), e = (St.data.entrainements || []).find((x) => x.id === sid); if (!e) return;
+      if (PREVIEW) { toast("Aperçu : l'archer répondra ici, pas toi"); return; }
+      const next = e.reponse === val ? "" : val, before = e.reponse;
+      e.reponse = next; render();
+      try { await API.repondre(who(), sid, next); toast(next === "present" ? "C'est noté : présent" : next === "absent" ? "C'est noté : absent" : "Réponse retirée"); if (ENC()) { St.data = await API.charger(who()); render(); } }
+      catch (err) { e.reponse = before; render(); toast("Réponse non envoyée : " + err.message); }
+      return;
+    }
     if (t.dataset.arcombo) { St.combo = t.dataset.arcombo; render(); return; }
     if (t.dataset.who) { St.cur = +t.dataset.who; load(); return; }
     if (t.dataset.saison) { St.saison += +t.dataset.saison; render(); return; }

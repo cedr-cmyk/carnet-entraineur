@@ -201,6 +201,7 @@
       charger: (a) => rpc("espace_archer", { p_owner: a.owner, p_archer: a.archer_id }),
       ecrire: (a, id, data) => rpc("archer_ecrire_entree", { p_owner: a.owner, p_archer: a.archer_id, p_id: id, p_data: data }),
       supprimer: (a, id) => rpc("archer_supprimer_entree", { p_owner: a.owner, p_archer: a.archer_id, p_id: id }),
+      repondre: (a, seance, reponse) => rpc("archer_repondre", { p_owner: a.owner, p_archer: a.archer_id, p_seance: seance, p_reponse: reponse }),
       fichiers: (a) => { filesOwner = a.owner; tellSW(); },
       ajouterCode: async (code) => { await rpc("utiliser_invitation", { p_code: code }); return rpc("mes_acces"); },
       deconnexion: () => window.carnetLogout(),
