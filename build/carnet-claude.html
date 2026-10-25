@@ -521,7 +521,16 @@ svg.chart .szl { stroke: var(--line-2, var(--line)); stroke-dasharray: 3 3; }
 .sc-n { color: var(--muted); font-weight: 700; } .sc-s { text-align: right; font-weight: 700; } .sc-t { text-align: right; font-weight: 800; color: var(--gold, var(--accent)); }
 .sc-chips { display: flex; gap: 4px; flex-wrap: wrap; }
 .sc-click { cursor: pointer; border-radius: 8px; } .sc-click:hover { background: var(--sunk); } .sc-row.on { background: color-mix(in srgb, var(--accent) 14%, transparent); }
-.tv-box { display: grid; gap: 10px; } .tv-chips .chip { min-width: 44px; justify-content: center; }
+.tv-box { display: grid; gap: 10px; }
+.bilan .stat { gap: 18px; } .bilan-rec { margin: 0; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--gold, var(--accent)) 16%, transparent); font-weight: 700; color: var(--ink); }
+.vbars { display: flex; gap: 6px; align-items: flex-end; height: 130px; padding-top: 6px; overflow-x: auto; }
+.vb { display: grid; grid-template-rows: auto 1fr auto; justify-items: center; gap: 3px; min-width: 30px; flex: 1; height: 100%; font-variant-numeric: tabular-nums; }
+.vb-v { font-size: .78rem; font-weight: 700; } .vb-n { font-size: .72rem; color: var(--muted); }
+.vb-b { width: 100%; max-width: 34px; display: flex; align-items: flex-end; background: var(--sunk); border-radius: 6px; overflow: hidden; }
+.vb-b i { display: block; width: 100%; background: var(--accent); border-radius: 6px 6px 0 0; } .vb.best .vb-b i { background: var(--gold, #FFD700); }
+.ar-big { width: 100%; min-height: 56px; font-size: 1.1rem; }
+.ar-mot { display: grid; gap: 4px; text-align: left; width: 100%; color: var(--ink); cursor: pointer; }
+.coach-mot { border-left: 3px solid var(--accent); padding: 8px 12px; background: var(--sunk); border-radius: 0 12px 12px 0; } .tv-chips .chip { min-width: 44px; justify-content: center; }
 .sc-c { font-style: normal; min-width: 28px; height: 28px; display: grid; place-items: center; border-radius: 7px; font-weight: 800; font-size: .9rem; }
 .sc-c.y, .kp .y { background: #FFD700; color: #1a1300; } .sc-c.r, .kp .r { background: #EF4444; color: #fff; } .sc-c.b, .kp .b { background: #06B6D4; color: #04232a; }
 .sc-c.k, .kp .k { background: #1E293B; color: #fff; border: 1px solid #475569; } .sc-c.w, .kp .w { background: #F8FAFC; color: #0B0F19; } .sc-c.m, .kp .m { background: #64748B; color: #fff; }
@@ -691,7 +700,10 @@ window.CarnetArcherUI = (API, opts = {}) => {
   function vAccueil() {
     const ann = (St.data.annonces || []).slice().sort((a, b) => (b.important ? 1 : 0) - (a.important ? 1 : 0) || (b.date || "").localeCompare(a.date || ""));
     const ent = St.data.entrainements, prenom = St.data.archer?.prenom || "";
-    let h = `<div class="card ar-infos"><h3 class="hub-h">Infos du club</h3>${ann.length ? ann.map((n) => `<div class="ar-info${n.important ? " imp" : ""}">
+    const mots = St.data.entrees.filter((e) => e.commentaireCoach).sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, 2);
+    let h = `<button class="btn primary ar-big" data-act="tc-new">🎯 Nouveau tir compté</button>`;
+    h += mots.map((e) => `<button class="card coach-mot ar-mot" data-entry="${esc(e.id)}"><b>💬 Le mot de ton entraîneur · ${esc(dObj(e.date).toLocaleDateString("fr-FR"))}</b><span>${esc(e.commentaireCoach)}</span></button>`).join("");
+    h += `<div class="card ar-infos"><h3 class="hub-h">Infos du club</h3>${ann.length ? ann.map((n) => `<div class="ar-info${n.important ? " imp" : ""}">
       <b>${n.important ? '<span class="tag imp">Important</span> ' : ""}${esc(n.titre || "Info")}</b>${n.texte ? `<p>${esc(n.texte).replace(/\n/g, "<br>")}</p>` : ""}
       <span class="tirline">${[n.date ? "Publiée le " + dObj(n.date).toLocaleDateString("fr-FR") : "", (n.clubIds || []).length ? n.clubIds.map(clubNom).filter(Boolean).join(", ") : ""].filter(Boolean).map(esc).join(" · ")}</span></div>`).join("")
       : `<p class="tirline">Pas d'info particulière en ce moment.</p>`}</div>`;
@@ -719,13 +731,13 @@ window.CarnetArcherUI = (API, opts = {}) => {
     const tot = VOL.map(([k, l]) => [l, list.reduce((n, e) => n + volOf(e, k), 0)]), all = tot.reduce((n, [, v]) => n + v, 0);
     const notes = list.map((e) => num(e.note)).filter((v) => v != null), moy = notes.length ? (notes.reduce((a, b) => a + b, 0) / notes.length).toFixed(1).replace(".", ",") : "—";
     const c = St.data.carnets.find((x) => x.saison === key), o = c?.objectifs || {};
-    let h = `<div class="bar"><button class="btn" data-saison="-1" aria-label="Saison précédente">‹</button><b>Saison ${end - 1}-${end}</b><button class="btn" data-saison="1" aria-label="Saison suivante">›</button><span class="grow"></span><button class="btn primary" data-act="new">+ Noter une séance</button></div>
+    let h = `<div class="bar"><button class="btn" data-saison="-1" aria-label="Saison précédente">‹</button><b>Saison ${end - 1}-${end}</b><button class="btn" data-saison="1" aria-label="Saison suivante">›</button><span class="grow"></span><button class="btn" data-act="tc-new">🎯 Tir compté</button><button class="btn primary" data-act="new">+ Noter une séance</button></div>
       <div class="hub-stats"><div class="hub-stat"><div class="hub-stat-top"><span>Flèches de la saison</span></div><b class="c-gold">${all.toLocaleString("fr-FR")}</b><small>${tot.filter(([, v]) => v).map(([l, v]) => `${l} ${v}`).join(" · ") || "aucune pour l'instant"}</small></div>
       <div class="hub-stat"><div class="hub-stat-top"><span>Séances notées</span></div><b class="c-cyan">${list.length}</b><small>ressenti moyen ${moy} / 10</small></div></div>`;
     if (o.processus || o.classement || o.score) h += `<div class="card"><h3 class="hub-h">Mes objectifs de la saison</h3>${[["processus", "Processus"], ["classement", "Classement"], ["score", "Score"]].filter(([k]) => o[k]).map(([k, l]) => `<div class="eq-l"><span>${l}</span><b>${esc(o[k])}</b></div>`).join("")}</div>`;
-    if (window.CarnetTcProgress) h += window.CarnetTcProgress(list, St.tcCombo, "data-artc");
+    if (window.CarnetTcProgress) h += window.CarnetTcProgress(list, St.tcCombo, "data-artc", St.tcPer || "30", "data-artcp");
     h += list.length ? `<div class="list">${list.map((e) => `<button class="row" data-entry="${esc(e.id)}"><span class="date"><span class="d">${dObj(e.date).getDate()}</span><span class="mo">${dObj(e.date).toLocaleDateString("fr-FR", { month: "short" }).replace(".", "")}</span></span>
-      <span class="main"><span class="t">${esc(e.objectif || (e.concoursId ? "Concours" : "Séance"))}</span><span class="m">${[e.concoursId && num(e.scoreCompet) != null ? e.scoreCompet + " pts" : "", !e.concoursId && num(e.scoreCompte) != null ? `tir compté ${e.scoreCompte} pts${e.tcDistance ? " à " + e.tcDistance + " m" : ""}` : "", vol(e) ? vol(e) + " flèches" : "", e.emotion || "", e.seanceId ? "séance du club" : e.concoursId ? "concours" : "noté par moi"].filter(Boolean).map(esc).join(" · ")}</span>${e.commentaire ? `<span class="m">${esc(e.commentaire.slice(0, 100))}</span>` : ""}</span>
+      <span class="main"><span class="t">${esc(e.objectif || (e.concoursId ? "Concours" : "Séance"))}</span><span class="m">${[e.concoursId && num(e.scoreCompet) != null ? e.scoreCompet + " pts" : "", !e.concoursId && num(e.scoreCompte) != null ? `tir compté ${e.scoreCompte} pts${e.tcDistance ? " à " + e.tcDistance + " m" : ""}` : "", vol(e) ? vol(e) + " flèches" : "", e.emotion || "", e.seanceId ? "séance du club" : e.concoursId ? "concours" : "noté par moi", e.commentaireCoach ? "💬 mot de l'entraîneur" : ""].filter(Boolean).map(esc).join(" · ")}</span>${e.commentaire ? `<span class="m">${esc(e.commentaire.slice(0, 100))}</span>` : ""}</span>
       <span class="count">${num(e.note) != null ? `${e.note}<small>/10</small>` : ""}</span></button>`).join("")}</div>` : `<p class="notice">Rien de noté cette saison. « Noter une séance » ajoute une ligne à ton carnet : ton entraîneur la verra.</p>`;
     return h;
   }
@@ -738,6 +750,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
         ${line("Distance", r.distance ? r.distance + " m" : "")}${line("Blason", r.blason)}${line("Arc", r.arc)}${line("Score", num(r.score) != null ? r.score + " pts" : "pas encore saisi")}${line("Place", r.place)}${line("Remarque", r.remarque)}</div>`
         : `<p class="notice">Ce concours n'est plus dans ta liste : ton entraîneur t'en a peut-être retiré. La ligne disparaîtra de ton carnet à sa prochaine connexion.</p>`}
       ${(c?.classements || []).map((k) => `<a class="btn" href="${BLOB}${esc(k.assetId)}" target="_blank" rel="noopener">Classement PDF${c.classements.length > 1 ? " · " + esc(k.nom || "") : ""}</a>`).join("")}
+      ${e.commentaireCoach ? `<div class="coach-mot"><b>💬 Le mot de ton entraîneur</b><p style="margin:4px 0 0;color:var(--ink)">${esc(e.commentaireCoach)}</p></div>` : ""}
       <span class="tirline">Cette ligne vient du concours enregistré par ton entraîneur : le score et les flèches s'y ajoutent tout seuls. Tu peux y noter ton ressenti.</span>
       <div class="acts"><button type="button" class="btn" data-close>Fermer</button>${c ? `<button type="button" class="btn" id="co-voir">Mes concours</button>` : ""}<button type="button" class="btn primary" id="co-res">Mon ressenti</button></div></div></div>`;
     el.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", (ev) => { if (ev.target === b) el.innerHTML = ""; }));
@@ -770,7 +783,10 @@ window.CarnetArcherUI = (API, opts = {}) => {
       if (j) { T.impacts.splice(j[1], 1); last.splice(last.lastIndexOf(j[0].k), 1); } else last.pop();
       if (!last.length) T.volees.pop(); draw();
     }
-    function draw() {
+    let drawing = false, again = false;
+    // un champ qui perd le focus pendant le remplacement relance draw : on le rejoue après, pas en plein milieu
+    function draw() { if (drawing) { again = true; return; } drawing = true; try { drawNow(); } finally { drawing = false; } if (again) { again = false; draw(); } }
+    function drawNow() {
       const n = shot(), vcur = T.volees.length && T.volees[T.volees.length - 1].length < T.fpv ? T.volees.length : Math.min(T.volees.length + 1, T.nbVolees);
       const keys = ["X", "10", "9", "8", "7", "6", "5", "4", "3", "2", "1", "M"], face = C.face(T), minV = 11 - face.zones;
       const cls = (k) => (["X", "10", "9"].includes(k) ? "y" : ["8", "7"].includes(k) ? "r" : ["6", "5"].includes(k) ? "b" : ["4", "3"].includes(k) ? "k" : k === "M" ? "m" : "w");
@@ -788,6 +804,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
         <span class="tirline">Touche la cible là où la flèche s'est plantée : la valeur se calcule toute seule. Tu peux aussi taper la valeur sans placer la flèche.</span>
         <div class="bar"><b>Volée en cours : ${Math.min(vcur, T.nbVolees)} / ${T.nbVolees}</b><span class="grow"></span><span>${n} / ${plan()} flèches${n ? ` · ${(total() / n).toFixed(2).replace(".", ",")} par flèche` : ""}</span></div>
         <div class="tgt-bar"><span style="width:${Math.min(100, (n / plan()) * 100)}%"></span></div>
+        ${full() && C.bilan ? C.bilan(T, (St.data?.entrees || []).filter((x) => x.id !== init.id)) : ""}
         ${C.carte(T, "data-vv", view ?? curIdx())}${C.groupe({ ...T, impacts: view === "all" ? T.impacts : T.impacts.filter((p) => p.v === (view ?? curIdx())) })}
         <div class="acts"><button type="button" class="btn" id="tg-no">Annuler</button><button type="button" class="btn primary" id="tg-ok">Valider le tir</button></div></div>`;
       layer.querySelector("svg.tgt").addEventListener("click", (ev) => {
@@ -805,6 +822,25 @@ window.CarnetArcherUI = (API, opts = {}) => {
       $("#tg-ok").onclick = () => { layer.remove(); onDone(T); };
     }
     draw();
+  }
+  // Accès direct : tir sur la cible → ligne « Tir compté » du jour dans le carnet → bilan
+  function tirDirect() {
+    const last = St.data.entrees.filter((x) => x.tcDistance || x.tcBlason).sort((a, b) => (b.date || "").localeCompare(a.date || ""))[0] || {};
+    cibleSheet({ distance: last.tcDistance || "18", blason: last.tcBlason || "" }, async (t) => {
+      const fl = t.volees.flat(); if (!fl.length) return;
+      const sc = fl.reduce((a, k) => a + kv(k), 0), date = today();
+      const data = { date, saison: `${saisonOf(date) - 1}-${saisonOf(date)}`, objectif: "Tir compté", tcDistance: String(t.distance || ""), tcBlason: t.blason || "", compte: String(fl.length), scoreCompte: String(sc), tcTir: t };
+      const others = St.data.entrees.slice(), bil = window.CarnetCible?.bilan ? window.CarnetCible.bilan(t, others) : "";
+      if (PREVIEW) { toast("Aperçu : l'archer enregistrera ce tir, pas toi"); return; }
+      const id = "a_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      try { await API.ecrire(who(), id, data); } catch (err) { toast("Enregistrement impossible : " + err.message); return; }
+      const el = $("#sheet");
+      el.innerHTML = `<div class="sheet-bg" data-close><div class="sheet" role="dialog" aria-label="Bilan du tir"><h3>Tir enregistré dans ton carnet</h3>${bil}
+        <span class="tirline">Ajoute ton ressenti si tu veux : touche la ligne « Tir compté » du jour dans « Mon carnet ».</span>
+        <div class="acts"><button type="button" class="btn primary" data-close>Fermer</button></div></div></div>`;
+      el.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", (ev) => { if (ev.target === b) el.innerHTML = ""; }));
+      St.saison = saisonOf(date); load();
+    });
   }
   function formEntry(e = null) {
     const d = e || { date: today() }, el = $("#sheet");
@@ -826,6 +862,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
       <div class="f">Objectif atteint<div class="radio">${[["", "Je ne sais pas"], ["O", "Oui"], ["N", "Non"]].map(([v, l]) => `<label><input type="radio" name="atteint" value="${v}" ${(d.atteint || "") === v ? "checked" : ""}> ${l}</label>`).join("")}</div></div>
       <div class="grid2"><label class="f">Ressenti (0 à 10)<select name="note"><option value="">—</option>${Array.from({ length: 11 }, (_, i) => `<option ${String(d.note ?? "") === String(i) ? "selected" : ""}>${i}</option>`).join("")}</select></label>
         <label class="f">Émotion<select name="emotion"><option value="">—</option>${EMOTIONS.map((x) => `<option ${d.emotion === x ? "selected" : ""}>${x}</option>`).join("")}</select></label></div>
+      ${d.commentaireCoach ? `<div class="coach-mot"><b>💬 Le mot de ton entraîneur</b><p style="margin:4px 0 0;color:var(--ink)">${esc(d.commentaireCoach)}</p></div>` : ""}
       <label class="f">Mes commentaires<textarea name="commentaire">${esc(d.commentaire)}</textarea></label>
       <div class="acts">${e && String(e.id).startsWith("a_") ? `<button type="button" class="btn danger left" id="ar-del">Supprimer</button>` : ""}<button type="button" class="btn" data-close>Annuler</button><button class="btn primary">Enregistrer</button></div></form></div>`;
     el.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", (ev) => { if (ev.target === b) el.innerHTML = ""; }));
@@ -833,7 +870,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     $("#ar-tcn")?.addEventListener("input", tcm); $("#ar-tcs")?.addEventListener("input", tcm); tcm();
     $("#ar-cible")?.addEventListener("click", () => {
       const f = $("#ar-form"); let prev = null; try { prev = f.tcTir.value ? JSON.parse(f.tcTir.value) : null; } catch (err) { prev = null; }
-      cibleSheet({ distance: f.tcDistance.value || prev?.distance || "18", blason: f.tcBlason.value || prev?.blason || "", prev }, (t) => {
+      cibleSheet({ id: e?.id, distance: f.tcDistance.value || prev?.distance || "18", blason: f.tcBlason.value || prev?.blason || "", prev }, (t) => {
         const sc = t.volees.flat().reduce((a, k) => a + kv(k), 0), n = t.volees.flat().length;
         f.tcDistance.value = t.distance; f.tcBlason.value = t.blason; f.compte.value = n || ""; f.scoreCompte.value = n ? sc : ""; f.tcTir.value = n ? JSON.stringify(t) : "";
         $("#ar-cible").textContent = n ? "🎯 Voir / modifier mon tir sur la cible" : "🎯 Saisir mon tir sur la cible"; tcm();
@@ -916,7 +953,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
   }
   // ---------- Événements ----------
   root.addEventListener("click", async (ev) => {
-    const t = ev.target.closest("[data-atab],[data-who],[data-act],[data-saison],[data-entry],[data-eval],[data-arcombo],[data-rep],[data-artc],#ar-out"); if (!t) return;
+    const t = ev.target.closest("[data-atab],[data-who],[data-act],[data-saison],[data-entry],[data-eval],[data-arcombo],[data-rep],[data-artc],[data-artcp],#ar-out"); if (!t) return;
     ev.stopPropagation();
     if (t.dataset.act === "close-preview") { root.remove(); return; }
     if (t.id === "ar-out") return API.deconnexion();
@@ -932,6 +969,8 @@ window.CarnetArcherUI = (API, opts = {}) => {
       return;
     }
     if (t.dataset.artc) { St.tcCombo = t.dataset.artc; render(); return; }
+    if (t.dataset.artcp) { St.tcPer = t.dataset.artcp; render(); return; }
+    if (t.dataset.act === "tc-new") { tirDirect(); return; }
     if (t.dataset.arcombo) { St.combo = t.dataset.arcombo; render(); return; }
     if (t.dataset.who) { St.cur = +t.dataset.who; load(); return; }
     if (t.dataset.saison) { St.saison += +t.dataset.saison; render(); return; }
@@ -954,7 +993,7 @@ window.CarnetLineChart = (...a) => lineChart(...a); // graphique partagé avec l
 window.CarnetBlasonOpts = (c) => blasonOpts(c);
 window.CarnetDistances = () => DISTANCES;
 window.CarnetTcProgress = (...a) => tcProgress(...a);
-window.CarnetCible = { svg: (t) => targetSvg(t), face: (t) => faceOf(t), scoreAt: (f, r) => scoreAt(f, r), groupe: (t) => groupStats(t), carte: (t, a, s) => tirCarte(t, a, s), viewer: (t, s, a) => tirViewer(t, s, a) };
+window.CarnetCible = { svg: (t) => targetSvg(t), face: (t) => faceOf(t), scoreAt: (f, r) => scoreAt(f, r), groupe: (t) => groupStats(t), carte: (t, a, s) => tirCarte(t, a, s), viewer: (t, s, a, o) => tirViewer(t, s, a, o), bilan: (t, o) => tirBilan(t, o) };
 const ARCS = ["Classique", "Poulies", "Barebow", "Arc droit", "Arc chasse"];
 const CATS = ["U11", "U13", "U15", "U18", "U21", "Senior 1", "Senior 2", "Senior 3"];
 const FEDS = ["FFTA", "UFOLEP"];
@@ -1612,7 +1651,7 @@ function tcPoints(entries) {
     return { date: e.date, score: sc, n, label: [dist !== "" && dist != null ? `${dist} m` : "", bl].filter(Boolean).join(" · ") || "Distance non précisée", e };
   }).filter(Boolean).sort((a, b) => a.date.localeCompare(b.date));
 }
-function tcProgress(entries, cur, attr = "data-tccombo") {
+function tcProgress(entries, cur, attr = "data-tccombo", period = "30", pattr = "data-tcper") {
   const pts = tcPoints(entries); if (!pts.length) return "";
   const combos = [...new Set(pts.map((p) => p.label))].sort((p, q) => pts.filter((x) => x.label === q).length - pts.filter((x) => x.label === p).length);
   const k = combos.includes(cur) ? cur : combos[0], sel = pts.filter((p) => p.label === k), moy = sel.every((p) => p.n > 0);
@@ -1623,7 +1662,44 @@ function tcProgress(entries, cur, attr = "data-tccombo") {
     ${combos.length > 1 ? `<div class="chips">${combos.map((c) => `<button class="chip" ${attr}="${esc(c)}" aria-pressed="${c === k}">${esc(c)}</button>`).join("")}</div>` : `<b>${esc(k)}</b>`}
     <div class="stat"><div><b>${fmtP(last)}</b><span>dernier tir (${last.score} pts${last.n ? ` / ${last.n} fl.` : ""})</span></div><div><b>${fmtP(best)}</b><span>meilleur (${esc(dObj(best.date).toLocaleDateString("fr-FR"))})</span></div><div><b>${sel.length}</b><span>tir${sel.length > 1 ? "s" : ""} compté${sel.length > 1 ? "s" : ""}</span></div></div>
     ${sel.length >= 2 ? lineChart(sel.map((p) => ({ date: p.date, label: dObj(p.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }), y: v(p), tip: `${fmtLong(p.date)} : ${p.score} pts${p.n ? ` en ${p.n} flèches (${f2(p.score / p.n)} par flèche)` : ""}` })), { digits: moy ? 2 : 0 }) : `<p class="tirline">La courbe apparaît dès le 2e tir compté à cette distance.</p>`}
-    <span class="tirline">${moy ? "Moyenne de points par flèche : elle se compare même si le nombre de flèches change." : "Score total (renseigner le nombre de flèches permet de suivre la moyenne par flèche)."}</span></div>`;
+    <span class="tirline">${moy ? "Moyenne de points par flèche : elle se compare même si le nombre de flèches change." : "Score total (renseigner le nombre de flèches permet de suivre la moyenne par flèche)."}</span></div>
+    ${impactsMap(entries, k, period, pattr)}`;
+}
+// Carte des impacts : toutes les flèches placées sur la cible pour une distance · blason, sur une période, pour voir une tendance
+const tirLab = (e) => [e.tcDistance !== "" && e.tcDistance != null ? `${e.tcDistance} m` : "", e.tcBlason].filter(Boolean).join(" · ") || "Distance non précisée";
+function impactsMap(entries, combo, period = "30", pattr = "data-tcper") {
+  const today = todayISO(), from = addDaysISO(today, -30), z = saisonOfDate(today);
+  const all = entries.filter((e) => e.date && e.tcTir && (e.tcTir.impacts || []).length && tirLab(e) === combo);
+  if (!all.length) return "";
+  const list = all.filter((e) => (period === "tout" ? true : period === "saison" ? saisonOfDate(e.date) === z : e.date >= from));
+  const imps = list.flatMap((e) => e.tcTir.impacts), ref = all[all.length - 1].tcTir;
+  const per = [["30", "30 derniers jours"], ["saison", "Saison"], ["tout", "Tout"]];
+  return `<div class="card tc-card"><h3 class="hub-h">Où vont les flèches · ${esc(combo)}</h3>
+    <div class="chips">${per.map(([k, l]) => `<button class="chip" ${pattr}="${k}" aria-pressed="${k === period}">${l}</button>`).join("")}</div>
+    ${imps.length ? `${targetSvg({ id: "imap", blason: ref.blason, impacts: imps, showAll: true, mini: true, only: "all", volees: [[]] })}
+      ${groupStats({ blason: ref.blason, impacts: imps })}
+      <span class="tirline">${imps.length} flèche${imps.length > 1 ? "s" : ""} placée${imps.length > 1 ? "s" : ""} sur ${list.length} tir${list.length > 1 ? "s" : ""}. Le centre du groupement montre une tendance (par exemple toujours en bas à gauche) à travailler avec l'entraîneur.</span>`
+      : `<p class="tirline">Aucune flèche placée sur la cible pendant cette période.</p>`}</div>`;
+}
+// Bilan d'un tir : comparé au tir précédent et au meilleur à la même distance, meilleure volée, 10 et X, évolution volée par volée
+function tirBilan(t, others = []) {
+  const vols = (t.volees || []).filter((v) => v.length), fl = vols.flat(); if (!fl.length) return "";
+  const f2 = (x) => x.toFixed(2).replace(".", ","), tot = fl.reduce((a, x) => a + val(x), 0), moy = tot / fl.length;
+  const sums = vols.map((v) => v.reduce((a, x) => a + val(x), 0)), avgs = vols.map((v, i) => sums[i] / v.length);
+  const bestV = avgs.indexOf(Math.max(...avgs)), dix = fl.filter((x) => x === "X" || x === "10").length, xs = fl.filter((x) => x === "X").length, ms = fl.filter((x) => x === "M").length;
+  const lab = [t.distance ? `${t.distance} m` : "", t.blason].filter(Boolean).join(" · ") || "Distance non précisée";
+  const prevs = tcPoints(others).filter((p) => p.label === lab && p.n > 0), prev = prevs[prevs.length - 1];
+  const bestPrev = prevs.length ? Math.max(...prevs.map((p) => p.score / p.n)) : null;
+  const diff = prev ? moy - prev.score / prev.n : null;
+  const half = Math.floor(vols.length / 2), a1 = half ? avgs.slice(0, half).reduce((a, b) => a + b, 0) / half : null, a2 = half ? avgs.slice(half).reduce((a, b) => a + b, 0) / (vols.length - half) : null;
+  const fat = half >= 2 && a2 < a1 - 0.3 ? `Baisse en fin de tir : ${f2(a1 - a2)} point par flèche de moins sur la 2e moitié.` : half >= 2 && a2 > a1 + 0.3 ? `Montée en puissance : ${f2(a2 - a1)} point par flèche de plus sur la 2e moitié.` : "";
+  return `<div class="card bilan"><h3 class="hub-h">Bilan du tir</h3>
+    <div class="stat"><div><b>${tot}</b><span>points en ${fl.length} flèches</span></div><div><b>${f2(moy)}</b><span>par flèche</span></div>
+      <div><b class="${diff == null ? "" : diff >= 0 ? "c-green" : "c-red"}">${diff == null ? "—" : (diff >= 0 ? "+" : "−") + f2(Math.abs(diff))}</b><span>${prev ? `vs tir du ${esc(dObj(prev.date).toLocaleDateString("fr-FR"))}` : "premier tir à cette distance"}</span></div>
+      <div><b>${dix}</b><span>10${xs ? ` dont ${xs} X` : ""}${ms ? ` · ${ms} manquée${ms > 1 ? "s" : ""}` : ""}</span></div></div>
+    ${bestPrev != null && moy > bestPrev + 1e-9 ? `<p class="bilan-rec">🏆 Nouveau record à ${esc(lab)} : ${f2(moy)} par flèche (avant : ${f2(bestPrev)})</p>` : ""}
+    ${vols.length > 1 ? `<div class="vbars" role="img" aria-label="Points par volée">${vols.map((v, i) => `<div class="vb${i === bestV ? " best" : ""}"><span class="vb-v">${sums[i]}</span><span class="vb-b"><i style="height:${Math.max(4, (avgs[i] / 10) * 100)}%"></i></span><span class="vb-n">V${i + 1}</span></div>`).join("")}</div>
+      <span class="tirline">Meilleure volée : V${bestV + 1} (${sums[bestV]} pts).${fat ? " " + fat : ""}</span>` : ""}</div>`;
 }
 function linkBase(s, aid) {
   return { archerId: aid, saison: saisonKey(saisonOfDate(s.date)), date: s.date, seanceId: s.id, objectif: "", atteint: "", note: "", emotion: "", commentaire: "",
@@ -2033,7 +2109,7 @@ function viewCarnet() {
   if (S.cTab === "recap") {
     const rows = MOIS_SAISON.map((m) => ({ m, st: monthStats(S.centrees.filter((e) => Number(e.date.slice(5, 7)) === m)), mo: (c.mois || {})[m] || {} }));
     const an = monthStats(S.centrees);
-    h += tcProgress(S.centrees, S.tcCombo);
+    h += tcProgress(S.centrees, S.tcCombo, "data-tccombo", S.tcPer || "saison");
     h += `<div class="card"><div class="stat"><div><b>${an.total}</b><span>flèches sur la saison</span></div><div><b>${an.n}</b><span>séances notées</span></div><div><b>${fmt1(an.moyNote)}</b><span>ressenti moyen /10</span></div><div><b>${an.bestCompte ?? "—"}</b><span>meilleur tir compté</span></div><div><b>${an.bestCompet ?? "—"}</b><span>meilleur score en compétition</span></div></div></div>
       <div class="card"><h3 style="margin:0;font-family:var(--font-display);text-transform:uppercase">Volume annuel</h3>
       ${an.total ? `<div class="hbars">${VOL.map(([k, l]) => `<div class="hb"><span class="hl">${l}</span><span class="ht"><span style="width:${(an[k] / Math.max(...VOL.map(([x]) => an[x]))) * 100}%"></span></span><span class="hv">${an[k]} <small>${Math.round((an[k] / an.total) * 100)} %</small></span></div>`).join("")}</div>` : `<p class="notice">Aucune flèche notée pour cette saison.</p>`}</div>
@@ -2077,20 +2153,21 @@ function formEntree(e = null) {
       ${e?.seanceId ? `<span class="tirline">Ligne liée à une séance du club : les flèches et scores des feuilles de marque s'ajoutent automatiquement.</span>` : ""}</div>
     <div class="grid2"><label class="f" for="ce-sc">Score tir compté<input type="number" inputmode="numeric" min="0" id="ce-sc" name="scoreCompte" value="${esc(e?.scoreCompte)}" placeholder="${e?.auto?.scoreCompte ?? ""}"></label>
       <label class="f" for="ce-scc">Score compétition<input type="number" inputmode="numeric" min="0" id="ce-scc" name="scoreCompet" value="${esc(e?.scoreCompet)}" placeholder="${e?.auto?.scoreCompet ?? ""}"></label></div>
-    ${e?.tcTir && (e.tcTir.volees || []).some((v) => v.length) ? `<details class="card"><summary><b>Tir compté sur la cible</b> <span class="tirline">noté par l'archer · ${esc(e.tcTir.distance || "")} m · ${esc(e.tcTir.blason || "")}</span></summary><div id="ce-tv">${tirViewer(e.tcTir, 0)}</div></details>` : ""}
+    ${e?.tcTir && (e.tcTir.volees || []).some((v) => v.length) ? `<details class="card"><summary><b>Tir compté sur la cible</b> <span class="tirline">noté par l'archer · ${esc(e.tcTir.distance || "")} m · ${esc(e.tcTir.blason || "")}</span></summary><div id="ce-tv">${tirViewer(e.tcTir, "all", "data-tv", S.centrees.filter((x) => x.id !== e.id && x.date <= e.date))}</div></details>` : ""}
     <div class="grid2"><label class="f" for="ce-tcd">Distance du tir compté (m)<input type="number" inputmode="numeric" min="0" id="ce-tcd" name="tcDistance" list="ce-dl" value="${esc(e?.tcDistance)}" placeholder="${esc(e?.auto?.tcDistance ?? "")}"><datalist id="ce-dl">${DISTANCES.map((d) => `<option value="${d}">`).join("")}</datalist></label>
       <label class="f" for="ce-tcb">Blason du tir compté<select id="ce-tcb" name="tcBlason"><option value="">—</option>${blasonOpts(e?.tcBlason || "")}</select></label></div>
     <div class="f">Objectif atteint<div class="radio">${[["", "Non renseigné"], ["O", "Oui"], ["N", "Non"]].map(([v, l]) => `<label><input type="radio" name="atteint" value="${v}" ${(e?.atteint || "") === v ? "checked" : ""}> ${l}</label>`).join("")}</div></div>
     <div class="grid2"><label class="f" for="ce-note">Ressenti (note de 0 à 10)<select id="ce-note" name="note"><option value="">—</option>${Array.from({ length: 11 }, (_, i) => `<option ${String(e?.note ?? "") === String(i) ? "selected" : ""}>${i}</option>`).join("")}</select></label>
       <label class="f" for="ce-emo">Émotion ressentie<select id="ce-emo" name="emotion"><option value="">—</option>${EMOTIONS.map((x) => `<option ${e?.emotion === x ? "selected" : ""}>${x}</option>`).join("")}</select></label></div>
-    <label class="f" for="ce-com">Commentaires et ressentis<textarea id="ce-com" name="commentaire">${esc(e?.commentaire)}</textarea></label>`,
+    <label class="f" for="ce-com">Commentaires et ressentis<textarea id="ce-com" name="commentaire">${esc(e?.commentaire)}</textarea></label>
+    <label class="f" for="ce-coach">Mot de l'entraîneur (l'archer le lit dans son espace)<textarea id="ce-coach" name="commentaireCoach" placeholder="Ex. Beau groupement, garde ce placement d'épaule. Prochaine étape : travailler la fin de tir.">${esc(e?.commentaireCoach)}</textarea></label>`,
     {
       onSave(fd) {
         const date = fd.get("date"); if (!date) { toast("Choisis une date"); return false; }
         const dm = Number(date.slice(5, 7)), dy = Number(date.slice(0, 4));
         if (moisYear(end, dm) !== dy) { toast(`Cette date n'est pas dans la saison ${end - 1}-${end}`); return false; }
         const data = { archerId: a.id, saison: saisonKey(end), date, seanceId: fd.get("seanceId") || null, objectif: fd.get("objectif").trim(),
-          atteint: fd.get("atteint") || "", note: fd.get("note"), emotion: fd.get("emotion"), commentaire: fd.get("commentaire").trim(),
+          atteint: fd.get("atteint") || "", note: fd.get("note"), emotion: fd.get("emotion"), commentaire: fd.get("commentaire").trim(), commentaireCoach: (fd.get("commentaireCoach") || "").trim(),
           scoreCompte: fd.get("scoreCompte"), scoreCompet: fd.get("scoreCompet"), tcDistance: fd.get("tcDistance") || "", tcBlason: fd.get("tcBlason") || "", createdAt: e?.createdAt || Date.now() };
         VOL.forEach(([k]) => (data[k] = fd.get(k)));
         const sid = data.seanceId, ls = sid ? S.seances.find((x) => x.id === sid) : null;
@@ -2106,7 +2183,7 @@ function formEntree(e = null) {
       deleteLabel: "Supprimer cette ligne",
     });
   const tvb = $("#ce-tv");
-  if (tvb) tvb.addEventListener("click", (ev) => { const b = ev.target.closest("[data-tv]"); if (!b) return; ev.preventDefault(); tvb.innerHTML = tirViewer(e.tcTir, b.dataset.tv === "all" ? "all" : Number(b.dataset.tv)); });
+  if (tvb) tvb.addEventListener("click", (ev) => { const b = ev.target.closest("[data-tv]"); if (!b) return; ev.preventDefault(); tvb.innerHTML = tirViewer(e.tcTir, b.dataset.tv === "all" ? "all" : Number(b.dataset.tv), "data-tv", S.centrees.filter((x) => x.id !== e.id && x.date <= e.date)); });
   const from = $("#ce-from");
   if (from) from.addEventListener("change", () => {
     const s = S.seances.find((x) => x.id === from.value); if (!s) { $("#ce-sid").value = ""; return; }
@@ -2849,6 +2926,7 @@ function targetSvg(t) {
   }
   const dot = (p, faded) => { const s = p.k || scoreAt(face, Math.hypot(p.x, p.y)), fill = s === "X" || s === "10" ? "#FFD700" : s === "9" ? "#F59E0B" : Number(s) >= 7 ? "#EF4444" : Number(s) >= 5 ? "#06B6D4" : "#334155";
     const lab = !faded || t.showAll; // showAll : toutes les flèches du tir restent lisibles (volées précédentes atténuées)
+    if (t.mini) return `<circle cx="${250 + p.x * 240}" cy="${250 + p.y * 240}" r="6" fill="#0B0F19" fill-opacity=".8" stroke="#fff" stroke-width="1.5"/>`;
     if (t.showAll) return `<g opacity="${faded ? 0.7 : 1}"><circle cx="${250 + p.x * 240}" cy="${250 + p.y * 240}" r="13" fill="#0B0F19" stroke="${faded ? "#94A3B8" : "#fff"}" stroke-width="${faded ? 2 : 3}"/><text x="${250 + p.x * 240}" y="${254.5 + p.y * 240}" text-anchor="middle" font-size="12" font-weight="800" fill="#fff" font-family="Inter, sans-serif">${s}</text></g>`;
     return `<g opacity="${faded ? 0.28 : 1}"><circle cx="${250 + p.x * 240}" cy="${250 + p.y * 240}" r="11" fill="${fill}" stroke="${faded || !t.showAll ? "#0B0F19" : "#fff"}" stroke-width="2"/>${!lab ? "" : `<text x="${250 + p.x * 240}" y="${254 + p.y * 240}" text-anchor="middle" font-size="11" font-weight="800" fill="${fill === "#FFD700" || fill === "#F59E0B" ? "#0B0F19" : "#fff"}" font-family="Inter, sans-serif">${s}</text>`}</g>`; };
   return `<div class="tgt-wrap"><svg class="tgt" viewBox="0 0 500 500" data-tgt="${esc(t.id)}" role="img" aria-label="Blason : touche l'impact de la flèche">
@@ -2863,7 +2941,7 @@ function tirCarte(t, attr = "", sel = null) {
   return rows.length ? `<div class="sc-card"><div class="sc-row sc-h"><span class="sc-n"></span><span class="sc-chips">Flèches</span><span class="sc-s">Volée</span><span class="sc-t">Total</span></div>${rows.join("")}</div>` : "";
 }
 // Visionneuse d'un tir enregistré : une volée à la fois (ou tout le tir), avec sa feuille de marque
-function tirViewer(t, sel = 0, attr = "data-tv") {
+function tirViewer(t, sel = 0, attr = "data-tv", others = []) {
   const vols = (t.volees || []).filter((v) => v.length), n = vols.length; if (!n) return "";
   const k = sel === "all" ? "all" : Math.min(Math.max(0, Number(sel) || 0), n - 1);
   const sub = { ...t, impacts: k === "all" ? t.impacts || [] : (t.impacts || []).filter((p) => p.v === k) };
@@ -2873,7 +2951,7 @@ function tirViewer(t, sel = 0, attr = "data-tv") {
     ${targetSvg({ ...t, id: "tv-" + (t.id || "x"), showAll: true, only: k, volees: [...vols, []] })}
     ${k === "all" ? "" : `<div class="sc-chips" style="justify-content:center">${vols[k].map((x) => `<i class="sc-c ${chipCls(x)}">${x}</i>`).join("")}</div>`}
     ${groupStats(sub) || (sub.impacts.length < 2 ? `<span class="tirline">${sub.impacts.length ? "Une seule flèche placée sur la cible pour cette volée." : "Flèches notées sans position sur la cible."}</span>` : "")}
-    ${tirCarte(t, attr, k)}</div>`;
+    ${tirCarte(t, attr, k)}${k === "all" ? tirBilan(t, others) : ""}</div>`;
 }
 function groupStats(t) {
   const face = faceOf(t), imp = t.impacts || [];
@@ -3284,6 +3362,35 @@ async function fillAcces(aid, force = false) {
     <span class="tirline">À donner avec l'adresse de l'appli : ${esc(location.origin + location.pathname)}. La personne crée son compte, puis tape le code.</span>`;
   accCache = { aid, html: $("#acc-box").innerHTML };
 }
+// Derniers tirs comptés de l'archer (sur la fiche) : chargés à la demande, ouverts dans une fiche avec la cible et le mot de l'entraîneur
+let tcCache = { aid: null, at: 0, list: [] };
+async function loadTc(aid) {
+  if (!S.db || (tcCache.aid === aid && Date.now() - tcCache.at < 30000)) return;
+  tcCache = { aid, at: Date.now(), list: tcCache.aid === aid ? tcCache.list : [] };
+  try { const snap = await S.db.collection("carnetEntrees").where("archerId", "==", aid).get(); tcCache.list = snap.docs.map((d) => ({ id: d.id, ...d.data() })); if (S.archer === aid && !S.carnet && !$("#sheet").innerHTML) render(); } catch (e) { console.error(e); }
+}
+function tcRecentCard(a) {
+  loadTc(a.id);
+  const pts = tcPoints(tcCache.aid === a.id ? tcCache.list : []).filter((p) => !p.e.concoursId).slice(-5).reverse();
+  if (!pts.length) return "";
+  const f2 = (x) => x.toFixed(2).replace(".", ",");
+  return `<h2 class="sec">Derniers tirs comptés</h2><div class="list">${pts.map((p) => `<button class="row" data-tcopen="${esc(p.e.id)}"><span class="date"><span class="d">${dObj(p.date).getDate()}</span><span class="mo">${dObj(p.date).toLocaleDateString("fr-FR", { month: "short" }).replace(".", "")}</span></span>
+    <span class="main"><span class="t">${esc(p.label)}${p.e.tcTir ? " 🎯" : ""}</span><span class="m">${[p.e.saisiParArcher ? "noté par l'archer" : "", p.e.commentaireCoach ? "💬 mot de l'entraîneur" : ""].filter(Boolean).join(" · ")}</span></span>
+    <span class="count">${p.score}<small> pts${p.n ? ` · ${f2(p.score / p.n)}/fl.` : ""}</small></span></button>`).join("")}</div>`;
+}
+function coachTir(id) {
+  const e = tcCache.list.find((x) => x.id === id); if (!e) return;
+  const others = tcCache.list.filter((x) => x.id !== e.id && x.date <= e.date);
+  sheet(`Tir compté du ${fmtLong(e.date)}`, `
+    <span class="tirline">${esc(tirLab(e))} · ${esc(e.scoreCompte)} pts${e.compte ? ` en ${esc(e.compte)} flèches` : ""}${e.saisiParArcher ? " · noté par l'archer" : ""}</span>
+    ${e.tcTir ? `<div id="ct-tv">${tirViewer(e.tcTir, "all", "data-tv", others)}</div>` : ""}
+    ${e.commentaire ? `<div class="f">Ressenti de l'archer<p class="prev" style="color:var(--ink)">${esc(e.commentaire)}</p></div>` : ""}
+    <label class="f" for="ct-com">Mot de l'entraîneur (l'archer le lit dans son espace)<textarea id="ct-com" name="commentaireCoach" placeholder="Ex. Beau groupement, garde ce placement d'épaule.">${esc(e.commentaireCoach)}</textarea></label>`, {
+    onSave(fd) { const v = (fd.get("commentaireCoach") || "").trim(); e.commentaireCoach = v; patch("carnetEntrees", e.id, { commentaireCoach: v }); toast(v ? "Mot envoyé à l'archer" : "Mot retiré"); render(); },
+  });
+  const box = $("#ct-tv");
+  if (box) box.addEventListener("click", (ev) => { const b = ev.target.closest("[data-tv]"); if (!b) return; ev.preventDefault(); box.innerHTML = tirViewer(e.tcTir, b.dataset.tv === "all" ? "all" : Number(b.dataset.tv), "data-tv", others); });
+}
 function viewArcher() {
   const a = S.archers.find((x) => x.id === S.archer);
   if (!a) { S.archer = null; return viewArchers(); }
@@ -3299,8 +3406,8 @@ function viewArcher() {
       const todo = S.attributions.filter((x) => x.archerId === a.id && !x.fait).sort((p, q) => {
         const dp = S.seances.find((y) => y.id === p.seanceId)?.date || "9999", dq = S.seances.find((y) => y.id === q.seanceId)?.date || "9999"; return dp.localeCompare(dq);
       });
-      if (!todo.length) return "";
-      return `<h2 class="sec">Exercices à faire</h2><div class="list">${todo.map((x) => {
+      if (!todo.length) return tcRecentCard(a);
+      return tcRecentCard(a) + `<h2 class="sec">Exercices à faire</h2><div class="list">${todo.map((x) => {
         const d = docOf(x.documentId), s = S.seances.find((y) => y.id === x.seanceId);
         return `<div class="row"><span class="main"><span class="t">${d ? `<button class="lnk" data-doc="${d.id}">${esc(d.titre || d.nomFichier)}</button>` : "Fiche supprimée"}</span>
           <span class="m">${s ? `${esc(fmtLong(s.date))} · ${esc(clubName(s.clubId))}` : "Sans séance précise"}${x.remarque ? ` · ${esc(x.remarque.slice(0, 90))}` : ""}</span></span>
@@ -4044,7 +4151,7 @@ function formSeance(s = null) {
 
 // ---------- Événements ----------
 document.addEventListener("click", (e) => {
-  const t = e.target.closest("[data-tab],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-annonce],[data-partage],[data-tccombo]");
+  const t = e.target.closest("[data-tab],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen]");
   if (!t || t.closest("#sheet")) return;
   if (t.dataset.dashSuivi) { const [sid, aid] = t.dataset.dashSuivi.split("|"); S.seance = sid; S.suivi = aid; S.tirOpen = null; render(); window.scrollTo(0, 0); return; }
   if (t.dataset.tab) { go(t.dataset.tab); try { history.replaceState(null, "", "#" + t.dataset.tab); } catch (_) {} return; }
@@ -4055,6 +4162,8 @@ document.addEventListener("click", (e) => {
   }
   if (t.dataset.folder !== undefined) { S.folder = t.dataset.folder || null; render(); window.scrollTo(0, 0); return; }
   if (t.dataset.tccombo) { S.tcCombo = t.dataset.tccombo; render(); return; }
+  if (t.dataset.tcper) { S.tcPer = t.dataset.tcper; render(); return; }
+  if (t.dataset.tcopen) { coachTir(t.dataset.tcopen); return; }
   if (t.dataset.annonce) { const n = S.annonces.find((x) => x.id === t.dataset.annonce); if (n && S.canWrite) formAnnonce(n); return; }
   if (t.dataset.partage) { const d = S.documents.find((x) => x.id === t.dataset.partage); if (d) formPartage(d); return; }
   if (t.dataset.doc) { const d = S.documents.find((x) => x.id === t.dataset.doc); if (d) openDoc(d); return; }
