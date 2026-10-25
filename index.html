@@ -548,6 +548,15 @@ svg.chart .szl { stroke: var(--line-2, var(--line)); stroke-dasharray: 3 3; }
 .vb-v { font-size: .78rem; font-weight: 700; } .vb-n { font-size: .72rem; color: var(--muted); }
 .vb-b { width: 100%; max-width: 34px; display: flex; align-items: flex-end; background: var(--sunk); border-radius: 6px; overflow: hidden; }
 .vb-b i { display: block; width: 100%; background: var(--accent); border-radius: 6px 6px 0 0; } .vb.best .vb-b i { background: var(--gold, #FFD700); }
+.chrono { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; gap: 12px; padding: 14px 16px calc(14px + env(safe-area-inset-bottom)); background: #0B0F19; color: #fff; overflow: auto; transition: background-color .3s; }
+.chrono[data-col="rouge"] { background: #7F1D1D; } .chrono[data-col="vert"] { background: #14532D; } .chrono[data-col="orange"] { background: #9A3412; } .chrono[data-col="fin"] { background: #0F172A; }
+.ch-top { display: flex; gap: 8px; align-items: center; } .ch-top .grow { flex: 1; } .ch-top b { font-size: 1.15rem; }
+.ch-face { flex: 1; display: grid; place-items: center; align-content: center; text-align: center; gap: 6px; min-height: 40vh; }
+.ch-big { font-size: clamp(6rem, 28vw, 20rem); line-height: 1; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.ch-ph { font-size: clamp(1.1rem, 3.5vw, 2rem); font-weight: 700; } .ch-vol { font-size: clamp(1rem, 3vw, 1.6rem); opacity: .85; }
+.ch-acts { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; } .ch-acts .btn { min-height: 56px; min-width: 130px; font-size: 1.05rem; } .ch-go { min-width: 220px !important; }
+.ch-form { display: grid; gap: 8px; background: rgba(255,255,255,.06); border-radius: 16px; padding: 12px; } .ch-help { text-align: center; color: rgba(255,255,255,.75); }
+.ar-quick { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
 .ar-big { width: 100%; min-height: 56px; font-size: 1.1rem; }
 .ar-mot { display: grid; gap: 4px; text-align: left; width: 100%; color: var(--ink); cursor: pointer; }
 .coach-mot { border-left: 3px solid var(--accent); padding: 8px 12px; background: var(--sunk); border-radius: 0 12px 12px 0; } .tv-chips .chip { min-width: 44px; justify-content: center; }
@@ -721,6 +730,11 @@ window.CarnetArcherUI = (API, opts = {}) => {
     else h += ({ accueil: vAccueil, carnet: vCarnet, concours: vConcours, documents: vDocs, evaluations: vEvals }[St.tab] || vAccueil)();
     view.innerHTML = h;
   }
+  // Réglages du chrono de l'archer : gardés sur son appareil
+  const LSK = "carnet-chronos";
+  const lsGet = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } };
+  const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* stockage indisponible */ } };
+  const chronoStore = { list: () => lsGet(LSK, []), save: (l) => lsSet(LSK, l), last: () => lsGet(LSK + "-dernier", ""), setLast: (n) => lsSet(LSK + "-dernier", n) };
   // ---------- Accueil : infos du club et entraînements proposés ----------
   const ENC = () => ["encadrant", "les-deux"].includes(St.data.archer?.role);
   const clubNom = (id) => (St.data.clubs || []).find((c) => c.id === id)?.nom || "";
@@ -728,7 +742,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     const ann = (St.data.annonces || []).slice().sort((a, b) => (b.important ? 1 : 0) - (a.important ? 1 : 0) || (b.date || "").localeCompare(a.date || ""));
     const ent = St.data.entrainements, prenom = St.data.archer?.prenom || "";
     const mots = St.data.entrees.filter((e) => e.commentaireCoach).sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, 2);
-    let h = `<button class="btn primary ar-big" data-act="tc-new">🎯 Nouveau tir compté</button>`;
+    let h = `<div class="ar-quick"><button class="btn primary ar-big" data-act="tc-new">🎯 Nouveau tir compté</button>${window.CarnetChrono ? `<button class="btn ar-big" data-act="chrono">⏱ Chrono</button>` : ""}</div>`;
     h += mots.map((e) => `<button class="card coach-mot ar-mot" data-entry="${esc(e.id)}"><b>💬 Le mot de ton entraîneur · ${esc(dObj(e.date).toLocaleDateString("fr-FR"))}</b><span>${esc(e.commentaireCoach)}</span></button>`).join("");
     h += `<div class="card ar-infos"><h3 class="hub-h">Infos du club</h3>${ann.length ? ann.map((n) => `<div class="ar-info${n.important ? " imp" : ""}">
       <b>${n.important ? '<span class="tag imp">Important</span> ' : ""}${esc(n.titre || "Info")}</b>${n.texte ? `<p>${esc(n.texte).replace(/\n/g, "<br>")}</p>` : ""}
@@ -1022,6 +1036,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     if (t.dataset.artc) { St.tcCombo = t.dataset.artc; render(); return; }
     if (t.dataset.artcp) { St.tcPer = t.dataset.artcp; render(); return; }
     if (t.dataset.act === "tc-new") { tirDirect(); return; }
+    if (t.dataset.act === "chrono") { window.CarnetChrono(chronoStore); return; }
     if (t.dataset.arcombo) { St.combo = t.dataset.arcombo; render(); return; }
     if (t.dataset.who) { St.cur = +t.dataset.who; load(); return; }
     if (t.dataset.saison) { St.saison += +t.dataset.saison; render(); return; }
@@ -1304,7 +1319,7 @@ function viewSeances() {
   const past = list.filter((s) => s.date < t).sort((a, b) => (b.date + (b.heure || "")).localeCompare(a.date + (a.heure || "")));
   const shownPast = S.past ? past : past.slice(0, 15);
   let h = clubChips();
-  if (S.canWrite && S.clubs.some((c) => creneaux(c).some((k) => JOURS.includes(k.jour)))) h += `<div class="bar"><span class="grow"></span><button class="btn" data-act="gen-month">Créer les séances d'un mois</button></div>`;
+  h += `<div class="bar"><span class="grow"></span><button class="btn" data-act="chrono">⏱ Chrono</button>${S.canWrite && S.clubs.some((c) => creneaux(c).some((k) => JOURS.includes(k.jour))) ? `<button class="btn" data-act="gen-month">Créer les séances d'un mois</button>` : ""}</div>`;
   if (!list.length) return h + `<div class="empty"><h3>Aucune séance</h3><p>Crée une séance pour pointer les présents et noter ce qui a été travaillé.</p><button class="btn primary" data-act="new-seance">Nouvelle séance</button></div>`;
   h += `<h2 class="sec">Aujourd'hui et à venir</h2>`;
   h += up.length ? `<div class="list">${up.map(seanceRow).join("")}</div>` : `<p class="notice">Aucune séance prévue. Utilise « Nouvelle séance » pour en créer une.</p>`;
@@ -1320,7 +1335,7 @@ function viewSeance() {
   const pres = new Set(s.presents || []);
   const roster = S.archers.filter((a) => (a.clubIds || []).includes(s.clubId) && (a.actif !== false || pres.has(a.id))).sort(byName);
   return `<div class="bar"><button class="btn ghost" data-act="back">← Séances</button><span class="grow"></span>
-      <button class="btn" data-act="print-sheet">Imprimer les fiches</button>
+      <button class="btn" data-act="chrono">⏱ Chrono</button><button class="btn" data-act="print-sheet">Imprimer les fiches</button>
       ${S.canWrite ? `<button class="btn" data-act="quick-entry">Saisir la feuille papier</button><button class="btn" data-act="edit-seance">Modifier</button>` : ""}</div>
     <div class="head club-edge" style="--club:${esc(clubColor(s.clubId))}"><span class="m" style="display:flex;gap:6px;align-items:center"><span class="dot" style="background:${esc(clubColor(s.clubId))}"></span>${esc(clubName(s.clubId))}</span>
       <h2>${esc(s.theme || "Entraînement")}</h2>
@@ -3031,6 +3046,90 @@ document.addEventListener("click", (e) => {
   addArrow(scoreAt(faceOf(t), Math.hypot(x, y)), { x, y });
 });
 
+// ---------- Chrono d'entraînement (feux et signaux comme en concours, réglages personnalisés) ----------
+const CHRONO_DEF = [
+  { nom: "Salle · 3 flèches", prep: 10, tir: 120, orange: 30, volees: 10, vagues: 1, alterner: false, pause: 0, son: true },
+  { nom: "Extérieur · 6 flèches", prep: 10, tir: 240, orange: 30, volees: 6, vagues: 1, alterner: false, pause: 0, son: true },
+  { nom: "Salle AB / CD", prep: 10, tir: 120, orange: 30, volees: 10, vagues: 2, alterner: true, pause: 0, son: true },
+  { nom: "Finale · 1 flèche / 20 s", prep: 10, tir: 20, orange: 5, volees: 5, vagues: 1, alterner: false, pause: 0, son: true },
+  { nom: "Volume · 1 min, pause 30 s", prep: 5, tir: 60, orange: 15, volees: 12, vagues: 1, alterner: false, pause: 30, son: true },
+];
+// store : { list() → réglages perso, save(liste) }
+function openChrono(store) {
+  const mine = () => store.list() || [], all = () => [...CHRONO_DEF, ...mine()];
+  let cfg = { ...(all().find((c) => c.nom === store.last?.()) || CHRONO_DEF[0]) }, st = null, timer = null, ac = null, lock = null, editing = false;
+  const el = document.createElement("div"); el.className = "chrono"; document.body.appendChild(el);
+  const beep = (n) => {
+    if (!cfg.son) return;
+    try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); const t0 = ac.currentTime;
+      for (let i = 0; i < n; i++) { const o = ac.createOscillator(), g = ac.createGain(); o.type = "square"; o.frequency.value = 2200; o.connect(g); g.connect(ac.destination);
+        const a = t0 + i * 0.55; g.gain.setValueAtTime(0.0001, a); g.gain.exponentialRampToValueAtTime(0.25, a + 0.02); g.gain.setValueAtTime(0.25, a + 0.35); g.gain.exponentialRampToValueAtTime(0.0001, a + 0.4); o.start(a); o.stop(a + 0.42); }
+    } catch (e) { /* pas de son sur cet appareil */ }
+  };
+  const wake = async (on) => { try { if (on && navigator.wakeLock) lock = await navigator.wakeLock.request("screen"); else if (!on && lock) { await lock.release(); lock = null; } } catch (e) { lock = null; } };
+  const groupe = (v, w) => { const ab = !cfg.alterner || v % 2 === 0 ? ["AB", "CD"] : ["CD", "AB"]; return cfg.vagues > 1 ? ab[w] : ""; };
+  // phases : prep → tir (par vague) → cibles (récupération) → volée suivante
+  const go = (phase, dur) => { st.phase = phase; st.dur = dur; st.t0 = performance.now(); st.paused = 0; };
+  function start() { st = { v: 0, w: 0, phase: "", dur: 0, t0: 0, paused: 0, pauseAt: null }; go("prep", cfg.prep); beep(2); wake(true); tick(); timer = setInterval(tick, 200); }
+  function next() {
+    if (st.phase === "prep") { go("tir", cfg.tir); beep(1); }
+    else if (st.phase === "tir") {
+      if (st.w + 1 < cfg.vagues) { st.w++; go("prep", cfg.prep); beep(2); }
+      else { beep(3); st.w = 0; if (st.v + 1 >= cfg.volees) { go("fin", 0); clearInterval(timer); wake(false); } else go("cibles", cfg.pause || 0); }
+    } else if (st.phase === "cibles") { st.v++; go("prep", cfg.prep); beep(2); }
+    draw();
+  }
+  const left = () => { if (!st) return cfg.prep; const el2 = ((st.pauseAt ?? performance.now()) - st.t0 - st.paused) / 1000; return Math.max(0, st.dur - el2); };
+  function tick() { if (!st || st.pauseAt) return; if (st.dur > 0 && left() <= 0) next(); else if (st.phase === "cibles" && !st.dur) { /* attente du bouton */ } paint(); }
+  const fmt = (x) => { const s2 = Math.ceil(x); return s2 >= 60 ? `${Math.floor(s2 / 60)}:${String(s2 % 60).padStart(2, "0")}` : String(s2); };
+  function paint() {
+    const big = el.querySelector(".ch-big"); if (!big || !st) return;
+    const l = left(), col = st.phase === "tir" ? (l <= cfg.orange ? "orange" : "vert") : st.phase === "fin" ? "fin" : "rouge";
+    el.dataset.col = col; big.textContent = st.phase === "cibles" && !st.dur ? "🏹" : st.phase === "fin" ? "✓" : fmt(l);
+    const g = groupe(st.v, st.w);
+    el.querySelector(".ch-ph").textContent = { prep: `Préparation${g ? " · " + g : ""} — au pas de tir`, tir: `Tir${g ? " · " + g : ""}${l <= cfg.orange ? " — dernières secondes" : ""}`, cibles: "Aux cibles : on va chercher les flèches", fin: "Entraînement terminé" }[st.phase] || "";
+    el.querySelector(".ch-vol").textContent = st.phase === "fin" ? `${cfg.volees} volées tirées` : `Volée ${st.v + 1} / ${cfg.volees}`;
+  }
+  function draw() {
+    const run = !!st && st.phase !== "fin";
+    el.innerHTML = `<div class="ch-top"><b>⏱ Chrono</b><span class="grow"></span>${run ? "" : `<button class="btn" data-ch="set">${editing ? "Fermer les réglages" : "Réglages"}</button>`}<button class="btn" data-ch="close" aria-label="Fermer le chrono">✕</button></div>
+      ${run ? "" : `<div class="chips ch-presets">${all().map((c) => `<button class="chip" data-chp="${esc(c.nom)}" aria-pressed="${c.nom === cfg.nom}">${esc(c.nom)}</button>`).join("")}</div>`}
+      ${editing && !run ? `<form class="ch-form" id="ch-form">
+        <div class="grid4"><label class="f">Préparation (s)<input type="number" min="0" name="prep" value="${cfg.prep}"></label><label class="f">Temps de tir (s)<input type="number" min="5" name="tir" value="${cfg.tir}"></label>
+          <label class="f">Orange à (s restantes)<input type="number" min="0" name="orange" value="${cfg.orange}"></label><label class="f">Volées<input type="number" min="1" max="60" name="volees" value="${cfg.volees}"></label></div>
+        <div class="grid4"><label class="f">Vagues<select name="vagues"><option value="1" ${cfg.vagues === 1 ? "selected" : ""}>Une seule</option><option value="2" ${cfg.vagues === 2 ? "selected" : ""}>AB puis CD</option></select></label>
+          <label class="f">Ordre des vagues<select name="alterner"><option value="0" ${!cfg.alterner ? "selected" : ""}>Toujours AB puis CD</option><option value="1" ${cfg.alterner ? "selected" : ""}>Alterner AB-CD / CD-AB</option></select></label>
+          <label class="f">Entre les volées<select name="pause"><option value="0" ${!cfg.pause ? "selected" : ""}>Attendre mon signal</option>${[20, 30, 45, 60, 90, 120].map((x) => `<option value="${x}" ${cfg.pause === x ? "selected" : ""}>Pause de ${x} s</option>`).join("")}</select></label>
+          <label class="f">Signaux sonores<select name="son"><option value="1" ${cfg.son ? "selected" : ""}>Oui</option><option value="0" ${!cfg.son ? "selected" : ""}>Non</option></select></label></div>
+        <div class="bar"><input type="text" name="nom" value="${esc(cfg.nom)}" placeholder="Nom du réglage" style="flex:1;min-width:160px"><button class="btn primary">Enregistrer ce réglage</button>${mine().some((c) => c.nom === cfg.nom) ? `<button type="button" class="btn danger" data-ch="del">Supprimer</button>` : ""}</div>
+        <span class="tirline">Les réglages fournis restent toujours disponibles ; un réglage enregistré sous un autre nom s'ajoute à la liste.</span></form>` : ""}
+      <div class="ch-face"><span class="ch-ph">${st ? "" : `${esc(cfg.nom)} · ${cfg.volees} volées · ${fmt(cfg.tir)}${cfg.tir >= 60 ? "" : " s"} de tir${cfg.vagues > 1 ? " · AB / CD" : ""}`}</span><b class="ch-big">${st ? "" : fmt(cfg.tir)}</b><span class="ch-vol">${st ? "" : "Prêt"}</span></div>
+      <div class="ch-acts">${!st || st.phase === "fin" ? `<button class="btn primary ch-go" data-ch="start">${st ? "Recommencer" : "▶ Démarrer"}</button>`
+        : `<button class="btn" data-ch="pause">${st.pauseAt ? "▶ Reprendre" : "⏸ Pause"}</button><button class="btn primary ch-go" data-ch="next">${st.phase === "cibles" ? "Volée suivante ▶" : st.phase === "tir" ? "Tout le monde a fini ⏭" : "Commencer le tir ⏭"}</button><button class="btn danger" data-ch="stop">Arrêter</button>`}</div>
+      <span class="tirline ch-help">Rouge : préparation (2 signaux). Vert : tir (1 signal), orange pour les dernières secondes. 3 signaux : aux cibles.</span>`;
+    paint();
+    const f = el.querySelector("#ch-form");
+    if (f) f.addEventListener("submit", (ev) => { ev.preventDefault(); const fd = new FormData(f), n = (fd.get("nom") || "").trim() || "Mon réglage";
+      const c = { nom: n, prep: +fd.get("prep") || 0, tir: Math.max(5, +fd.get("tir") || 120), orange: Math.max(0, +fd.get("orange") || 0), volees: Math.max(1, Math.min(60, +fd.get("volees") || 1)), vagues: +fd.get("vagues") === 2 ? 2 : 1, alterner: fd.get("alterner") === "1", pause: +fd.get("pause") || 0, son: fd.get("son") === "1" };
+      if (CHRONO_DEF.some((d) => d.nom === n)) { c.nom = n + " (perso)"; }
+      store.save([...mine().filter((x) => x.nom !== c.nom), c]); cfg = c; editing = false; store.setLast?.(c.nom); draw(); toast(`Réglage « ${c.nom} » enregistré`); });
+  }
+  el.addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-ch],[data-chp]"); if (!b) return;
+    if (b.dataset.chp) { cfg = { ...all().find((c) => c.nom === b.dataset.chp) }; store.setLast?.(cfg.nom); st = null; draw(); return; }
+    const a = b.dataset.ch;
+    if (a === "close") { clearInterval(timer); wake(false); el.remove(); return; }
+    if (a === "set") { editing = !editing; draw(); return; }
+    if (a === "del") { store.save(mine().filter((x) => x.nom !== cfg.nom)); cfg = { ...CHRONO_DEF[0] }; editing = false; draw(); return; }
+    if (a === "start") { clearInterval(timer); editing = false; start(); draw(); return; }
+    if (a === "next") { if (st.pauseAt) { st.paused += performance.now() - st.pauseAt; st.pauseAt = null; } next(); return; }
+    if (a === "pause") { if (st.pauseAt) { st.paused += performance.now() - st.pauseAt; st.pauseAt = null; } else st.pauseAt = performance.now(); draw(); return; }
+    if (a === "stop") { clearInterval(timer); wake(false); st = null; draw(); }
+  });
+  draw();
+}
+const coachChronoStore = { list: () => (Array.isArray(prm().chronos) ? prm().chronos : []), save: (l) => setParam({ chronos: l }), last: () => prm().chronoDernier || "", setLast: (n) => setParam({ chronoDernier: n }) };
+window.CarnetChrono = (store) => openChrono(store);
 // ---------- Tableau de bord (repris d'ArcherHub) ----------
 let dashCache = { at: 0, entries: [] };
 async function loadDashEntries() {
@@ -4341,6 +4440,7 @@ document.addEventListener("click", (e) => {
   if (a === "restore") startRestore();
   if (a === "logout" && window.carnetLogout) window.carnetLogout();
   if (a === "new-annonce") formAnnonce();
+  if (a === "chrono") openChrono(coachChronoStore);
   if (a === "new-partage") formPartage();
   if (a === "rep-cocher") {
     const s = S.seances.find((x) => x.id === S.seance); if (!s) return;

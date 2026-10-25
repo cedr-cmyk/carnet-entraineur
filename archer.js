@@ -87,6 +87,11 @@ window.CarnetArcherUI = (API, opts = {}) => {
     else h += ({ accueil: vAccueil, carnet: vCarnet, concours: vConcours, documents: vDocs, evaluations: vEvals }[St.tab] || vAccueil)();
     view.innerHTML = h;
   }
+  // Réglages du chrono de l'archer : gardés sur son appareil
+  const LSK = "carnet-chronos";
+  const lsGet = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } };
+  const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* stockage indisponible */ } };
+  const chronoStore = { list: () => lsGet(LSK, []), save: (l) => lsSet(LSK, l), last: () => lsGet(LSK + "-dernier", ""), setLast: (n) => lsSet(LSK + "-dernier", n) };
   // ---------- Accueil : infos du club et entraînements proposés ----------
   const ENC = () => ["encadrant", "les-deux"].includes(St.data.archer?.role);
   const clubNom = (id) => (St.data.clubs || []).find((c) => c.id === id)?.nom || "";
@@ -94,7 +99,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     const ann = (St.data.annonces || []).slice().sort((a, b) => (b.important ? 1 : 0) - (a.important ? 1 : 0) || (b.date || "").localeCompare(a.date || ""));
     const ent = St.data.entrainements, prenom = St.data.archer?.prenom || "";
     const mots = St.data.entrees.filter((e) => e.commentaireCoach).sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, 2);
-    let h = `<button class="btn primary ar-big" data-act="tc-new">🎯 Nouveau tir compté</button>`;
+    let h = `<div class="ar-quick"><button class="btn primary ar-big" data-act="tc-new">🎯 Nouveau tir compté</button>${window.CarnetChrono ? `<button class="btn ar-big" data-act="chrono">⏱ Chrono</button>` : ""}</div>`;
     h += mots.map((e) => `<button class="card coach-mot ar-mot" data-entry="${esc(e.id)}"><b>💬 Le mot de ton entraîneur · ${esc(dObj(e.date).toLocaleDateString("fr-FR"))}</b><span>${esc(e.commentaireCoach)}</span></button>`).join("");
     h += `<div class="card ar-infos"><h3 class="hub-h">Infos du club</h3>${ann.length ? ann.map((n) => `<div class="ar-info${n.important ? " imp" : ""}">
       <b>${n.important ? '<span class="tag imp">Important</span> ' : ""}${esc(n.titre || "Info")}</b>${n.texte ? `<p>${esc(n.texte).replace(/\n/g, "<br>")}</p>` : ""}
@@ -388,6 +393,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     if (t.dataset.artc) { St.tcCombo = t.dataset.artc; render(); return; }
     if (t.dataset.artcp) { St.tcPer = t.dataset.artcp; render(); return; }
     if (t.dataset.act === "tc-new") { tirDirect(); return; }
+    if (t.dataset.act === "chrono") { window.CarnetChrono(chronoStore); return; }
     if (t.dataset.arcombo) { St.combo = t.dataset.arcombo; render(); return; }
     if (t.dataset.who) { St.cur = +t.dataset.who; load(); return; }
     if (t.dataset.saison) { St.saison += +t.dataset.saison; render(); return; }
