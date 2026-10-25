@@ -537,6 +537,8 @@ svg.chart .szl { stroke: var(--line-2, var(--line)); stroke-dasharray: 3 3; }
 .ch-ph { font-size: clamp(1.1rem, 3.5vw, 2rem); font-weight: 700; } .ch-vol { font-size: clamp(1rem, 3vw, 1.6rem); opacity: .85; }
 .ch-acts { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; } .ch-acts .btn { min-height: 56px; min-width: 130px; font-size: 1.05rem; } .ch-go { min-width: 220px !important; }
 .ch-form { display: grid; gap: 8px; background: rgba(255,255,255,.06); border-radius: 16px; padding: 12px; } .ch-help { text-align: center; color: rgba(255,255,255,.75); }
+.top-chrono { margin-left: 10px; min-height: 38px; padding: 6px 12px; } .dash-chrono { width: 100%; min-height: 54px; font-size: 1.05rem; margin-bottom: 4px; }
+.ar-root .top-chrono { display: none; } @media (max-width: 520px) { .top-chrono .tc-l { display: none; } .top-chrono { font-size: 1.2rem; padding: 6px 10px; } }
 .ar-quick { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
 .ar-big { width: 100%; min-height: 56px; font-size: 1.1rem; }
 .ar-mot { display: grid; gap: 4px; text-align: left; width: 100%; color: var(--ink); cursor: pointer; }
@@ -614,6 +616,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
       <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><path d="M21 3l-8 8M17 3h4v4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
       <h1>Carnet <em>de l'entraîneur</em></h1>
       <span class="sub" id="sync">Connexion…</span>
+      <button type="button" class="btn top-chrono" data-act="chrono" aria-label="Ouvrir le chrono d'entraînement">⏱<span class="tc-l"> Chrono</span></button>
     </div>
     <nav class="tabs" role="tablist" id="tabs"></nav>
   </div>
@@ -3164,7 +3167,7 @@ function viewAccueil() {
     return { a: S.archers.find((x) => x.id === aid), r, score: num(r.score), moy, n: prev.length };
   }).sort((p, q) => fullName(p.a).localeCompare(fullName(q.a), "fr")) : [];
   const card = (icon, cls, label, val, sub) => `<div class="hub-stat"><div class="hub-stat-top"><span>${label}</span><i class="hub-ico ${cls}">${ICON[icon]}</i></div><b class="${cls}">${val}</b><small>${sub}</small></div>`;
-  let h = clubChips() + `<div class="head"><span class="pill">Tableau de bord</span><h2>${prm().nom ? "Bonjour " + esc(prm().nom) : "Bonjour"}</h2><span class="m">${esc(fmtLong(today))}</span></div>
+  let h = clubChips() + `<button class="btn primary dash-chrono" data-act="chrono">⏱ Lancer le chrono d'entraînement</button><div class="head"><span class="pill">Tableau de bord</span><h2>${prm().nom ? "Bonjour " + esc(prm().nom) : "Bonjour"}</h2><span class="m">${esc(fmtLong(today))}</span></div>
     <div class="hub-stats">
       ${card("cal", "c-cyan", "Séances du mois", sessM.length, `${upcoming.length ? "prochaine : " + dObj(upcoming[0].date).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" }) : "aucune prévue"}`)}
       ${card("wrench", aRep ? "c-red" : "c-green", "Matériel à réparer", aRep, `${mat.filter((m) => m.archerId).length} prêté${mat.filter((m) => m.archerId).length > 1 ? "s" : ""} sur ${mat.length}`)}
