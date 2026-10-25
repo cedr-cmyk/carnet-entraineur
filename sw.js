@@ -1,5 +1,5 @@
 // Service worker : appli disponible hors connexion, et fichiers servis à l'adresse _blob/<id>
-const SHELL = "carnet-shell-v6", FILES = "carnet-fichiers-v1";
+const SHELL = "carnet-shell-v7", FILES = "carnet-fichiers-v1";
 const ASSETS = ["./", "./index.html", "./backend.js", "./config.js", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 let auth = null;
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(SHELL).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting())); });
