@@ -3032,7 +3032,7 @@ const CHRONO_DEF = [
   { nom: "Extérieur · 6 flèches", prep: 10, tir: 240, orange: 30, volees: 6, vagues: 1, alterner: false, pause: 0, son: true },
   { nom: "Salle AB / CD", prep: 10, tir: 120, orange: 30, volees: 10, vagues: 2, alterner: true, pause: 0, son: true },
   { nom: "Finale · 1 flèche / 20 s", prep: 10, tir: 20, orange: 5, volees: 5, vagues: 1, alterner: false, pause: 0, son: true },
-  { nom: "Volume · 1 min, pause 30 s", prep: 5, tir: 60, orange: 15, volees: 12, vagues: 1, alterner: false, pause: 30, son: true },
+  { nom: "Volume · 60 s, pause 30 s", prep: 5, tir: 60, orange: 15, volees: 12, vagues: 1, alterner: false, pause: 30, son: true },
 ];
 // store : { list() → réglages perso, save(liste) }
 function openChrono(store) {
@@ -3061,7 +3061,7 @@ function openChrono(store) {
   }
   const left = () => { if (!st) return cfg.prep; const el2 = ((st.pauseAt ?? performance.now()) - st.t0 - st.paused) / 1000; return Math.max(0, st.dur - el2); };
   function tick() { if (!st || st.pauseAt) return; if (st.dur > 0 && left() <= 0) next(); else if (st.phase === "cibles" && !st.dur) { /* attente du bouton */ } paint(); }
-  const fmt = (x) => { const s2 = Math.ceil(x); return s2 >= 60 ? `${Math.floor(s2 / 60)}:${String(s2 % 60).padStart(2, "0")}` : String(s2); };
+  const fmt = (x) => String(Math.ceil(x)); // toujours en secondes, comme sur les feux de concours
   function paint() {
     const big = el.querySelector(".ch-big"); if (!big || !st) return;
     const l = left(), col = st.phase === "tir" ? (l <= cfg.orange ? "orange" : "vert") : st.phase === "fin" ? "fin" : "rouge";
@@ -3083,7 +3083,7 @@ function openChrono(store) {
           <label class="f">Signaux sonores<select name="son"><option value="1" ${cfg.son ? "selected" : ""}>Oui</option><option value="0" ${!cfg.son ? "selected" : ""}>Non</option></select></label></div>
         <div class="bar"><input type="text" name="nom" value="${esc(cfg.nom)}" placeholder="Nom du réglage" style="flex:1;min-width:160px"><button class="btn primary">Enregistrer ce réglage</button>${mine().some((c) => c.nom === cfg.nom) ? `<button type="button" class="btn danger" data-ch="del">Supprimer</button>` : ""}</div>
         <span class="tirline">Les réglages fournis restent toujours disponibles ; un réglage enregistré sous un autre nom s'ajoute à la liste.</span></form>` : ""}
-      <div class="ch-face"><span class="ch-ph">${st ? "" : `${esc(cfg.nom)} · ${cfg.volees} volées · ${fmt(cfg.tir)}${cfg.tir >= 60 ? "" : " s"} de tir${cfg.vagues > 1 ? " · AB / CD" : ""}`}</span><b class="ch-big">${st ? "" : fmt(cfg.tir)}</b><span class="ch-vol">${st ? "" : "Prêt"}</span></div>
+      <div class="ch-face"><span class="ch-ph">${st ? "" : `${esc(cfg.nom)} · ${cfg.volees} volées · ${fmt(cfg.tir)} s de tir${cfg.vagues > 1 ? " · AB / CD" : ""}`}</span><b class="ch-big">${st ? "" : fmt(cfg.tir)}</b><span class="ch-vol">${st ? "" : "Prêt"}</span></div>
       <div class="ch-acts">${!st || st.phase === "fin" ? `<button class="btn primary ch-go" data-ch="start">${st ? "Recommencer" : "▶ Démarrer"}</button>`
         : `<button class="btn" data-ch="pause">${st.pauseAt ? "▶ Reprendre" : "⏸ Pause"}</button><button class="btn primary ch-go" data-ch="next">${st.phase === "cibles" ? "Volée suivante ▶" : st.phase === "tir" ? "Tout le monde a fini ⏭" : "Commencer le tir ⏭"}</button><button class="btn danger" data-ch="stop">Arrêter</button>`}</div>
       <span class="tirline ch-help">Rouge : préparation (2 signaux). Vert : tir (1 signal), orange pour les dernières secondes. 3 signaux : aux cibles.</span>`;
