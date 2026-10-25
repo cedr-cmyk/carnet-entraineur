@@ -145,6 +145,61 @@ window.CarnetArcherUI = (API, opts = {}) => {
     $("#co-res").onclick = () => formEntry(e);
     const v = $("#co-voir"); if (v) v.onclick = () => { el.innerHTML = ""; St.tab = "concours"; render(); window.scrollTo(0, 0); };
   }
+  // ---------- Tir compté sur la cible : toucher l'impact ou taper la valeur ----------
+  const kv = (k) => (k === "X" ? 10 : k === "M" ? 0 : Number(k) || 0), krank = (k) => (k === "X" ? 11 : kv(k));
+  function cibleSheet(init, onDone) {
+    const C = window.CarnetCible;
+    const T = init.prev ? JSON.parse(JSON.stringify(init.prev)) : { distance: init.distance, blason: init.blason || "Trispot 40 cm CL", fpv: 3, nbVolees: 10, volees: [], impacts: [] };
+    T.distance = init.distance || T.distance; if (init.blason) T.blason = init.blason;
+    const layer = document.createElement("div"); layer.className = "sheet-bg ar-tgt-layer"; document.body.appendChild(layer);
+    const total = () => T.volees.flat().reduce((a, k) => a + kv(k), 0), shot = () => T.volees.flat().length, plan = () => T.fpv * T.nbVolees;
+    const full = () => shot() >= plan();
+    function add(k, imp) {
+      if (full()) { toast("Toutes les flèches sont notées"); return; }
+      let last = T.volees[T.volees.length - 1]; if (!last || last.length >= T.fpv) { last = []; T.volees.push(last); }
+      last.push(k); if (imp) T.impacts.push({ v: T.volees.length - 1, x: +imp.x.toFixed(4), y: +imp.y.toFixed(4), k });
+      if (last.length === T.fpv) last.sort((a, b) => krank(b) - krank(a));
+      if (full()) toast(`Tir terminé : ${total()} points`);
+      draw();
+    }
+    function undo() {
+      const vi = T.volees.length - 1, last = T.volees[vi]; if (!last || !last.length) return;
+      const j = T.impacts.map((p, i) => [p, i]).filter(([p]) => p.v === vi).pop();
+      if (j) { T.impacts.splice(j[1], 1); last.splice(last.lastIndexOf(j[0].k), 1); } else last.pop();
+      if (!last.length) T.volees.pop(); draw();
+    }
+    function draw() {
+      const n = shot(), vcur = T.volees.length && T.volees[T.volees.length - 1].length < T.fpv ? T.volees.length : Math.min(T.volees.length + 1, T.nbVolees);
+      const keys = ["X", "10", "9", "8", "7", "6", "5", "4", "3", "2", "1", "M"], face = C.face(T), minV = 11 - face.zones;
+      const cls = (k) => (["X", "10", "9"].includes(k) ? "y" : ["8", "7"].includes(k) ? "r" : ["6", "5"].includes(k) ? "b" : ["4", "3"].includes(k) ? "k" : k === "M" ? "m" : "w");
+      layer.innerHTML = `<div class="sheet ar-tgt-sheet" role="dialog" aria-label="Tir compté sur la cible">
+        <div class="bar"><h3 style="margin:0">Tir compté sur la cible</h3><span class="grow"></span><b style="font-size:1.2rem">${total()} pts</b></div>
+        <div class="grid4"><label class="f">Distance (m)<input type="number" inputmode="numeric" id="tg-d" value="${esc(T.distance)}"></label>
+          <label class="f">Blason<select id="tg-b">${C ? window.CarnetBlasonOpts(T.blason) : ""}</select></label>
+          <label class="f">Flèches par volée<select id="tg-f">${[3, 6].map((x) => `<option ${T.fpv === x ? "selected" : ""}>${x}</option>`).join("")}</select></label>
+          <label class="f">Volées<input type="number" inputmode="numeric" min="1" max="40" id="tg-v" value="${T.nbVolees}"></label></div>
+        <div class="ar-tgt-grid"><div>${C.svg({ id: "ar-tir", ...T, showAll: true, volees: T.volees.length ? T.volees : [[]] })}</div>
+          <div class="kp" role="group" aria-label="Valeur de la flèche">${keys.filter((k) => k === "X" || k === "M" || Number(k) >= minV).map((k) => `<button type="button" class="${cls(k)}" data-k="${k}">${k}</button>`).join("")}<button type="button" class="undo" id="tg-undo">↶ Annuler la flèche</button></div></div>
+        <span class="tirline">Touche la cible là où la flèche s'est plantée : la valeur se calcule toute seule. Tu peux aussi taper la valeur sans placer la flèche.</span>
+        <div class="bar"><b>Volée ${Math.min(vcur, T.nbVolees)} / ${T.nbVolees}</b><span class="grow"></span><span>${n} / ${plan()} flèches${n ? ` · ${(total() / n).toFixed(2).replace(".", ",")} par flèche` : ""}</span></div>
+        <div class="tgt-bar"><span style="width:${Math.min(100, (n / plan()) * 100)}%"></span></div>
+        ${C.carte(T)}${C.groupe(T)}
+        <div class="acts"><button type="button" class="btn" id="tg-no">Annuler</button><button type="button" class="btn primary" id="tg-ok">Valider le tir</button></div></div>`;
+      layer.querySelector("svg.tgt").addEventListener("click", (ev) => {
+        const r = ev.currentTarget.getBoundingClientRect(), x = ((ev.clientX - r.left) / r.width * 500 - 250) / 240, y = ((ev.clientY - r.top) / r.height * 500 - 250) / 240;
+        add(C.scoreAt(C.face(T), Math.hypot(x, y)), { x, y });
+      });
+      layer.querySelectorAll("[data-k]").forEach((b) => b.addEventListener("click", () => add(b.dataset.k)));
+      $("#tg-undo").onclick = undo;
+      $("#tg-d").onchange = (ev) => { T.distance = ev.target.value; };
+      $("#tg-b").onchange = (ev) => { T.blason = ev.target.value; T.volees.forEach((v, vi) => { T.impacts.filter((p) => p.v === vi).forEach((p) => { const i = v.indexOf(p.k); const nk = C.scoreAt(C.face(T), Math.hypot(p.x, p.y)); if (i >= 0) v[i] = nk; p.k = nk; }); }); draw(); };
+      $("#tg-f").onchange = (ev) => { if (shot()) { toast("Change le nombre de flèches par volée avant de commencer"); ev.target.value = T.fpv; return; } T.fpv = +ev.target.value; T.nbVolees = T.fpv === 6 ? 6 : 10; draw(); };
+      $("#tg-v").onchange = (ev) => { T.nbVolees = Math.max(Math.ceil(shot() / T.fpv) || 1, Math.min(40, +ev.target.value || 1)); draw(); };
+      $("#tg-no").onclick = () => layer.remove();
+      $("#tg-ok").onclick = () => { layer.remove(); onDone(T); };
+    }
+    draw();
+  }
   function formEntry(e = null) {
     const d = e || { date: today() }, el = $("#sheet");
     const lock = e?.concoursId ? "readonly" : "";
@@ -158,7 +213,9 @@ window.CarnetArcherUI = (API, opts = {}) => {
           <label class="f" style="font-weight:500">Blason<select name="tcBlason"><option value="">—</option>${window.CarnetBlasonOpts ? window.CarnetBlasonOpts(d.tcBlason ?? tcLast.tcBlason ?? "") : ""}</select></label>
           <label class="f" style="font-weight:500">Flèches<input type="number" inputmode="numeric" min="0" name="compte" id="ar-tcn" value="${esc(d.compte)}" placeholder="${d.auto?.compte ? "+" + d.auto.compte : "ex. 30"}"></label>
           <label class="f" style="font-weight:500">Score<input type="number" inputmode="numeric" min="0" name="scoreCompte" id="ar-tcs" value="${esc(d.scoreCompte)}" placeholder="${esc(d.auto?.scoreCompte ?? "")}"></label></div>
-        <span class="tirline" id="ar-tcm"></span></div>
+        <span class="tirline" id="ar-tcm"></span>
+        ${window.CarnetCible ? `<button type="button" class="btn primary" id="ar-cible">🎯 ${d.tcTir ? "Voir / modifier mon tir sur la cible" : "Saisir mon tir sur la cible"}</button>` : ""}
+        <input type="hidden" name="tcTir" id="ar-tctir" value="${esc(d.tcTir ? JSON.stringify(d.tcTir) : "")}"></div>
       <input type="hidden" name="scoreCompet" value="${esc(d.scoreCompet)}">`}
       <div class="f">Objectif atteint<div class="radio">${[["", "Je ne sais pas"], ["O", "Oui"], ["N", "Non"]].map(([v, l]) => `<label><input type="radio" name="atteint" value="${v}" ${(d.atteint || "") === v ? "checked" : ""}> ${l}</label>`).join("")}</div></div>
       <div class="grid2"><label class="f">Ressenti (0 à 10)<select name="note"><option value="">—</option>${Array.from({ length: 11 }, (_, i) => `<option ${String(d.note ?? "") === String(i) ? "selected" : ""}>${i}</option>`).join("")}</select></label>
@@ -168,6 +225,14 @@ window.CarnetArcherUI = (API, opts = {}) => {
     el.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", (ev) => { if (ev.target === b) el.innerHTML = ""; }));
     const tcm = () => { const n = Number($("#ar-tcn")?.value), sc = Number($("#ar-tcs")?.value), o = $("#ar-tcm"); if (!o) return; o.textContent = n > 0 && sc > 0 ? `Moyenne : ${(sc / n).toFixed(2).replace(".", ",")} point${sc / n >= 2 ? "s" : ""} par flèche` : ""; };
     $("#ar-tcn")?.addEventListener("input", tcm); $("#ar-tcs")?.addEventListener("input", tcm); tcm();
+    $("#ar-cible")?.addEventListener("click", () => {
+      const f = $("#ar-form"); let prev = null; try { prev = f.tcTir.value ? JSON.parse(f.tcTir.value) : null; } catch (err) { prev = null; }
+      cibleSheet({ distance: f.tcDistance.value || prev?.distance || "18", blason: f.tcBlason.value || prev?.blason || "", prev }, (t) => {
+        const sc = t.volees.flat().reduce((a, k) => a + kv(k), 0), n = t.volees.flat().length;
+        f.tcDistance.value = t.distance; f.tcBlason.value = t.blason; f.compte.value = n || ""; f.scoreCompte.value = n ? sc : ""; f.tcTir.value = n ? JSON.stringify(t) : "";
+        $("#ar-cible").textContent = n ? "🎯 Voir / modifier mon tir sur la cible" : "🎯 Saisir mon tir sur la cible"; tcm();
+      });
+    });
     const del = $("#ar-del");
     if (del) del.onclick = async () => { if (!del.dataset.ok) { del.dataset.ok = 1; del.textContent = "Confirmer"; return; } try { await API.supprimer(who(), e.id); el.innerHTML = ""; toast("Séance supprimée"); load(); } catch (err) { toast(err.message); } };
     $("#ar-form").addEventListener("submit", async (ev) => {
@@ -175,6 +240,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
       if (PREVIEW) { toast("Aperçu : l'archer pourra enregistrer ici, pas toi"); return; } const fd = new FormData(ev.target), date = fd.get("date"); if (!date) return;
       const data = { date, saison: `${saisonOf(date) - 1}-${saisonOf(date)}` };
       ["objectif", "atteint", "note", "emotion", "commentaire", "scoreCompte", "scoreCompet", "tcDistance", "tcBlason", ...VOL.map(([k]) => k)].forEach((k) => (data[k] = String(fd.get(k) ?? "").trim()));
+      try { const tj = fd.get("tcTir"); if (tj) data.tcTir = JSON.parse(tj); } catch (err) { /* tir illisible : ignoré */ }
       const id = e?.id || "a_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
       try { await API.ecrire(who(), id, data); el.innerHTML = ""; toast("Enregistré dans ton carnet"); St.saison = saisonOf(date); load(); } catch (err) { toast("Enregistrement impossible : " + err.message); }
     });
