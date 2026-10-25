@@ -633,6 +633,7 @@ window.CarnetLineChart = (...a) => lineChart(...a); // graphique partagé avec l
 window.CarnetBlasonOpts = (c) => blasonOpts(c);
 window.CarnetDistances = () => DISTANCES;
 window.CarnetTcProgress = (...a) => tcProgress(...a);
+window.CarnetChrono = (store) => openChrono(store);
 window.CarnetCible = { svg: (t) => targetSvg(t), face: (t) => faceOf(t), scoreAt: (f, r) => scoreAt(f, r), groupe: (t) => groupStats(t), carte: (t, a, s) => tirCarte(t, a, s), viewer: (t, s, a, o) => tirViewer(t, s, a, o), bilan: (t, o) => tirBilan(t, o) };
 const ARCS = ["Classique", "Poulies", "Barebow", "Arc droit", "Arc chasse"];
 const CATS = ["U11", "U13", "U15", "U18", "U21", "Senior 1", "Senior 2", "Senior 3"];
@@ -2703,7 +2704,6 @@ function openChrono(store) {
   draw();
 }
 const coachChronoStore = { list: () => (Array.isArray(prm().chronos) ? prm().chronos : []), save: (l) => setParam({ chronos: l }), last: () => prm().chronoDernier || "", setLast: (n) => setParam({ chronoDernier: n }) };
-window.CarnetChrono = (store) => openChrono(store);
 // ---------- Tableau de bord (repris d'ArcherHub) ----------
 let dashCache = { at: 0, entries: [] };
 async function loadDashEntries() {
