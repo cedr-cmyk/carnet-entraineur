@@ -579,6 +579,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
 .test-band { background: linear-gradient(90deg, #78350F, #0E7490); text-shadow: none; }
 </style>
 
+<script>window.CARNET_TEST = true; // version de test uniquement (retiré par build.py)</script>
 <div class="test-band" role="note">Version de test : les données sont séparées de ton vrai carnet. Tu peux tout essayer sans risque.</div>
 <header class="top">
   <div class="top-in">
@@ -601,7 +602,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
 // telles que les renvoie la base (fonction espace_archer), et remplit son carnet.
 // window.CarnetArcherUI(API, { preview }) : preview = aperçu ouvert par l'entraîneur, en lecture seule.
 window.CarnetArcherUI = (API, opts = {}) => {
-  const PREVIEW = !!opts.preview, BLOB = window.CARNET_BLOB_BASE || "/_blob/";
+  const PREVIEW = !!opts.preview && !opts.testWrite, TESTW = !!opts.testWrite, BLOB = window.CARNET_BLOB_BASE || "/_blob/";
   const VOL = [["paille", "Paille"], ["visuel", "Visuel"], ["blason", "Blason"], ["compte", "Tir compté"], ["compet", "Compét"], ["autre", "Autre"]];
   const EMOTIONS = ["Fierté", "Satisfaction", "Soulagement", "Espoir", "Tristesse", "Déception", "Honte", "Colère"];
   const TYPES = { salle: "Salle", exterieur: "Extérieur", ufolarc_court: "Ufolarc court", ufolarc_long: "Ufolarc long", safari: "Safari", campagne: "Campagne", "3d": "3D", nature: "Nature" };
@@ -656,9 +657,10 @@ window.CarnetArcherUI = (API, opts = {}) => {
   const name = (a) => `${a.prenom || ""} ${a.nom || ""}`.trim() || "Archer";
 
   // Espace archer : remplace l'interface de l'entraîneur ; aperçu : s'ouvre par-dessus, en plein écran
-  const root = document.createElement("div"); root.className = "ar-root" + (PREVIEW ? " ar-preview" : "");
-  root.innerHTML = `${PREVIEW ? `<div class="test-band ar-band" role="note">Aperçu : voici exactement ce que voit l'archer dans son espace (lecture seule) <button class="btn" data-act="close-preview">Fermer l'aperçu</button></div>` : ""}<header class="top"></header><main><div class="wrap"></div></main>`;
-  if (!PREVIEW) { document.querySelector("header.top")?.setAttribute("hidden", ""); document.querySelector("#fab")?.setAttribute("hidden", ""); document.querySelector("main")?.setAttribute("hidden", ""); }
+  const root = document.createElement("div"); root.className = "ar-root" + (PREVIEW || TESTW ? " ar-preview" : "");
+  root.innerHTML = `${PREVIEW ? `<div class="test-band ar-band" role="note">Aperçu : voici exactement ce que voit l'archer dans son espace (lecture seule) <button class="btn" data-act="close-preview">Fermer l'aperçu</button></div>`
+    : TESTW ? `<div class="test-band ar-band" role="note">Archer de test : tu agis comme l'archer, ce que tu enregistres va dans la version de test <button class="btn" data-act="close-preview">Revenir à l'entraîneur</button></div>` : ""}<header class="top"></header><main><div class="wrap"></div></main>`;
+  if (!PREVIEW && !TESTW) { document.querySelector("header.top")?.setAttribute("hidden", ""); document.querySelector("#fab")?.setAttribute("hidden", ""); document.querySelector("main")?.setAttribute("hidden", ""); }
   document.body.appendChild(root);
   const top = root.querySelector("header.top"), view = root.querySelector(".wrap");
 
@@ -671,13 +673,13 @@ window.CarnetArcherUI = (API, opts = {}) => {
   function header() {
     const tabs = [["accueil", "Accueil"], ["carnet", "Mon carnet"], ["concours", "Mes concours"], ["documents", "Documents"], ["evaluations", "Évaluations"]];
     top.innerHTML = `<div class="top-in"><div class="brand"><span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/></svg></span>
-      <h1>Espace <em>${esc(St.data?.archer ? name(St.data.archer) : name(who()))}</em></h1><span class="sub">${PREVIEW ? "" : `<button class="btn ghost" id="ar-out">Se déconnecter</button>`}</span></div>
+      <h1>Espace <em>${esc(St.data?.archer ? name(St.data.archer) : name(who()))}</em></h1><span class="sub">${PREVIEW || TESTW ? "" : `<button class="btn ghost" id="ar-out">Se déconnecter</button>`}</span></div>
       <nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" aria-selected="${St.tab === k}" data-atab="${k}">${l}</button>`).join("")}</nav></div>`;
   }
   function render() {
     header();
     let h = "";
-    if (PREVIEW) h += "";
+    if (PREVIEW || TESTW) h += "";
     else if (St.list.length > 1) h += `<div class="chips" role="group" aria-label="Archer">${St.list.map((a, i) => `<button class="chip" data-who="${i}" aria-pressed="${i === St.cur}">${esc(name(a))}</button>`).join("")}<button class="chip" data-act="add-code">+ Code</button></div>`;
     else h += `<div class="bar"><span class="grow"></span><button class="btn ghost" data-act="add-code">J'ai un autre code (frère, sœur…)</button></div>`;
     if (St.err) h += `<p class="notice">${esc(St.err)}</p><button class="btn" data-act="reload">Réessayer</button>`;
@@ -698,7 +700,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     if (!ent) return h;
     h += `<h2 class="sec">Prochains entraînements</h2>`;
     if (!ent.length) return h + `<p class="notice">Aucun entraînement proposé pour l'instant. Ton entraîneur les ajoute au fil de la saison.</p>`;
-    h += `<span class="tirline">${ENC() ? "Dis si tu seras là. Comme encadrant, tu vois aussi qui a prévu de venir." : `Dis à ton entraîneur si ${St.list.length > 1 || PREVIEW ? esc(prenom) + " sera là" : "tu seras là"} : ça l'aide à préparer la séance.`}</span>`;
+    h += `<span class="tirline">${ENC() ? "Dis si tu seras là. Comme encadrant, tu vois aussi qui a prévu de venir." : `Dis à ton entraîneur si ${St.list.length > 1 || PREVIEW || TESTW ? esc(prenom) + " sera là" : "tu seras là"} : ça l'aide à préparer la séance.`}</span>`;
     h += `<div class="list">${ent.map((e) => `<div class="card ar-ent"><div class="bar"><span class="date"><span class="d">${dObj(e.date).getDate()}</span><span class="mo">${dObj(e.date).toLocaleDateString("fr-FR", { month: "short" }).replace(".", "")}</span></span>
       <span class="main" style="flex:1;min-width:0"><b>${esc(dObj(e.date).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }))}${e.heure ? " · " + esc(e.heure) : ""}</b>
         <span class="tirline" style="display:block">${[clubNom(e.clubId), e.groupe, e.theme, e.lieu].filter(Boolean).map(esc).join(" · ")}</span></span></div>
@@ -3072,7 +3074,7 @@ function confirmSheet(title, body, okLabel, onOk, onCancel = () => {}) {
 }
 // Accès de l'archer (ou de ses parents) à son espace : invitation par code, retrait
 // Aperçu de l'espace archer : mêmes données que celles renvoyées à l'archer par la base (fonction espace_archer)
-async function previewArcher(aid) {
+async function previewArcher(aid, testWrite = false) {
   const a = S.archers.find((x) => x.id === aid); if (!a || !window.CarnetArcherUI) return;
   const build = async () => {
     const entrees = S.db ? (await S.db.collection("carnetEntrees").where("archerId", "==", aid).get()).docs.map((d) => ({ id: d.id, ...d.data() })) : [];
@@ -3095,7 +3097,32 @@ async function previewArcher(aid) {
           sansReponse: S.archers.filter((x) => concerne(s, x) && !rs.some((r) => r.archerId === x.id)).length }; }),
     };
   };
-  window.CarnetArcherUI({ list: [{ owner: "", archer_id: aid, prenom: a.prenom, nom: a.nom }], charger: build, fichiers() {}, ecrire: async () => {}, supprimer: async () => {}, repondre: async () => {}, ajouterCode: async () => [], deconnexion() {} }, { preview: true });
+  const api = { list: [{ owner: "", archer_id: aid, prenom: a.prenom, nom: a.nom }], charger: build, fichiers() {}, ecrire: async () => {}, supprimer: async () => {}, repondre: async () => {}, ajouterCode: async () => [], deconnexion() {} };
+  if (testWrite) {
+    api.ecrire = async (_, id, data) => {
+      const cur = (await S.db.collection("carnetEntrees").doc(id).get()), ex = cur.exists ? cur.data() : null;
+      if (ex && ex.archerId !== aid) throw new Error("accès refusé"); if (!ex && !String(id).startsWith("a_")) throw new Error("identifiant invalide");
+      const champs = ex?.concoursId ? ["atteint", "note", "emotion", "commentaire"] : AR_CHAMPS, v = {};
+      champs.forEach((k) => { if (k in data) v[k] = data[k]; });
+      Object.assign(v, { archerId: aid, saisiParArcher: true, majArcher: Date.now() });
+      if (ex) await S.db.collection("carnetEntrees").doc(id).update(v); else await S.db.collection("carnetEntrees").doc(id).set({ createdAt: Date.now(), ...v });
+      dashCache.at = 0;
+    };
+    api.supprimer = async (_, id) => { if (String(id).startsWith("a_")) await S.db.collection("carnetEntrees").doc(id).delete(); };
+    api.repondre = async (_, sid, rep) => {
+      const id = `r_${sid}_${aid}`;
+      if (!rep) { S.reponses = S.reponses.filter((r) => r.id !== id); await S.db.collection("reponses").doc(id).delete(); return; }
+      const d = { seanceId: sid, archerId: aid, reponse: rep, at: Date.now() };
+      S.reponses = [...S.reponses.filter((r) => r.id !== id), { id, ...d }]; await S.db.collection("reponses").doc(id).set(d);
+    };
+  }
+  window.CarnetArcherUI(api, testWrite ? { preview: true, testWrite: true } : { preview: true });
+}
+// Version de test uniquement : l'entraîneur joue l'archer, avec les mêmes règles que le serveur (champs autorisés, lignes « a_ »)
+const AR_CHAMPS = ["date", "saison", "objectif", "atteint", "note", "emotion", "commentaire", "paille", "visuel", "blason", "compte", "compet", "autre", "scoreCompte", "scoreCompet", "tcDistance", "tcBlason", "tcTir"];
+async function testArcher(aid) {
+  const a = S.archers.find((x) => x.id === aid); if (!a || !window.CarnetArcherUI || !S.db) return;
+  previewArcher(aid, true);
 }
 // ---------- Espace des archers : infos du club, documents partagés, entraînements proposés ----------
 const PUBLICS = [["", "Non proposée aux archers"], ["tous", "Adultes et jeunes"], ["adultes", "Adultes"], ["jeunes", "Jeunes"]];
@@ -3260,7 +3287,7 @@ function viewArcher() {
       }).join("")}</div>`;
     })()}
     ${(() => { const ms = pretsOf(a.id); return ms.length ? `<div class="notice" style="font-family:var(--font-body)">Matériel prêté : ${ms.map((m) => `${esc(matShort(m))} (${[tailleTxt(m), m.puissance ? m.puissance + " lbs" : "", m.modele, clubName(m.clubId)].filter(Boolean).map(esc).join(", ")})`).join(" · ")}</div>` : ""; })()}
-    ${window.CarnetArcherUI ? `<div class="bar"><span class="grow"></span><button class="btn" data-act="ar-preview">Aperçu de son espace archer</button></div>` : ""}
+    ${window.CarnetArcherUI ? `<div class="bar"><span class="grow"></span><button class="btn" data-act="ar-preview">Aperçu de son espace archer</button>${window.CARNET_TEST ? `<button class="btn primary" data-act="ar-test">Jouer l'archer (test)</button>` : ""}</div>` : ""}
     ${window.carnetAcces && S.canWrite ? `<h2 class="sec">Espace de l'archer</h2><div class="card" id="acc-box"><span class="tirline">Chargement des accès…</span></div>` : ""}
     ${equipCard(a)}
     ${archerConcours(a)}
@@ -4065,6 +4092,7 @@ document.addEventListener("click", (e) => {
   if (t.dataset.crit) { setCrit(t.dataset.crit, Number(t.dataset.v)); return; }
   if (t.dataset.eval) { openEval(t.dataset.eval); return; }
   if (t.dataset.act === "ar-preview") { previewArcher(S.archer); return; }
+  if (t.dataset.act === "ar-test" && window.CARNET_TEST) { testArcher(S.archer); return; }
   if (t.dataset.act === "acc-invite" && window.carnetAcces) { window.carnetAcces.inviter(S.archer).then(() => fillAcces(S.archer, true)).catch((e) => toast(e.message)); return; }
   if (t.dataset.act === "acc-all" && window.carnetAcces) { if (!t.dataset.confirm) { t.dataset.confirm = 1; t.textContent = "Confirmer : tout retirer"; return; } window.carnetAcces.retirer(null, S.archer).then(() => { toast("Accès retirés"); fillAcces(S.archer, true); }).catch((e) => toast(e.message)); return; }
   if (t.dataset.accDel && window.carnetAcces) { if (!t.dataset.confirm) { t.dataset.confirm = 1; t.textContent = "Confirmer"; return; } window.carnetAcces.retirer(t.dataset.accDel, S.archer).then(() => { toast("Accès retiré"); fillAcces(S.archer, true); }).catch((e) => toast(e.message)); return; }

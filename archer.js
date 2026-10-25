@@ -2,7 +2,7 @@
 // telles que les renvoie la base (fonction espace_archer), et remplit son carnet.
 // window.CarnetArcherUI(API, { preview }) : preview = aperçu ouvert par l'entraîneur, en lecture seule.
 window.CarnetArcherUI = (API, opts = {}) => {
-  const PREVIEW = !!opts.preview, BLOB = window.CARNET_BLOB_BASE || "/_blob/";
+  const PREVIEW = !!opts.preview && !opts.testWrite, TESTW = !!opts.testWrite, BLOB = window.CARNET_BLOB_BASE || "/_blob/";
   const VOL = [["paille", "Paille"], ["visuel", "Visuel"], ["blason", "Blason"], ["compte", "Tir compté"], ["compet", "Compét"], ["autre", "Autre"]];
   const EMOTIONS = ["Fierté", "Satisfaction", "Soulagement", "Espoir", "Tristesse", "Déception", "Honte", "Colère"];
   const TYPES = { salle: "Salle", exterieur: "Extérieur", ufolarc_court: "Ufolarc court", ufolarc_long: "Ufolarc long", safari: "Safari", campagne: "Campagne", "3d": "3D", nature: "Nature" };
@@ -57,9 +57,10 @@ window.CarnetArcherUI = (API, opts = {}) => {
   const name = (a) => `${a.prenom || ""} ${a.nom || ""}`.trim() || "Archer";
 
   // Espace archer : remplace l'interface de l'entraîneur ; aperçu : s'ouvre par-dessus, en plein écran
-  const root = document.createElement("div"); root.className = "ar-root" + (PREVIEW ? " ar-preview" : "");
-  root.innerHTML = `${PREVIEW ? `<div class="test-band ar-band" role="note">Aperçu : voici exactement ce que voit l'archer dans son espace (lecture seule) <button class="btn" data-act="close-preview">Fermer l'aperçu</button></div>` : ""}<header class="top"></header><main><div class="wrap"></div></main>`;
-  if (!PREVIEW) { document.querySelector("header.top")?.setAttribute("hidden", ""); document.querySelector("#fab")?.setAttribute("hidden", ""); document.querySelector("main")?.setAttribute("hidden", ""); }
+  const root = document.createElement("div"); root.className = "ar-root" + (PREVIEW || TESTW ? " ar-preview" : "");
+  root.innerHTML = `${PREVIEW ? `<div class="test-band ar-band" role="note">Aperçu : voici exactement ce que voit l'archer dans son espace (lecture seule) <button class="btn" data-act="close-preview">Fermer l'aperçu</button></div>`
+    : TESTW ? `<div class="test-band ar-band" role="note">Archer de test : tu agis comme l'archer, ce que tu enregistres va dans la version de test <button class="btn" data-act="close-preview">Revenir à l'entraîneur</button></div>` : ""}<header class="top"></header><main><div class="wrap"></div></main>`;
+  if (!PREVIEW && !TESTW) { document.querySelector("header.top")?.setAttribute("hidden", ""); document.querySelector("#fab")?.setAttribute("hidden", ""); document.querySelector("main")?.setAttribute("hidden", ""); }
   document.body.appendChild(root);
   const top = root.querySelector("header.top"), view = root.querySelector(".wrap");
 
@@ -72,13 +73,13 @@ window.CarnetArcherUI = (API, opts = {}) => {
   function header() {
     const tabs = [["accueil", "Accueil"], ["carnet", "Mon carnet"], ["concours", "Mes concours"], ["documents", "Documents"], ["evaluations", "Évaluations"]];
     top.innerHTML = `<div class="top-in"><div class="brand"><span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/></svg></span>
-      <h1>Espace <em>${esc(St.data?.archer ? name(St.data.archer) : name(who()))}</em></h1><span class="sub">${PREVIEW ? "" : `<button class="btn ghost" id="ar-out">Se déconnecter</button>`}</span></div>
+      <h1>Espace <em>${esc(St.data?.archer ? name(St.data.archer) : name(who()))}</em></h1><span class="sub">${PREVIEW || TESTW ? "" : `<button class="btn ghost" id="ar-out">Se déconnecter</button>`}</span></div>
       <nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" aria-selected="${St.tab === k}" data-atab="${k}">${l}</button>`).join("")}</nav></div>`;
   }
   function render() {
     header();
     let h = "";
-    if (PREVIEW) h += "";
+    if (PREVIEW || TESTW) h += "";
     else if (St.list.length > 1) h += `<div class="chips" role="group" aria-label="Archer">${St.list.map((a, i) => `<button class="chip" data-who="${i}" aria-pressed="${i === St.cur}">${esc(name(a))}</button>`).join("")}<button class="chip" data-act="add-code">+ Code</button></div>`;
     else h += `<div class="bar"><span class="grow"></span><button class="btn ghost" data-act="add-code">J'ai un autre code (frère, sœur…)</button></div>`;
     if (St.err) h += `<p class="notice">${esc(St.err)}</p><button class="btn" data-act="reload">Réessayer</button>`;
@@ -99,7 +100,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     if (!ent) return h;
     h += `<h2 class="sec">Prochains entraînements</h2>`;
     if (!ent.length) return h + `<p class="notice">Aucun entraînement proposé pour l'instant. Ton entraîneur les ajoute au fil de la saison.</p>`;
-    h += `<span class="tirline">${ENC() ? "Dis si tu seras là. Comme encadrant, tu vois aussi qui a prévu de venir." : `Dis à ton entraîneur si ${St.list.length > 1 || PREVIEW ? esc(prenom) + " sera là" : "tu seras là"} : ça l'aide à préparer la séance.`}</span>`;
+    h += `<span class="tirline">${ENC() ? "Dis si tu seras là. Comme encadrant, tu vois aussi qui a prévu de venir." : `Dis à ton entraîneur si ${St.list.length > 1 || PREVIEW || TESTW ? esc(prenom) + " sera là" : "tu seras là"} : ça l'aide à préparer la séance.`}</span>`;
     h += `<div class="list">${ent.map((e) => `<div class="card ar-ent"><div class="bar"><span class="date"><span class="d">${dObj(e.date).getDate()}</span><span class="mo">${dObj(e.date).toLocaleDateString("fr-FR", { month: "short" }).replace(".", "")}</span></span>
       <span class="main" style="flex:1;min-width:0"><b>${esc(dObj(e.date).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }))}${e.heure ? " · " + esc(e.heure) : ""}</b>
         <span class="tirline" style="display:block">${[clubNom(e.clubId), e.groupe, e.theme, e.lieu].filter(Boolean).map(esc).join(" · ")}</span></span></div>

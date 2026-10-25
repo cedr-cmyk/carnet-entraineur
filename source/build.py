@@ -11,7 +11,7 @@ s = s[:i] + '<script>\n' + ar + '\n</script>\n' + s[i:]
 os.makedirs(os.path.join(root, 'build'), exist_ok=True)
 open(os.path.join(root, 'build/carnet-essai.html'), 'w', encoding='utf8').write(s)
 main = s.replace("<title>Carnet d'essai</title>", "<title>Carnet de l'entraîneur</title>", 1)
-main = '\n'.join(l for l in main.split('\n') if not l.startswith('.test-band') and 'class="test-band"' not in l)
+main = '\n'.join(l for l in main.split('\n') if not l.startswith('.test-band') and 'class="test-band"' not in l and 'window.CARNET_TEST = true' not in l)
 open(os.path.join(root, 'build/carnet-claude.html'), 'w', encoding='utf8').write(main)
 body = main.replace("<title>Carnet de l'entraîneur</title>\n", "", 1)
 head = open(os.path.join(root, 'source/head.html'), encoding='utf8').read()
