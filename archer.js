@@ -155,7 +155,10 @@ window.CarnetArcherUI = (API, opts = {}) => {
     const layer = document.createElement("div"); layer.className = "sheet-bg ar-tgt-layer"; document.body.appendChild(layer);
     const total = () => T.volees.flat().reduce((a, k) => a + kv(k), 0), shot = () => T.volees.flat().length, plan = () => T.fpv * T.nbVolees;
     const full = () => shot() >= plan();
+    let view = null; // null : volée en cours ; sinon n° de volée regardée, ou "all"
+    const curIdx = () => (T.volees.length && T.volees[T.volees.length - 1].length < T.fpv ? T.volees.length - 1 : T.volees.length);
     function add(k, imp) {
+      view = null;
       if (full()) { toast("Toutes les flèches sont notées"); return; }
       let last = T.volees[T.volees.length - 1]; if (!last || last.length >= T.fpv) { last = []; T.volees.push(last); }
       last.push(k); if (imp) T.impacts.push({ v: T.volees.length - 1, x: +imp.x.toFixed(4), y: +imp.y.toFixed(4), k });
@@ -179,18 +182,22 @@ window.CarnetArcherUI = (API, opts = {}) => {
           <label class="f">Blason<select id="tg-b">${C ? window.CarnetBlasonOpts(T.blason) : ""}</select></label>
           <label class="f">Flèches par volée<select id="tg-f">${[3, 6].map((x) => `<option ${T.fpv === x ? "selected" : ""}>${x}</option>`).join("")}</select></label>
           <label class="f">Volées<input type="number" inputmode="numeric" min="1" max="40" id="tg-v" value="${T.nbVolees}"></label></div>
-        <div class="ar-tgt-grid"><div>${C.svg({ id: "ar-tir", ...T, showAll: true, volees: T.volees.length ? T.volees : [[]] })}</div>
+        <div class="ar-tgt-grid"><div>
+          ${T.volees.some((v) => v.length) ? `<div class="chips tv-chips" style="margin-bottom:8px">${T.volees.map((v, i) => v.length ? `<button type="button" class="chip" data-vv="${i}" aria-pressed="${(view ?? curIdx()) === i}">V${i + 1}</button>` : "").join("")}${curIdx() >= T.volees.length && !full() ? `<button type="button" class="chip" data-vv="cur" aria-pressed="${view == null}">V${curIdx() + 1} · en cours</button>` : ""}<button type="button" class="chip" data-vv="all" aria-pressed="${view === "all"}">Tout</button></div>` : ""}
+          ${C.svg({ id: "ar-tir", ...T, showAll: true, only: view ?? curIdx(), volees: T.volees.length ? T.volees : [[]] })}
+          ${view != null ? `<span class="tirline">Tu regardes ${view === "all" ? "tout le tir" : "la volée " + (view + 1)}. Touche la cible pour continuer la volée en cours.</span>` : ""}</div>
           <div class="kp" role="group" aria-label="Valeur de la flèche">${keys.filter((k) => k === "X" || k === "M" || Number(k) >= minV).map((k) => `<button type="button" class="${cls(k)}" data-k="${k}">${k}</button>`).join("")}<button type="button" class="undo" id="tg-undo">↶ Annuler la flèche</button></div></div>
         <span class="tirline">Touche la cible là où la flèche s'est plantée : la valeur se calcule toute seule. Tu peux aussi taper la valeur sans placer la flèche.</span>
-        <div class="bar"><b>Volée ${Math.min(vcur, T.nbVolees)} / ${T.nbVolees}</b><span class="grow"></span><span>${n} / ${plan()} flèches${n ? ` · ${(total() / n).toFixed(2).replace(".", ",")} par flèche` : ""}</span></div>
+        <div class="bar"><b>Volée en cours : ${Math.min(vcur, T.nbVolees)} / ${T.nbVolees}</b><span class="grow"></span><span>${n} / ${plan()} flèches${n ? ` · ${(total() / n).toFixed(2).replace(".", ",")} par flèche` : ""}</span></div>
         <div class="tgt-bar"><span style="width:${Math.min(100, (n / plan()) * 100)}%"></span></div>
-        ${C.carte(T)}${C.groupe(T)}
+        ${C.carte(T, "data-vv", view ?? curIdx())}${C.groupe({ ...T, impacts: view === "all" ? T.impacts : T.impacts.filter((p) => p.v === (view ?? curIdx())) })}
         <div class="acts"><button type="button" class="btn" id="tg-no">Annuler</button><button type="button" class="btn primary" id="tg-ok">Valider le tir</button></div></div>`;
       layer.querySelector("svg.tgt").addEventListener("click", (ev) => {
         const r = ev.currentTarget.getBoundingClientRect(), x = ((ev.clientX - r.left) / r.width * 500 - 250) / 240, y = ((ev.clientY - r.top) / r.height * 500 - 250) / 240;
         add(C.scoreAt(C.face(T), Math.hypot(x, y)), { x, y });
       });
       layer.querySelectorAll("[data-k]").forEach((b) => b.addEventListener("click", () => add(b.dataset.k)));
+      layer.querySelectorAll("[data-vv]").forEach((b) => b.addEventListener("click", () => { const x = b.dataset.vv; view = x === "cur" ? null : x === "all" ? "all" : Number(x) === curIdx() ? null : Number(x); draw(); }));
       $("#tg-undo").onclick = undo;
       $("#tg-d").onchange = (ev) => { T.distance = ev.target.value; };
       $("#tg-b").onchange = (ev) => { T.blason = ev.target.value; T.volees.forEach((v, vi) => { T.impacts.filter((p) => p.v === vi).forEach((p) => { const i = v.indexOf(p.k); const nk = C.scoreAt(C.face(T), Math.hypot(p.x, p.y)); if (i >= 0) v[i] = nk; p.k = nk; }); }); draw(); };
