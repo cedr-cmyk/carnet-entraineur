@@ -541,7 +541,14 @@ svg.chart .szl { stroke: var(--line-2, var(--line)); stroke-dasharray: 3 3; }
 .kp button { min-height: 52px; border-radius: 12px; border: 0; font-size: 1.3rem; font-weight: 800; cursor: pointer; }
 .kp .undo { grid-column: span 2; background: var(--sunk); color: var(--ink); border: 1px solid var(--line); font-size: .95rem; }
 .tgt-bar { height: 8px; border-radius: 99px; background: var(--sunk); overflow: hidden; } .tgt-bar span { display: block; height: 100%; background: var(--accent); }
-@media (max-width: 640px) { .ar-tgt-grid { grid-template-columns: 1fr; } .kp { grid-template-columns: repeat(6, 1fr); } .kp button { min-height: 46px; font-size: 1.1rem; } .kp .undo { grid-column: span 6; } }
+.ar-tgt-layer svg.tgt { touch-action: none; width: 100%; }
+.loupe { position: fixed; width: 140px; height: 140px; border-radius: 50%; overflow: hidden; z-index: 60; pointer-events: none; border: 3px solid #fff; box-shadow: 0 10px 30px rgba(0,0,0,.6); background: #0B0F19; }
+.loupe svg { position: absolute; }
+.loupe .lp-x { position: absolute; left: 50%; top: 50%; width: 26px; height: 26px; margin: -13px 0 0 -13px; border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 0 1px #0B0F19; }
+.loupe .lp-x::before, .loupe .lp-x::after { content: ""; position: absolute; background: #fff; } .loupe .lp-x::before { left: 11px; top: -8px; width: 2px; height: 40px; } .loupe .lp-x::after { top: 11px; left: -8px; height: 2px; width: 40px; }
+.loupe .lp-v { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); background: #0B0F19; color: #fff; font-weight: 800; padding: 1px 8px; border-radius: 8px; font-size: .95rem; }
+@media (max-width: 640px) { .ar-tgt-layer .sheet { padding-left: 8px; padding-right: 8px; } .ar-tgt-layer .tgt-wrap { padding: 2px; border-radius: 16px; } .ar-tgt-layer svg.tgt { width: 100%; max-width: none; }
+  .ar-tgt-grid { grid-template-columns: 1fr; } .kp { grid-template-columns: repeat(6, 1fr); } .kp button { min-height: 46px; font-size: 1.1rem; } .kp .undo { grid-column: span 6; } }
 .grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
 @media (max-width: 560px) { .grid4 { grid-template-columns: 1fr 1fr; } }
 .ar-tc { border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); border-radius: var(--radius); padding: 12px; gap: 6px; }
@@ -759,6 +766,32 @@ window.CarnetArcherUI = (API, opts = {}) => {
   }
   // ---------- Tir compté sur la cible : toucher l'impact ou taper la valeur ----------
   const kv = (k) => (k === "X" ? 10 : k === "M" ? 0 : Number(k) || 0), krank = (k) => (k === "X" ? 11 : kv(k));
+  // Cible : clic à la souris ; au doigt, une loupe grossit la zone pendant qu'on glisse, la flèche se place quand on lève le doigt
+  function bindTarget(svg, onPlace, valueAt) {
+    const pos = (ev) => { const r = svg.getBoundingClientRect(); return { r, px: ev.clientX - r.left, py: ev.clientY - r.top, x: ((ev.clientX - r.left) / r.width * 500 - 250) / 240, y: ((ev.clientY - r.top) / r.height * 500 - 250) / 240 }; };
+    let loupe = null, last = null;
+    const Z = 3, L = 140;
+    const show = (ev) => {
+      const p = pos(ev); last = p;
+      if (!loupe) { loupe = document.createElement("div"); loupe.className = "loupe"; loupe.innerHTML = `<svg viewBox="0 0 500 500">${svg.innerHTML}</svg><i class="lp-x"></i><b class="lp-v"></b>`; document.body.appendChild(loupe); }
+      const inner = loupe.querySelector("svg"), W = p.r.width * Z;
+      inner.style.width = inner.style.height = W + "px"; inner.style.left = L / 2 - p.px * Z + "px"; inner.style.top = L / 2 - p.py * Z + "px";
+      const above = ev.clientY - L - 40 > 8;
+      loupe.style.left = Math.min(Math.max(8, ev.clientX - L / 2), innerWidth - L - 8) + "px"; loupe.style.top = (above ? ev.clientY - L - 40 : ev.clientY + 40) + "px";
+      loupe.querySelector(".lp-v").textContent = Math.hypot(p.x, p.y) > 1.05 ? "hors cible" : valueAt(p.x, p.y);
+    };
+    const hide = () => { loupe?.remove(); loupe = null; };
+    svg.addEventListener("pointerdown", (ev) => {
+      if (ev.pointerType === "mouse") return;
+      ev.preventDefault(); try { svg.setPointerCapture(ev.pointerId); } catch (err) { /* pointeur déjà relâché */ } show(ev);
+    });
+    svg.addEventListener("pointermove", (ev) => { if (loupe) { ev.preventDefault(); show(ev); } });
+    svg.addEventListener("pointerup", (ev) => {
+      if (ev.pointerType === "mouse") { const p = pos(ev); onPlace(p.x, p.y); return; }
+      if (!loupe) return; const p = last; hide(); if (p && Math.hypot(p.x, p.y) <= 1.05) onPlace(p.x, p.y);
+    });
+    svg.addEventListener("pointercancel", hide);
+  }
   function cibleSheet(init, onDone) {
     const C = window.CarnetCible;
     const T = init.prev ? JSON.parse(JSON.stringify(init.prev)) : { distance: init.distance, blason: init.blason || "Trispot 40 cm CL", fpv: 3, nbVolees: 10, volees: [], impacts: [] };
@@ -783,7 +816,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
       if (j) { T.impacts.splice(j[1], 1); last.splice(last.lastIndexOf(j[0].k), 1); } else last.pop();
       if (!last.length) T.volees.pop(); draw();
     }
-    let drawing = false, again = false;
+    let drawing = false, again = false, setOpen = false; // réglages repliés une fois le tir commencé (plus de place pour la cible)
     // un champ qui perd le focus pendant le remplacement relance draw : on le rejoue après, pas en plein milieu
     function draw() { if (drawing) { again = true; return; } drawing = true; try { drawNow(); } finally { drawing = false; } if (again) { again = false; draw(); } }
     function drawNow() {
@@ -792,32 +825,30 @@ window.CarnetArcherUI = (API, opts = {}) => {
       const cls = (k) => (["X", "10", "9"].includes(k) ? "y" : ["8", "7"].includes(k) ? "r" : ["6", "5"].includes(k) ? "b" : ["4", "3"].includes(k) ? "k" : k === "M" ? "m" : "w");
       layer.innerHTML = `<div class="sheet ar-tgt-sheet" role="dialog" aria-label="Tir compté sur la cible">
         <div class="bar"><h3 style="margin:0">Tir compté sur la cible</h3><span class="grow"></span><b style="font-size:1.2rem">${total()} pts</b></div>
-        <div class="grid4"><label class="f">Distance (m)<input type="number" inputmode="numeric" id="tg-d" value="${esc(T.distance)}"></label>
+        ${setOpen || !shot() ? `<div class="grid4"><label class="f">Distance (m)<input type="number" inputmode="numeric" id="tg-d" value="${esc(T.distance)}"></label>
           <label class="f">Blason<select id="tg-b">${C ? window.CarnetBlasonOpts(T.blason) : ""}</select></label>
           <label class="f">Flèches par volée<select id="tg-f">${[3, 6].map((x) => `<option ${T.fpv === x ? "selected" : ""}>${x}</option>`).join("")}</select></label>
-          <label class="f">Volées<input type="number" inputmode="numeric" min="1" max="40" id="tg-v" value="${T.nbVolees}"></label></div>
+          <label class="f">Volées<input type="number" inputmode="numeric" min="1" max="40" id="tg-v" value="${T.nbVolees}"></label></div>` : `<button type="button" class="btn ghost tg-sum" id="tg-set">${esc(T.distance || "?")} m · ${esc(T.blason)} · ${T.nbVolees} volées de ${T.fpv} ✎</button>`}
         <div class="ar-tgt-grid"><div>
           ${T.volees.some((v) => v.length) ? `<div class="chips tv-chips" style="margin-bottom:8px">${T.volees.map((v, i) => v.length ? `<button type="button" class="chip" data-vv="${i}" aria-pressed="${(view ?? curIdx()) === i}">V${i + 1}</button>` : "").join("")}${curIdx() >= T.volees.length && !full() ? `<button type="button" class="chip" data-vv="cur" aria-pressed="${view == null}">V${curIdx() + 1} · en cours</button>` : ""}<button type="button" class="chip" data-vv="all" aria-pressed="${view === "all"}">Tout</button></div>` : ""}
           ${C.svg({ id: "ar-tir", ...T, showAll: true, only: view ?? curIdx(), volees: T.volees.length ? T.volees : [[]] })}
           ${view != null ? `<span class="tirline">Tu regardes ${view === "all" ? "tout le tir" : "la volée " + (view + 1)}. Touche la cible pour continuer la volée en cours.</span>` : ""}</div>
           <div class="kp" role="group" aria-label="Valeur de la flèche">${keys.filter((k) => k === "X" || k === "M" || Number(k) >= minV).map((k) => `<button type="button" class="${cls(k)}" data-k="${k}">${k}</button>`).join("")}<button type="button" class="undo" id="tg-undo">↶ Annuler la flèche</button></div></div>
-        <span class="tirline">Touche la cible là où la flèche s'est plantée : la valeur se calcule toute seule. Tu peux aussi taper la valeur sans placer la flèche.</span>
+        <span class="tirline">${matchMedia("(pointer: coarse)").matches ? "Pose le doigt sur la cible, ajuste avec la loupe, puis lève le doigt pour placer la flèche" : "Touche la cible là où la flèche s'est plantée"} : la valeur se calcule toute seule. Tu peux aussi taper la valeur sans placer la flèche.</span>
         <div class="bar"><b>Volée en cours : ${Math.min(vcur, T.nbVolees)} / ${T.nbVolees}</b><span class="grow"></span><span>${n} / ${plan()} flèches${n ? ` · ${(total() / n).toFixed(2).replace(".", ",")} par flèche` : ""}</span></div>
         <div class="tgt-bar"><span style="width:${Math.min(100, (n / plan()) * 100)}%"></span></div>
         ${full() && C.bilan ? C.bilan(T, (St.data?.entrees || []).filter((x) => x.id !== init.id)) : ""}
         ${C.carte(T, "data-vv", view ?? curIdx())}${C.groupe({ ...T, impacts: view === "all" ? T.impacts : T.impacts.filter((p) => p.v === (view ?? curIdx())) })}
         <div class="acts"><button type="button" class="btn" id="tg-no">Annuler</button><button type="button" class="btn primary" id="tg-ok">Valider le tir</button></div></div>`;
-      layer.querySelector("svg.tgt").addEventListener("click", (ev) => {
-        const r = ev.currentTarget.getBoundingClientRect(), x = ((ev.clientX - r.left) / r.width * 500 - 250) / 240, y = ((ev.clientY - r.top) / r.height * 500 - 250) / 240;
-        add(C.scoreAt(C.face(T), Math.hypot(x, y)), { x, y });
-      });
+      bindTarget(layer.querySelector("svg.tgt"), (x, y) => add(C.scoreAt(C.face(T), Math.hypot(x, y)), { x, y }), (x, y) => C.scoreAt(C.face(T), Math.hypot(x, y)));
       layer.querySelectorAll("[data-k]").forEach((b) => b.addEventListener("click", () => add(b.dataset.k)));
       layer.querySelectorAll("[data-vv]").forEach((b) => b.addEventListener("click", () => { const x = b.dataset.vv; view = x === "cur" ? null : x === "all" ? "all" : Number(x) === curIdx() ? null : Number(x); draw(); }));
       $("#tg-undo").onclick = undo;
-      $("#tg-d").onchange = (ev) => { T.distance = ev.target.value; };
-      $("#tg-b").onchange = (ev) => { T.blason = ev.target.value; T.volees.forEach((v, vi) => { T.impacts.filter((p) => p.v === vi).forEach((p) => { const i = v.indexOf(p.k); const nk = C.scoreAt(C.face(T), Math.hypot(p.x, p.y)); if (i >= 0) v[i] = nk; p.k = nk; }); }); draw(); };
-      $("#tg-f").onchange = (ev) => { if (shot()) { toast("Change le nombre de flèches par volée avant de commencer"); ev.target.value = T.fpv; return; } T.fpv = +ev.target.value; T.nbVolees = T.fpv === 6 ? 6 : 10; draw(); };
-      $("#tg-v").onchange = (ev) => { T.nbVolees = Math.max(Math.ceil(shot() / T.fpv) || 1, Math.min(40, +ev.target.value || 1)); draw(); };
+      const ts = $("#tg-set"); if (ts) ts.onclick = () => { setOpen = true; draw(); };
+      if ($("#tg-d")) $("#tg-d").onchange = (ev) => { T.distance = ev.target.value; };
+      if ($("#tg-b")) $("#tg-b").onchange = (ev) => { T.blason = ev.target.value; T.volees.forEach((v, vi) => { T.impacts.filter((p) => p.v === vi).forEach((p) => { const i = v.indexOf(p.k); const nk = C.scoreAt(C.face(T), Math.hypot(p.x, p.y)); if (i >= 0) v[i] = nk; p.k = nk; }); }); draw(); };
+      if ($("#tg-f")) $("#tg-f").onchange = (ev) => { if (shot()) { toast("Change le nombre de flèches par volée avant de commencer"); ev.target.value = T.fpv; return; } T.fpv = +ev.target.value; T.nbVolees = T.fpv === 6 ? 6 : 10; draw(); };
+      if ($("#tg-v")) $("#tg-v").onchange = (ev) => { T.nbVolees = Math.max(Math.ceil(shot() / T.fpv) || 1, Math.min(40, +ev.target.value || 1)); draw(); };
       $("#tg-no").onclick = () => layer.remove();
       $("#tg-ok").onclick = () => { layer.remove(); onDone(T); };
     }

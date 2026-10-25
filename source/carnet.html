@@ -542,7 +542,14 @@ svg.chart .szl { stroke: var(--line-2, var(--line)); stroke-dasharray: 3 3; }
 .kp button { min-height: 52px; border-radius: 12px; border: 0; font-size: 1.3rem; font-weight: 800; cursor: pointer; }
 .kp .undo { grid-column: span 2; background: var(--sunk); color: var(--ink); border: 1px solid var(--line); font-size: .95rem; }
 .tgt-bar { height: 8px; border-radius: 99px; background: var(--sunk); overflow: hidden; } .tgt-bar span { display: block; height: 100%; background: var(--accent); }
-@media (max-width: 640px) { .ar-tgt-grid { grid-template-columns: 1fr; } .kp { grid-template-columns: repeat(6, 1fr); } .kp button { min-height: 46px; font-size: 1.1rem; } .kp .undo { grid-column: span 6; } }
+.ar-tgt-layer svg.tgt { touch-action: none; width: 100%; }
+.loupe { position: fixed; width: 140px; height: 140px; border-radius: 50%; overflow: hidden; z-index: 60; pointer-events: none; border: 3px solid #fff; box-shadow: 0 10px 30px rgba(0,0,0,.6); background: #0B0F19; }
+.loupe svg { position: absolute; }
+.loupe .lp-x { position: absolute; left: 50%; top: 50%; width: 26px; height: 26px; margin: -13px 0 0 -13px; border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 0 1px #0B0F19; }
+.loupe .lp-x::before, .loupe .lp-x::after { content: ""; position: absolute; background: #fff; } .loupe .lp-x::before { left: 11px; top: -8px; width: 2px; height: 40px; } .loupe .lp-x::after { top: 11px; left: -8px; height: 2px; width: 40px; }
+.loupe .lp-v { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); background: #0B0F19; color: #fff; font-weight: 800; padding: 1px 8px; border-radius: 8px; font-size: .95rem; }
+@media (max-width: 640px) { .ar-tgt-layer .sheet { padding-left: 8px; padding-right: 8px; } .ar-tgt-layer .tgt-wrap { padding: 2px; border-radius: 16px; } .ar-tgt-layer svg.tgt { width: 100%; max-width: none; }
+  .ar-tgt-grid { grid-template-columns: 1fr; } .kp { grid-template-columns: repeat(6, 1fr); } .kp button { min-height: 46px; font-size: 1.1rem; } .kp .undo { grid-column: span 6; } }
 .grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
 @media (max-width: 560px) { .grid4 { grid-template-columns: 1fr 1fr; } }
 .ar-tc { border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); border-radius: var(--radius); padding: 12px; gap: 6px; }
