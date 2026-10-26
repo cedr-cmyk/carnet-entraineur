@@ -1314,19 +1314,21 @@ function tcPoints(entries) {
     return { date: e.date, score: sc, n, label: [dist !== "" && dist != null ? `${dist} m` : "", bl].filter(Boolean).join(" · ") || "Distance non précisée", e };
   }).filter(Boolean).sort((a, b) => a.date.localeCompare(b.date));
 }
-function tcProgress(entries, cur, attr = "data-tccombo", period = "30", pattr = "data-tcper") {
+function tcProgress(entries, cur, attr = "data-tccombo", period = "30", pattr = "data-tcper", opt = { courbe: true, carte: true }) {
   const pts = tcPoints(entries); if (!pts.length) return "";
   const combos = [...new Set(pts.map((p) => p.label))].sort((p, q) => pts.filter((x) => x.label === q).length - pts.filter((x) => x.label === p).length);
   const k = combos.includes(cur) ? cur : combos[0], sel = pts.filter((p) => p.label === k), moy = sel.every((p) => p.n > 0);
   const v = (p) => (moy ? p.score / p.n : p.score), f2 = (x) => x.toFixed(2).replace(".", ",");
   const best = sel.reduce((m, p) => (v(p) > v(m) ? p : m), sel[0]), last = sel[sel.length - 1];
   const fmtP = (p) => (moy ? `${f2(v(p))} <small>/ flèche</small>` : `${p.score} <small>pts</small>`);
+  const chipsH = combos.length > 1 ? `<div class="chips">${combos.map((c) => `<button class="chip" ${attr}="${esc(c)}" aria-pressed="${c === k}">${esc(c)}</button>`).join("")}</div>` : "";
+  if (opt.courbe === false) return opt.carte === false ? "" : (chipsH ? `<div class="card tc-card">${chipsH}</div>` : "") + impactsMap(entries, k, period, pattr);
   return `<div class="card tc-card"><h3 class="hub-h">Progression en tir compté</h3>
     ${combos.length > 1 ? `<div class="chips">${combos.map((c) => `<button class="chip" ${attr}="${esc(c)}" aria-pressed="${c === k}">${esc(c)}</button>`).join("")}</div>` : `<b>${esc(k)}</b>`}
     <div class="stat"><div><b>${fmtP(last)}</b><span>dernier tir (${last.score} pts${last.n ? ` / ${last.n} fl.` : ""})</span></div><div><b>${fmtP(best)}</b><span>meilleur (${esc(dObj(best.date).toLocaleDateString("fr-FR"))})</span></div><div><b>${sel.length}</b><span>tir${sel.length > 1 ? "s" : ""} compté${sel.length > 1 ? "s" : ""}</span></div></div>
     ${sel.length >= 2 ? lineChart(sel.map((p) => ({ date: p.date, label: dObj(p.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }), y: v(p), tip: `${fmtLong(p.date)} : ${p.score} pts${p.n ? ` en ${p.n} flèches (${f2(p.score / p.n)} par flèche)` : ""}` })), { digits: moy ? 2 : 0 }) : `<p class="tirline">La courbe apparaît dès le 2e tir compté à cette distance.</p>`}
     <span class="tirline">${moy ? "Moyenne de points par flèche : elle se compare même si le nombre de flèches change." : "Score total (renseigner le nombre de flèches permet de suivre la moyenne par flèche)."}</span></div>
-    ${impactsMap(entries, k, period, pattr)}`;
+    ${opt.carte === false ? "" : impactsMap(entries, k, period, pattr)}`;
 }
 // Carte des impacts : toutes les flèches placées sur la cible pour une distance · blason, sur une période, pour voir une tendance
 const tirLab = (e) => [e.tcDistance !== "" && e.tcDistance != null ? `${e.tcDistance} m` : "", e.tcBlason].filter(Boolean).join(" · ") || "Distance non précisée";
@@ -2645,9 +2647,9 @@ document.addEventListener("click", (e) => {
 
 // ---------- Ce que l'archer voit dans son espace : profils simples pour ne pas perdre les plus jeunes ----------
 const AR_MODULES = [["seances", "Mes séances", "Le journal des séances du club où il était présent"], ["carnet", "Mon carnet", "Noter ses séances, ses flèches et son ressenti"],
-  ["tir", "Tir compté et progression", "La cible, le bilan, la courbe et « où vont les flèches »"],
+  ["tir", "Tir compté et courbe", "La cible, le bilan du tir et la courbe de progression"], ["impacts", "Où vont les flèches", "Toutes les flèches placées sur une même cible, pour voir une tendance"],
   ["concours", "Mes concours", "Résultats, courbe des scores, classements PDF"], ["documents", "Documents", "Documents du club et fiches d'exercices"], ["chrono", "Chrono", "Le chrono d'entraînement"]];
-const AR_PROFILS = { decouverte: ["Découverte", ["seances", "documents"]], loisir: ["Loisir", ["seances", "carnet", "tir", "documents", "chrono"]], competiteur: ["Compétiteur", AR_MODULES.map(([k]) => k)] };
+const AR_PROFILS = { decouverte: ["Découverte", ["seances", "documents"]], loisir: ["Loisir", ["seances", "carnet", "tir", "impacts", "documents", "chrono"]], competiteur: ["Compétiteur", AR_MODULES.map(([k]) => k)] };
 // profil « auto » : jeunes jusqu'à 12 ans dans la saison → Découverte ; archer avec un résultat en concours → Compétiteur ; sinon Loisir
 // Réglages de l'entraîneur (Paramètres › Espace archers) : parties de chaque profil, âge limite de Découverte, profil par défaut
 const espaceCfg = () => ({ profils: prm().profils, age: prm().profilAge, defaut: prm().profilDefaut });

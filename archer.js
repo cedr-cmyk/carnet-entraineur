@@ -72,7 +72,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
   }
   function header() {
     const tabs = [["accueil", "Accueil"], ["entrainement", "Entraînement"], ["concours", "Mes concours"], ["documents", "Documents"], ["parametres", "Paramètres"]];
-    const m = M(), vis = { entrainement: ["seances", "carnet", "tir", "evals"].some((k) => m.has(k)), concours: m.has("concours"), documents: m.has("documents") };
+    const m = M(), vis = { entrainement: ["seances", "carnet", "tir", "impacts", "evals"].some((k) => m.has(k)), concours: m.has("concours"), documents: m.has("documents") };
     const shownTabs = tabs.filter(([k]) => vis[k] !== false);
     if (!shownTabs.some(([k]) => k === St.tab) && !["carnet", "evaluations"].includes(St.tab)) St.tab = "accueil";
     top.innerHTML = `<div class="top-in"><div class="brand">${window.CarnetAvatar && St.data?.archer ? "" : `<span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/></svg></span>`}
@@ -139,7 +139,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
   // ---------- Entraînement : mes séances au club, mon carnet, mes évaluations ----------
   function vEntrainement() {
     if (St.tab === "carnet" || St.tab === "evaluations") { St.sub = St.tab; St.tab = "entrainement"; }
-    const m = M(), subs = [["seances", "Mes séances"], ["carnet", "Mon carnet"], ["evaluations", "Évaluations"]].filter(([k]) => m.has(k === "evaluations" ? "evals" : k) || (k === "carnet" && m.has("tir")));
+    const m = M(), subs = [["seances", "Mes séances"], ["carnet", "Mon carnet"], ["evaluations", "Évaluations"]].filter(([k]) => m.has(k === "evaluations" ? "evals" : k) || (k === "carnet" && (m.has("tir") || m.has("impacts"))));
     const sub = subs.some(([k]) => k === St.sub) ? St.sub : subs[0]?.[0] || "seances";
     return `${subs.length > 1 ? `<div class="chips ar-subs" role="tablist" aria-label="Entraînement">${subs.map(([k, l]) => `<button class="chip" role="tab" data-asub="${k}" aria-selected="${sub === k}" aria-pressed="${sub === k}">${l}</button>`).join("")}</div>` : ""}`
       + ({ seances: vSeances, carnet: vCarnet, evaluations: vEvals }[sub] || vSeances)();
@@ -171,7 +171,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
       <div class="hub-stats"><div class="hub-stat"><div class="hub-stat-top"><span>Flèches de la saison</span></div><b class="c-gold">${all.toLocaleString("fr-FR")}</b><small>${tot.filter(([, v]) => v).map(([l, v]) => `${l} ${v}`).join(" · ") || "aucune pour l'instant"}</small></div>
       <div class="hub-stat"><div class="hub-stat-top"><span>Séances notées</span></div><b class="c-cyan">${list.length}</b><small>ressenti moyen ${moy} / 10</small></div></div>`;
     if (o.processus || o.classement || o.score) h += `<div class="card"><h3 class="hub-h">Mes objectifs de la saison</h3>${[["processus", "Processus"], ["classement", "Classement"], ["score", "Score"]].filter(([k]) => o[k]).map(([k, l]) => `<div class="eq-l"><span>${l}</span><b>${esc(o[k])}</b></div>`).join("")}</div>`;
-    if (window.CarnetTcProgress && M().has("tir")) h += window.CarnetTcProgress(list, St.tcCombo, "data-artc", St.tcPer || "30", "data-artcp");
+    if (window.CarnetTcProgress && (M().has("tir") || M().has("impacts"))) h += window.CarnetTcProgress(list, St.tcCombo, "data-artc", St.tcPer || "30", "data-artcp", { courbe: M().has("tir"), carte: M().has("impacts") });
     h += list.length ? `<div class="list">${list.map((e) => `<button class="row" data-entry="${esc(e.id)}"><span class="date"><span class="d">${dObj(e.date).getDate()}</span><span class="mo">${dObj(e.date).toLocaleDateString("fr-FR", { month: "short" }).replace(".", "")}</span></span>
       <span class="main"><span class="t">${esc(e.objectif || (e.concoursId ? "Concours" : "Séance"))}</span><span class="m">${[e.concoursId && num(e.scoreCompet) != null ? e.scoreCompet + " pts" : "", !e.concoursId && num(e.scoreCompte) != null ? `tir compté ${e.scoreCompte} pts${e.tcDistance ? " à " + e.tcDistance + " m" : ""}` : "", vol(e) ? vol(e) + " flèches" : "", e.emotion || "", e.seanceId ? "séance du club" : e.concoursId ? "concours" : "noté par moi", e.commentaireCoach ? "💬 mot de l'entraîneur" : ""].filter(Boolean).map(esc).join(" · ")}</span>${e.commentaire ? `<span class="m">${esc(e.commentaire.slice(0, 100))}</span>` : ""}</span>
       <span class="count">${num(e.note) != null ? `${e.note}<small>/10</small>` : ""}</span></button>`).join("")}</div>` : `<p class="notice">Rien de noté cette saison. « Noter une séance » ajoute une ligne à ton carnet : ton entraîneur la verra.</p>`;
