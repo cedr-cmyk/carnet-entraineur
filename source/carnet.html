@@ -551,6 +551,7 @@ svg.chart .szl { stroke: var(--line-2, var(--line)); stroke-dasharray: 3 3; }
 .av-pick { border: 2px solid transparent; background: var(--sunk); border-radius: 16px; padding: 4px; display: grid; place-items: center; cursor: pointer; min-height: 60px; }
 .av-pick[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .av-cols { display: flex; gap: 8px; flex-wrap: wrap; } .av-col { width: 40px; height: 40px; border-radius: 50%; border: 3px solid transparent; cursor: pointer; } .av-col[aria-pressed="true"] { border-color: var(--ink); }
+.ar-params { display: grid; gap: 14px; max-width: 720px; } .ar-params .card { gap: 10px; }
 .ar-quick { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
 .ar-big { width: 100%; min-height: 56px; font-size: 1.1rem; }
 .ar-mot { display: grid; gap: 4px; text-align: left; width: 100%; color: var(--ink); cursor: pointer; }
@@ -646,6 +647,7 @@ window.CarnetBlasonOpts = (c) => blasonOpts(c);
 window.CarnetDistances = () => DISTANCES;
 window.CarnetTcProgress = (...a) => tcProgress(...a);
 window.CarnetChrono = (store) => openChrono(store);
+window.CarnetChronoNoms = () => CHRONO_DEF.map((c) => c.nom);
 window.CarnetAvatar = { svg: (a, n) => avatarSvg(a, n), choisir: (a, f) => avatarPicker(a, f) };
 window.CarnetCible = { svg: (t) => targetSvg(t), face: (t) => faceOf(t), scoreAt: (f, r) => scoreAt(f, r), groupe: (t) => groupStats(t), carte: (t, a, s) => tirCarte(t, a, s), viewer: (t, s, a, o) => tirViewer(t, s, a, o), bilan: (t, o) => tirBilan(t, o) };
 const ARCS = ["Classique", "Poulies", "Barebow", "Arc droit", "Arc chasse"];
