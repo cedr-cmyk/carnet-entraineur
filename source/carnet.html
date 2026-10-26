@@ -2647,7 +2647,7 @@ document.addEventListener("click", (e) => {
 
 // ---------- Ce que l'archer voit dans son espace : profils simples pour ne pas perdre les plus jeunes ----------
 const AR_MODULES = [["seances", "Mes séances", "Le journal des séances du club où il était présent"], ["carnet", "Mon carnet", "Noter ses séances, ses flèches et son ressenti"],
-  ["tir", "Tir compté et courbe", "La cible, le bilan du tir et la courbe de progression"], ["impacts", "Où vont les flèches", "Toutes les flèches placées sur une même cible, pour voir une tendance"],
+  ["tir", "Tir compté et courbe", "Noter son score de tir compté et suivre sa courbe de progression"], ["impacts", "Cible et « où vont les flèches »", "Placer ses flèches sur la cible volée par volée, et voir sa tendance"],
   ["concours", "Mes concours", "Résultats, courbe des scores, classements PDF"], ["documents", "Documents", "Documents du club et fiches d'exercices"], ["chrono", "Chrono", "Le chrono d'entraînement"]];
 const AR_PROFILS = { decouverte: ["Découverte", ["seances", "documents"]], loisir: ["Loisir", ["seances", "carnet", "tir", "impacts", "documents", "chrono"]], competiteur: ["Compétiteur", AR_MODULES.map(([k]) => k)] };
 // profil « auto » : jeunes jusqu'à 12 ans dans la saison → Découverte ; archer avec un résultat en concours → Compétiteur ; sinon Loisir

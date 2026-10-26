@@ -768,13 +768,14 @@ window.CarnetArcherUI = (API, opts = {}) => {
   // ---------- Accueil : infos du club et entraînements proposés ----------
   // Parties visibles, choisies par l'entraîneur (profil Découverte, Loisir, Compétiteur ou personnalisé)
   const M = () => (window.CarnetModules && St.data ? window.CarnetModules(St.data.archer, (St.data.concours || []).filter((c) => num(c.resultat?.score) != null).length, St.data.reglagesEspace || {}, (St.data.evaluations || []).length) : new Set(["seances", "carnet", "tir", "evals", "concours", "documents", "chrono"]));
+  const TC = () => M().has("tir") || M().has("impacts"); // noter un tir compté (score) ; la cible seulement avec « impacts »
   const ENC = () => ["encadrant", "les-deux"].includes(St.data.archer?.role);
   const clubNom = (id) => (St.data.clubs || []).find((c) => c.id === id)?.nom || "";
   function vAccueil() {
     const ann = (St.data.annonces || []).slice().sort((a, b) => (b.important ? 1 : 0) - (a.important ? 1 : 0) || (b.date || "").localeCompare(a.date || ""));
     const ent = St.data.entrainements, prenom = St.data.archer?.prenom || "";
     const mots = St.data.entrees.filter((e) => e.commentaireCoach).sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, 2);
-    const m = M(), q = [m.has("tir") ? `<button class="btn primary ar-big" data-act="tc-new">🎯 Nouveau tir compté</button>` : "", window.CarnetChrono && m.has("chrono") ? `<button class="btn ar-big" data-act="chrono">⏱ Chrono</button>` : ""].filter(Boolean);
+    const m = M(), q = [TC() ? `<button class="btn primary ar-big" data-act="tc-new">🎯 Nouveau tir compté</button>` : "", window.CarnetChrono && m.has("chrono") ? `<button class="btn ar-big" data-act="chrono">⏱ Chrono</button>` : ""].filter(Boolean);
     let h = q.length ? `<div class="ar-quick${q.length === 1 ? " one" : ""}">${q.join("")}</div>` : "";
     h += mots.map((e) => `<button class="card coach-mot ar-mot" data-entry="${esc(e.id)}"><b>💬 Le mot de ton entraîneur · ${esc(dObj(e.date).toLocaleDateString("fr-FR"))}</b><span>${esc(e.commentaireCoach)}</span></button>`).join("");
     h += `<div class="card ar-infos"><h3 class="hub-h">Infos du club</h3>${ann.length ? ann.map((n) => `<div class="ar-info${n.important ? " imp" : ""}">
@@ -832,7 +833,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     const tot = VOL.map(([k, l]) => [l, list.reduce((n, e) => n + volOf(e, k), 0)]), all = tot.reduce((n, [, v]) => n + v, 0);
     const notes = list.map((e) => num(e.note)).filter((v) => v != null), moy = notes.length ? (notes.reduce((a, b) => a + b, 0) / notes.length).toFixed(1).replace(".", ",") : "—";
     const c = St.data.carnets.find((x) => x.saison === key), o = c?.objectifs || {};
-    let h = `<div class="bar"><button class="btn" data-saison="-1" aria-label="Saison précédente">‹</button><b>Saison ${end - 1}-${end}</b><button class="btn" data-saison="1" aria-label="Saison suivante">›</button><span class="grow"></span>${M().has("tir") ? `<button class="btn" data-act="tc-new">🎯 Tir compté</button>` : ""}${M().has("carnet") ? `<button class="btn primary" data-act="new">+ Noter une séance</button>` : ""}</div>
+    let h = `<div class="bar"><button class="btn" data-saison="-1" aria-label="Saison précédente">‹</button><b>Saison ${end - 1}-${end}</b><button class="btn" data-saison="1" aria-label="Saison suivante">›</button><span class="grow"></span>${TC() ? `<button class="btn" data-act="tc-new">🎯 Tir compté</button>` : ""}${M().has("carnet") ? `<button class="btn primary" data-act="new">+ Noter une séance</button>` : ""}</div>
       <div class="hub-stats"><div class="hub-stat"><div class="hub-stat-top"><span>Flèches de la saison</span></div><b class="c-gold">${all.toLocaleString("fr-FR")}</b><small>${tot.filter(([, v]) => v).map(([l, v]) => `${l} ${v}`).join(" · ") || "aucune pour l'instant"}</small></div>
       <div class="hub-stat"><div class="hub-stat-top"><span>Séances notées</span></div><b class="c-cyan">${list.length}</b><small>ressenti moyen ${moy} / 10</small></div></div>`;
     if (o.processus || o.classement || o.score) h += `<div class="card"><h3 class="hub-h">Mes objectifs de la saison</h3>${[["processus", "Processus"], ["classement", "Classement"], ["score", "Score"]].filter(([k]) => o[k]).map(([k, l]) => `<div class="eq-l"><span>${l}</span><b>${esc(o[k])}</b></div>`).join("")}</div>`;
@@ -949,7 +950,34 @@ window.CarnetArcherUI = (API, opts = {}) => {
     draw();
   }
   // Accès direct : tir sur la cible → ligne « Tir compté » du jour dans le carnet → bilan
-  function tirDirect() {
+  function tirDirect() { if (!M().has("impacts")) return tirSimple(); return tirCible(); }
+  // Tir compté sans cible : distance, blason, flèches et score, puis la moyenne et la comparaison avec le tir précédent
+  function tirSimple() {
+    const P = prefs(), last = St.data.entrees.filter((x) => x.tcDistance || x.tcBlason).sort((a, b) => (b.date || "").localeCompare(a.date || ""))[0] || {}, el = $("#sheet");
+    el.innerHTML = `<div class="sheet-bg" data-close><form class="sheet" id="tc-form"><h3>Nouveau tir compté</h3>
+      <div class="grid2"><label class="f">Date<input type="date" name="date" required value="${today()}"></label><label class="f">Distance (m)<input type="number" inputmode="numeric" min="0" name="tcDistance" value="${esc(P.tcDistance || last.tcDistance || "18")}"></label></div>
+      <label class="f">Blason<select name="tcBlason"><option value="">—</option>${window.CarnetBlasonOpts ? window.CarnetBlasonOpts(P.tcBlason || last.tcBlason || "") : ""}</select></label>
+      <div class="grid2"><label class="f">Nombre de flèches<input type="number" inputmode="numeric" min="1" name="compte" id="ts-n" required placeholder="ex. 30"></label><label class="f">Score<input type="number" inputmode="numeric" min="0" name="scoreCompte" id="ts-s" required></label></div>
+      <span class="tirline" id="ts-m"></span>
+      <div class="acts"><button type="button" class="btn" data-close>Annuler</button><button class="btn primary">Enregistrer</button></div></form></div>`;
+    el.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", (ev) => { if (ev.target === b) el.innerHTML = ""; }));
+    const mm = () => { const n = Number($("#ts-n").value), sc = Number($("#ts-s").value); $("#ts-m").textContent = n > 0 && sc >= 0 && $("#ts-s").value !== "" ? `Moyenne : ${(sc / n).toFixed(2).replace(".", ",")} par flèche` : ""; };
+    $("#ts-n").addEventListener("input", mm); $("#ts-s").addEventListener("input", mm);
+    $("#tc-form").addEventListener("submit", async (ev) => {
+      ev.preventDefault(); const fd = new FormData(ev.target), date = fd.get("date"), n = Number(fd.get("compte")), sc = Number(fd.get("scoreCompte"));
+      if (!date || !(n > 0) || fd.get("scoreCompte") === "") return;
+      if (sc > n * 10) { toast(`Score impossible : ${n} flèches font au plus ${n * 10} points`); return; }
+      if (PREVIEW) { toast("Aperçu : l'archer enregistrera ce tir, pas toi"); return; }
+      const data = { date, saison: `${saisonOf(date) - 1}-${saisonOf(date)}`, objectif: "Tir compté", tcDistance: String(fd.get("tcDistance") || ""), tcBlason: fd.get("tcBlason") || "", compte: String(n), scoreCompte: String(sc) };
+      const lab = [data.tcDistance ? data.tcDistance + " m" : "", data.tcBlason].filter(Boolean).join(" · ");
+      const prev = St.data.entrees.filter((x) => num(x.scoreCompte) != null && Number(x.compte) > 0 && [x.tcDistance ? x.tcDistance + " m" : "", x.tcBlason].filter(Boolean).join(" · ") === lab && x.date <= date).sort((a, b) => b.date.localeCompare(a.date))[0];
+      try { await API.ecrire(who(), "a_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), data); } catch (err) { toast("Enregistrement impossible : " + err.message); return; }
+      const moy = sc / n, d = prev ? moy - Number(prev.scoreCompte) / Number(prev.compte) : null;
+      el.innerHTML = ""; toast(`Tir enregistré : ${moy.toFixed(2).replace(".", ",")} par flèche${d == null ? "" : ` (${d >= 0 ? "+" : "−"}${Math.abs(d).toFixed(2).replace(".", ",")} vs le tir précédent)`}`);
+      St.saison = saisonOf(date); load();
+    });
+  }
+  function tirCible() {
     const last = St.data.entrees.filter((x) => x.tcDistance || x.tcBlason).sort((a, b) => (b.date || "").localeCompare(a.date || ""))[0] || {};
     const P = prefs();
     cibleSheet({ distance: P.tcDistance || last.tcDistance || "18", blason: P.tcBlason || last.tcBlason || "" }, async (t) => {
@@ -976,14 +1004,14 @@ window.CarnetArcherUI = (API, opts = {}) => {
       <div class="grid2"><label class="f">Date<input type="date" name="date" required value="${esc(d.date)}" ${e?.seanceId || e?.concoursId ? "readonly" : ""}></label><label class="f">Objectif<input type="text" name="objectif" value="${esc(d.objectif)}"></label></div>
       <div class="f">Flèches tirées<div class="grid5">${VOL.filter(([k]) => k !== "compte" || e?.concoursId).map(([k, l]) => `<label class="f" style="font-weight:500">${l}<input type="number" inputmode="numeric" min="0" name="${k}" value="${esc(d[k])}" placeholder="${d.auto?.[k] ? "+" + d.auto[k] : "0"}" ${lock}></label>`).join("")}</div>${e?.auto ? `<span class="tirline">Les chiffres grisés viennent des feuilles de marque de ton entraîneur.</span>` : ""}</div>
       ${e?.concoursId ? `<input type="hidden" name="scoreCompte" value="${esc(d.scoreCompte)}"><label class="f">Score du concours<input type="number" name="scoreCompet" value="${esc(d.scoreCompet)}" readonly></label>`
-      : !M().has("tir") ? `<input type="hidden" name="scoreCompte" value="${esc(d.scoreCompte)}"><input type="hidden" name="tcDistance" value="${esc(d.tcDistance ?? "")}"><input type="hidden" name="tcBlason" value="${esc(d.tcBlason ?? "")}"><input type="hidden" name="compte" value="${esc(d.compte ?? "")}"><input type="hidden" name="scoreCompet" value="${esc(d.scoreCompet)}"><input type="hidden" name="tcTir" value="${esc(d.tcTir ? JSON.stringify(d.tcTir) : "")}">`
+      : !TC() ? `<input type="hidden" name="scoreCompte" value="${esc(d.scoreCompte)}"><input type="hidden" name="tcDistance" value="${esc(d.tcDistance ?? "")}"><input type="hidden" name="tcBlason" value="${esc(d.tcBlason ?? "")}"><input type="hidden" name="compte" value="${esc(d.compte ?? "")}"><input type="hidden" name="scoreCompet" value="${esc(d.scoreCompet)}"><input type="hidden" name="tcTir" value="${esc(d.tcTir ? JSON.stringify(d.tcTir) : "")}">`
       : `<div class="f ar-tc"><b>Mon tir compté</b><span class="tirline">Note ton score pour suivre ta progression (courbe dans « Mon carnet »).</span>
         <div class="grid4"><label class="f" style="font-weight:500">Distance (m)<input type="number" inputmode="numeric" min="0" name="tcDistance" list="ar-dl" value="${esc(d.tcDistance ?? tcLast.tcDistance ?? "")}" placeholder="${esc(d.auto?.tcDistance ?? "")}"><datalist id="ar-dl">${(window.CarnetDistances ? window.CarnetDistances() : [10, 18, 20, 30, 50, 70]).map((x) => `<option value="${x}">`).join("")}</datalist></label>
           <label class="f" style="font-weight:500">Blason<select name="tcBlason"><option value="">—</option>${window.CarnetBlasonOpts ? window.CarnetBlasonOpts(d.tcBlason ?? tcLast.tcBlason ?? "") : ""}</select></label>
           <label class="f" style="font-weight:500">Flèches<input type="number" inputmode="numeric" min="0" name="compte" id="ar-tcn" value="${esc(d.compte)}" placeholder="${d.auto?.compte ? "+" + d.auto.compte : "ex. 30"}"></label>
           <label class="f" style="font-weight:500">Score<input type="number" inputmode="numeric" min="0" name="scoreCompte" id="ar-tcs" value="${esc(d.scoreCompte)}" placeholder="${esc(d.auto?.scoreCompte ?? "")}"></label></div>
         <span class="tirline" id="ar-tcm"></span>
-        ${window.CarnetCible ? `<button type="button" class="btn primary" id="ar-cible">🎯 ${d.tcTir ? "Voir / modifier mon tir sur la cible" : "Saisir mon tir sur la cible"}</button>` : ""}
+        ${window.CarnetCible && M().has("impacts") ? `<button type="button" class="btn primary" id="ar-cible">🎯 ${d.tcTir ? "Voir / modifier mon tir sur la cible" : "Saisir mon tir sur la cible"}</button>` : ""}
         <input type="hidden" name="tcTir" id="ar-tctir" value="${esc(d.tcTir ? JSON.stringify(d.tcTir) : "")}"></div>
       <input type="hidden" name="scoreCompet" value="${esc(d.scoreCompet)}">`}
       <div class="f">Objectif atteint<div class="radio">${[["", "Je ne sais pas"], ["O", "Oui"], ["N", "Non"]].map(([v, l]) => `<label><input type="radio" name="atteint" value="${v}" ${(d.atteint || "") === v ? "checked" : ""}> ${l}</label>`).join("")}</div></div>
@@ -1056,7 +1084,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
       ${!M().has("chrono") ? "" : `<section class="card"><h3 class="hub-h">Chrono</h3>
         <label class="f">Réglage utilisé à l'ouverture<select data-pref-chrono>${chronos.map((n) => `<option ${n === cur ? "selected" : ""}>${esc(n)}</option>`).join("")}</select></label>
         <div class="bar"><button class="btn" data-act="chrono">⏱ Ouvrir le chrono</button><span class="tirline">Dans le chrono, « Réglages » crée tes propres réglages (temps de tir, volées, pause…).</span></div></section>`}
-      ${!M().has("tir") ? "" : `<section class="card"><h3 class="hub-h">Tir compté</h3>
+      ${!TC() ? "" : `<section class="card"><h3 class="hub-h">Tir compté</h3>
         <div class="grid2"><label class="f">Distance par défaut (m)<input type="number" inputmode="numeric" min="0" data-pref="tcDistance" value="${esc(P.tcDistance || "")}" placeholder="la dernière utilisée"></label>
           <label class="f">Blason par défaut<select data-pref="tcBlason"><option value="">Le dernier utilisé</option>${window.CarnetBlasonOpts ? window.CarnetBlasonOpts(P.tcBlason || "") : ""}</select></label></div>
         <span class="tirline">Utilisés quand tu lances « 🎯 Nouveau tir compté ».</span></section>`}
@@ -3159,7 +3187,7 @@ document.addEventListener("click", (e) => {
 
 // ---------- Ce que l'archer voit dans son espace : profils simples pour ne pas perdre les plus jeunes ----------
 const AR_MODULES = [["seances", "Mes séances", "Le journal des séances du club où il était présent"], ["carnet", "Mon carnet", "Noter ses séances, ses flèches et son ressenti"],
-  ["tir", "Tir compté et courbe", "La cible, le bilan du tir et la courbe de progression"], ["impacts", "Où vont les flèches", "Toutes les flèches placées sur une même cible, pour voir une tendance"],
+  ["tir", "Tir compté et courbe", "Noter son score de tir compté et suivre sa courbe de progression"], ["impacts", "Cible et « où vont les flèches »", "Placer ses flèches sur la cible volée par volée, et voir sa tendance"],
   ["concours", "Mes concours", "Résultats, courbe des scores, classements PDF"], ["documents", "Documents", "Documents du club et fiches d'exercices"], ["chrono", "Chrono", "Le chrono d'entraînement"]];
 const AR_PROFILS = { decouverte: ["Découverte", ["seances", "documents"]], loisir: ["Loisir", ["seances", "carnet", "tir", "impacts", "documents", "chrono"]], competiteur: ["Compétiteur", AR_MODULES.map(([k]) => k)] };
 // profil « auto » : jeunes jusqu'à 12 ans dans la saison → Découverte ; archer avec un résultat en concours → Compétiteur ; sinon Loisir
