@@ -571,6 +571,7 @@ svg.chart .szl { stroke: var(--line-2, var(--line)); stroke-dasharray: 3 3; }
 .av-pick[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .av-cols { display: flex; gap: 8px; flex-wrap: wrap; } .av-col { width: 40px; height: 40px; border-radius: 50%; border: 3px solid transparent; cursor: pointer; } .av-col[aria-pressed="true"] { border-color: var(--ink); }
 .ar-subs { margin-bottom: 4px; } .ar-hint { color: var(--accent) !important; }
+.ar-ver { text-align: center; color: var(--muted); font-size: .85rem; margin: 18px 0 4px; }
 .esp-card { gap: 10px; } .esp-mods { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
 .esp-m { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; opacity: .55; }
 .esp-m.on { opacity: 1; border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); } .esp-m input { accent-color: var(--accent); width: 18px; height: 18px; margin-top: 2px; }
@@ -586,6 +587,8 @@ svg.chart .szl { stroke: var(--line-2, var(--line)); stroke-dasharray: 3 3; }
 table.qvq td, table.qvq th { white-space: nowrap; } .qvq-f { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; } .qvq-f input, .qvq-f select { min-height: 40px; } .qvq-f input { flex: 1; min-width: 180px; }
 .qvq-sort { font-weight: 800; text-decoration: none; text-transform: inherit; letter-spacing: inherit; color: inherit; } .qvq-auto { display: block; color: var(--muted); font-size: .78rem; margin-top: 2px; } .qvq-c { text-align: center; font-weight: 800; } .qvq-a { display: flex; align-items: center; gap: 8px; } table.qvq select { min-width: 150px; }
 [hidden] { display: none !important; }
+.ver-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; } .ver-b { display: flex; flex-direction: column; gap: 2px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; }
+.ver-l { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); } .ver-n { font-family: var(--font-display); font-size: 1.8rem; line-height: 1.1; } .ver-d { font-size: .85rem; color: var(--muted); }
 .cd-cat { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-top: 8px; } .cd-cat summary { cursor: pointer; }
 .cd-list { display: flex; flex-direction: column; gap: 6px; } .cd-it { display: flex; gap: 10px; align-items: flex-start; padding: 8px; border-radius: 10px; background: var(--card2, rgba(255,255,255,.03)); cursor: pointer; }
 .cd-it input { margin-top: 3px; width: 20px; height: 20px; flex: none; } .cd-it .main { display: flex; flex-direction: column; gap: 2px; } .cd-it .t { font-weight: 600; } .cd-it .m { font-size: .9rem; color: var(--muted); } .cd-why { font-style: italic; }
@@ -677,6 +680,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
 <div id="toast" class="toast" hidden></div>
 <input type="file" id="file-in" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.mp4,.webm,.txt,.md,.csv,application/pdf,image/*,video/mp4,video/webm,text/plain,text/markdown,text/csv">
 
+<script>window.CARNET_VERSION = { v: "1.8", date: "2026-10-26", site: "1.8", test: false };</script>
 <script>
 // Espace archer : l'archer (ou son parent) voit uniquement ses propres informations,
 // telles que les renvoie la base (fonction espace_archer), et remplit son carnet.
@@ -1182,7 +1186,8 @@ window.CarnetArcherUI = (API, opts = {}) => {
         <span class="tirline">Utilisés quand tu lances « 🎯 Nouveau tir compté ».</span></section>`}
       ${PREVIEW ? "" : `<section class="card"><h3 class="hub-h">Mon compte</h3>
         <div class="bar"><button class="btn" data-act="add-code">Ajouter un autre archer (frère, sœur…)</button>${TESTW ? "" : `<button class="btn danger" id="ar-out">Se déconnecter</button>`}</div></section>`}
-      <span class="tirline">Ces préférences sont gardées sur cet appareil.</span></div>`;
+      <span class="tirline">Ces préférences sont gardées sur cet appareil.</span>
+      ${window.CARNET_VERSION ? `<p class="ar-ver">Appli version ${esc(window.CARNET_VERSION.v)}${PREVIEW && window.CARNET_VERSION.test && window.CARNET_VERSION.site !== window.CARNET_VERSION.v ? ` (test · les archers ont la ${esc(window.CARNET_VERSION.site)})` : ""}</p>` : ""}</div>`;
   }
   // ---------- Documents : partagés avec le club + fiches d'exercices de l'archer ----------
   function vDocs() {
@@ -3628,6 +3633,19 @@ function cleanConcoursLines() {
   orph.forEach((e) => remove("carnetEntrees", e.id));
   if (orph.length) dashCache.entries = dashCache.entries.filter((e) => !orph.includes(e));
 }
+// ---------- Numéro de version (fichier VERSION, ajouté par build.py) ----------
+const VER = window.CARNET_VERSION || { v: "?", date: "", site: "?", test: !!window.CARNET_TEST };
+document.querySelectorAll(".test-v").forEach((e) => (e.textContent = VER.v + " "));
+const verDate = (d) => (d ? new Date(d + "T12:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) : "");
+function versionCard() {
+  const same = VER.v === VER.site;
+  return `<h2 class="sec">Version</h2>
+    <div class="card"><div class="ver-grid">
+      <div class="ver-b"><span class="ver-l">${VER.test ? "Ce carnet (test)" : "Ce carnet"}</span><b class="ver-n">${esc(VER.v)}</b><span class="ver-d">${VER.date ? "construit le " + verDate(VER.date) : ""}</span></div>
+      <div class="ver-b"><span class="ver-l">Site des archers</span><b class="ver-n">${esc(VER.site)}</b><span class="ver-d">version mise à leur disposition</span></div></div>
+      <p class="${same ? "tirline" : "notice"}" style="margin:8px 0 0">${same ? "✓ Ton carnet et le site des archers sont à la même version." : VER.test ? `Cette version de test (${esc(VER.v)}) n'est pas encore chez les archers : ils ont la ${esc(VER.site)}. Elle leur arrivera quand tu feras le transfert.` : `Le site des archers n'est pas à la même version que ce carnet.`}</p>
+      <span class="tirline">Sur le site, l'archer voit le numéro en bas de son onglet Paramètres. S'il n'a pas le bon, il ferme et rouvre l'appli.</span></div>`;
+}
 const ICON = {
   target: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/></svg>',
   cal: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 10h18M8 3v4M16 3v4" stroke="currentColor" stroke-width="2"/></svg>',
@@ -4359,7 +4377,8 @@ function viewData() {
   const p = prm(), ro = S.canWrite ? "" : "disabled";
   const nEnt = S.carnets.length;
   const PT = [["general", "Général"], ["seances", "Séances"], ["concours", "Concours"], ["archers", "Espace archers"], ["donnees", "Données"]], pt = PT.some(([k]) => k === S.pTab) ? S.pTab : LS.get("ptab", "general");
-  const part = { general: () => `    <h2 class="sec">Entraîneur</h2>
+  const part = { general: () => `    ${versionCard()}
+    <h2 class="sec">Entraîneur</h2>
     <div class="card"><label class="f" for="pr-nom">Ton prénom ou nom (affiché en haut du carnet)<input type="text" id="pr-nom" data-prm="nom" value="${esc(p.nom)}" placeholder="Ex. Cédric" ${ro}></label></div>
     ${window.carnetLogout ? `<div class="card"><div class="bar"><span class="tirline">Connecté à ton compte du carnet sur cet appareil.</span><span class="grow"></span><button class="btn" data-act="logout">Se déconnecter</button></div></div>` : ""}
     <h2 class="sec">Affichage sur cet appareil</h2>

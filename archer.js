@@ -502,7 +502,8 @@ window.CarnetArcherUI = (API, opts = {}) => {
         <span class="tirline">Utilisés quand tu lances « 🎯 Nouveau tir compté ».</span></section>`}
       ${PREVIEW ? "" : `<section class="card"><h3 class="hub-h">Mon compte</h3>
         <div class="bar"><button class="btn" data-act="add-code">Ajouter un autre archer (frère, sœur…)</button>${TESTW ? "" : `<button class="btn danger" id="ar-out">Se déconnecter</button>`}</div></section>`}
-      <span class="tirline">Ces préférences sont gardées sur cet appareil.</span></div>`;
+      <span class="tirline">Ces préférences sont gardées sur cet appareil.</span>
+      ${window.CARNET_VERSION ? `<p class="ar-ver">Appli version ${esc(window.CARNET_VERSION.v)}${PREVIEW && window.CARNET_VERSION.test && window.CARNET_VERSION.site !== window.CARNET_VERSION.v ? ` (test · les archers ont la ${esc(window.CARNET_VERSION.site)})` : ""}</p>` : ""}</div>`;
   }
   // ---------- Documents : partagés avec le club + fiches d'exercices de l'archer ----------
   function vDocs() {
