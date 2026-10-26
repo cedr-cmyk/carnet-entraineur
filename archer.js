@@ -72,7 +72,8 @@ window.CarnetArcherUI = (API, opts = {}) => {
   }
   function header() {
     const tabs = [["accueil", "Accueil"], ["carnet", "Mon carnet"], ["concours", "Mes concours"], ["documents", "Documents"], ["evaluations", "Évaluations"]];
-    top.innerHTML = `<div class="top-in"><div class="brand"><span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/></svg></span>
+    top.innerHTML = `<div class="top-in"><div class="brand">${window.CarnetAvatar && St.data?.archer ? "" : `<span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/></svg></span>`}
+      ${window.CarnetAvatar && St.data?.archer ? `<button type="button" class="av-btn" data-act="avatar" aria-label="Choisir mon avatar">${window.CarnetAvatar.svg(St.data.archer, 40)}<span class="av-edit" aria-hidden="true">✎</span></button>` : ""}
       <h1>Espace <em>${esc(St.data?.archer ? name(St.data.archer) : name(who()))}</em></h1><span class="sub">${PREVIEW || TESTW ? "" : `<button class="btn ghost" id="ar-out">Se déconnecter</button>`}</span></div>
       <nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" aria-selected="${St.tab === k}" data-atab="${k}">${l}</button>`).join("")}</nav></div>`;
   }
@@ -393,6 +394,14 @@ window.CarnetArcherUI = (API, opts = {}) => {
     if (t.dataset.artc) { St.tcCombo = t.dataset.artc; render(); return; }
     if (t.dataset.artcp) { St.tcPer = t.dataset.artcp; render(); return; }
     if (t.dataset.act === "tc-new") { tirDirect(); return; }
+    if (t.dataset.act === "avatar" && window.CarnetAvatar) {
+      window.CarnetAvatar.choisir(St.data.archer, async (v) => {
+        if (PREVIEW) { toast("Aperçu : l'archer choisira son avatar ici"); return; }
+        const before = St.data.archer.avatar; St.data.archer.avatar = v; render();
+        try { await API.avatar(who(), v); toast("Avatar enregistré"); } catch (err) { St.data.archer.avatar = before; render(); toast("Avatar non enregistré : " + err.message); }
+      });
+      return;
+    }
     if (t.dataset.act === "chrono") { window.CarnetChrono(chronoStore); return; }
     if (t.dataset.arcombo) { St.combo = t.dataset.arcombo; render(); return; }
     if (t.dataset.who) { St.cur = +t.dataset.who; load(); return; }

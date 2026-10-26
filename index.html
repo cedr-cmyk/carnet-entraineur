@@ -558,6 +558,18 @@ svg.chart .szl { stroke: var(--line-2, var(--line)); stroke-dasharray: 3 3; }
 .ch-form { display: grid; gap: 8px; background: rgba(255,255,255,.06); border-radius: 16px; padding: 12px; } .ch-help { text-align: center; color: rgba(255,255,255,.75); }
 .top-chrono { margin-left: 10px; min-height: 38px; padding: 6px 12px; } .dash-chrono { width: 100%; min-height: 54px; font-size: 1.05rem; margin-bottom: 4px; }
 .ar-root .top-chrono { display: none; } @media (max-width: 520px) { .top-chrono .tc-l { display: none; } .top-chrono { font-size: 1.2rem; padding: 6px 10px; } }
+.av { display: block; flex: none; border-radius: 50%; }
+.row-av { flex: none; display: flex; align-items: center; }
+.av-head { display: flex; align-items: center; gap: 14px; } .av-head h2 { margin: 0; }
+.av-btn { position: relative; border: 0; background: none; padding: 0; cursor: pointer; border-radius: 50%; }
+.av-btn .av-edit { position: absolute; right: -2px; bottom: -2px; width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: #0F172A; font-size: 13px; font-weight: 800; display: grid; place-items: center; border: 2px solid var(--bg); }
+.pt .av { width: 34px; height: 34px; }
+.av-layer { z-index: 45; }
+.av-prev { display: flex; align-items: center; gap: 14px; font-size: 1.1rem; }
+.av-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 8px; }
+.av-pick { border: 2px solid transparent; background: var(--sunk); border-radius: 16px; padding: 4px; display: grid; place-items: center; cursor: pointer; min-height: 60px; }
+.av-pick[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.av-cols { display: flex; gap: 8px; flex-wrap: wrap; } .av-col { width: 40px; height: 40px; border-radius: 50%; border: 3px solid transparent; cursor: pointer; } .av-col[aria-pressed="true"] { border-color: var(--ink); }
 .ar-quick { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
 .ar-big { width: 100%; min-height: 56px; font-size: 1.1rem; }
 .ar-mot { display: grid; gap: 4px; text-align: left; width: 100%; color: var(--ink); cursor: pointer; }
@@ -718,7 +730,8 @@ window.CarnetArcherUI = (API, opts = {}) => {
   }
   function header() {
     const tabs = [["accueil", "Accueil"], ["carnet", "Mon carnet"], ["concours", "Mes concours"], ["documents", "Documents"], ["evaluations", "Évaluations"]];
-    top.innerHTML = `<div class="top-in"><div class="brand"><span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/></svg></span>
+    top.innerHTML = `<div class="top-in"><div class="brand">${window.CarnetAvatar && St.data?.archer ? "" : `<span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/></svg></span>`}
+      ${window.CarnetAvatar && St.data?.archer ? `<button type="button" class="av-btn" data-act="avatar" aria-label="Choisir mon avatar">${window.CarnetAvatar.svg(St.data.archer, 40)}<span class="av-edit" aria-hidden="true">✎</span></button>` : ""}
       <h1>Espace <em>${esc(St.data?.archer ? name(St.data.archer) : name(who()))}</em></h1><span class="sub">${PREVIEW || TESTW ? "" : `<button class="btn ghost" id="ar-out">Se déconnecter</button>`}</span></div>
       <nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" aria-selected="${St.tab === k}" data-atab="${k}">${l}</button>`).join("")}</nav></div>`;
   }
@@ -1039,6 +1052,14 @@ window.CarnetArcherUI = (API, opts = {}) => {
     if (t.dataset.artc) { St.tcCombo = t.dataset.artc; render(); return; }
     if (t.dataset.artcp) { St.tcPer = t.dataset.artcp; render(); return; }
     if (t.dataset.act === "tc-new") { tirDirect(); return; }
+    if (t.dataset.act === "avatar" && window.CarnetAvatar) {
+      window.CarnetAvatar.choisir(St.data.archer, async (v) => {
+        if (PREVIEW) { toast("Aperçu : l'archer choisira son avatar ici"); return; }
+        const before = St.data.archer.avatar; St.data.archer.avatar = v; render();
+        try { await API.avatar(who(), v); toast("Avatar enregistré"); } catch (err) { St.data.archer.avatar = before; render(); toast("Avatar non enregistré : " + err.message); }
+      });
+      return;
+    }
     if (t.dataset.act === "chrono") { window.CarnetChrono(chronoStore); return; }
     if (t.dataset.arcombo) { St.combo = t.dataset.arcombo; render(); return; }
     if (t.dataset.who) { St.cur = +t.dataset.who; load(); return; }
@@ -1063,6 +1084,7 @@ window.CarnetBlasonOpts = (c) => blasonOpts(c);
 window.CarnetDistances = () => DISTANCES;
 window.CarnetTcProgress = (...a) => tcProgress(...a);
 window.CarnetChrono = (store) => openChrono(store);
+window.CarnetAvatar = { svg: (a, n) => avatarSvg(a, n), choisir: (a, f) => avatarPicker(a, f) };
 window.CarnetCible = { svg: (t) => targetSvg(t), face: (t) => faceOf(t), scoreAt: (f, r) => scoreAt(f, r), groupe: (t) => groupStats(t), carte: (t, a, s) => tirCarte(t, a, s), viewer: (t, s, a, o) => tirViewer(t, s, a, o), bilan: (t, o) => tirBilan(t, o) };
 const ARCS = ["Classique", "Poulies", "Barebow", "Arc droit", "Arc chasse"];
 const CATS = ["U11", "U13", "U15", "U18", "U21", "Senior 1", "Senior 2", "Senior 3"];
@@ -1349,7 +1371,7 @@ function viewSeance() {
     ${(() => { const enc = roster.filter((a) => pres.has(a.id) && encadre(s, a.id)).length, arc = pres.size - enc; return `<div class="bar"><div class="score"><b>${arc}</b><span>archer${arc > 1 ? "s" : ""}${enc ? ` · ${enc} encadrant${enc > 1 ? "s" : ""}` : ""} sur ${roster.length} personnes</span></div><span class="grow"></span>`; })()}
       ${S.canWrite && roster.length ? `<button class="btn" data-act="all-present">Tous présents</button><button class="btn" data-act="none-present">Tout décocher</button>` : ""}</div>
     ${roster.length ? (() => {
-      const tile = (a) => `<div class="ptw"><button class="pt" data-toggle="${a.id}" aria-pressed="${pres.has(a.id)}" ${S.canWrite ? "" : "disabled"}><span class="box"></span><span class="nm">${esc(fullName(a))}${pretsOf(a.id).length ? ` ${pretTag(a.id)}` : ""}<span class="sm">${esc(roleOf(a) === "encadrant" ? "Encadrant / animateur" : [(a.federations || []).map((f) => catOf(a, f)).filter(Boolean).join(" / "), (a.arcs || []).join(", ")].filter(Boolean).join(" · "))}</span></span></button>
+      const tile = (a) => `<div class="ptw"><button class="pt" data-toggle="${a.id}" aria-pressed="${pres.has(a.id)}" ${S.canWrite ? "" : "disabled"}><span class="box"></span>${avatarSvg(a, 34)}<span class="nm">${esc(fullName(a))}${pretsOf(a.id).length ? ` ${pretTag(a.id)}` : ""}<span class="sm">${esc(roleOf(a) === "encadrant" ? "Encadrant / animateur" : [(a.federations || []).map((f) => catOf(a, f)).filter(Boolean).join(" / "), (a.arcs || []).join(", ")].filter(Boolean).join(" · "))}</span></span></button>
         ${roleOf(a) === "les-deux" && pres.has(a.id) ? `<label class="encx"><input type="checkbox" data-encadre="${a.id}" ${(s.encadrants || []).includes(a.id) ? "checked" : ""} ${S.canWrite ? "" : "disabled"}> Encadre aujourd'hui</label>` : ""}</div>`;
       const arch = roster.filter((a) => roleOf(a) !== "encadrant"), staff = roster.filter((a) => roleOf(a) === "encadrant");
       return `<div class="attend">${arch.map(tile).join("")}</div>${staff.length ? `<h2 class="sec">Encadrement</h2><div class="attend">${staff.map(tile).join("")}</div>` : ""}`;
@@ -3050,6 +3072,62 @@ document.addEventListener("click", (e) => {
   addArrow(scoreAt(faceOf(t), Math.hypot(x, y)), { x, y });
 });
 
+// ---------- Avatars : dessins originaux à choisir (aucune photo), initiales en couleur par défaut ----------
+const AV_FONDS = ["#FDE68A", "#A5F3FC", "#FECACA", "#BBF7D0", "#DDD6FE", "#FBCFE8", "#FED7AA", "#E2E8F0"];
+const AV_K = "#0F172A"; // traits
+const AV = {
+  renard: ["Renard", `<path d="M14 18l8 12h20l8-12-4 20-14 14-14-14z" fill="#EA580C"/><path d="M22 40l10 10 10-10-10-4z" fill="#FFF7ED"/><path d="M14 18l6 14M50 18l-6 14" stroke="#9A3412" stroke-width="2"/><circle cx="25" cy="36" r="2.6" fill="${AV_K}"/><circle cx="39" cy="36" r="2.6" fill="${AV_K}"/><circle cx="32" cy="45" r="2.4" fill="${AV_K}"/>`],
+  hibou: ["Hibou", `<path d="M16 16l8 8h16l8-8v26a16 14 0 0 1-32 0z" fill="#92400E"/><circle cx="25" cy="32" r="8" fill="#FFF"/><circle cx="39" cy="32" r="8" fill="#FFF"/><circle cx="25" cy="32" r="3.6" fill="${AV_K}"/><circle cx="39" cy="32" r="3.6" fill="${AV_K}"/><path d="M29 40h6l-3 6z" fill="#F59E0B"/><path d="M22 48q10 6 20 0" stroke="#FDE68A" stroke-width="2" fill="none"/>`],
+  loup: ["Loup", `<path d="M16 14l10 12h12l10-12-2 22-14 18-14-18z" fill="#64748B"/><path d="M24 40l8 14 8-14-8-3z" fill="#E2E8F0"/><path d="M18 18l5 7M46 18l-5 7" stroke="#334155" stroke-width="2"/><path d="M22 34l6 2M42 34l-6 2" stroke="${AV_K}" stroke-width="3" stroke-linecap="round"/><circle cx="32" cy="47" r="2.4" fill="${AV_K}"/>`],
+  ours: ["Ours", `<circle cx="18" cy="20" r="7" fill="#78350F"/><circle cx="46" cy="20" r="7" fill="#78350F"/><circle cx="32" cy="36" r="18" fill="#92400E"/><ellipse cx="32" cy="43" rx="9" ry="7" fill="#FDE68A"/><circle cx="25" cy="32" r="2.6" fill="${AV_K}"/><circle cx="39" cy="32" r="2.6" fill="${AV_K}"/><ellipse cx="32" cy="40" rx="3" ry="2.2" fill="${AV_K}"/>`],
+  chat: ["Chat", `<path d="M16 14l8 12M48 14l-8 12" stroke="#1E293B" stroke-width="0"/><path d="M16 12l10 12h12l10-12v26a16 16 0 0 1-32 0z" fill="#1E293B"/><circle cx="25" cy="34" r="3.4" fill="#A3E635"/><circle cx="39" cy="34" r="3.4" fill="#A3E635"/><path d="M30 42h4l-2 2z" fill="#FB7185"/><path d="M14 42l10-1M14 46l10-2M50 42l-10-1M50 46l-10-2" stroke="#E2E8F0" stroke-width="1.4"/>`],
+  lapin: ["Lapin", `<ellipse cx="25" cy="16" rx="5" ry="12" fill="#F8FAFC" stroke="#CBD5E1"/><ellipse cx="39" cy="16" rx="5" ry="12" fill="#F8FAFC" stroke="#CBD5E1"/><ellipse cx="25" cy="17" rx="2.2" ry="8" fill="#FBCFE8"/><ellipse cx="39" cy="17" rx="2.2" ry="8" fill="#FBCFE8"/><circle cx="32" cy="40" r="15" fill="#F8FAFC" stroke="#CBD5E1"/><circle cx="26" cy="37" r="2.4" fill="${AV_K}"/><circle cx="38" cy="37" r="2.4" fill="${AV_K}"/><path d="M30 43h4l-2 2z" fill="#FB7185"/>`],
+  panda: ["Panda", `<circle cx="19" cy="20" r="7" fill="${AV_K}"/><circle cx="45" cy="20" r="7" fill="${AV_K}"/><circle cx="32" cy="36" r="18" fill="#FFF"/><ellipse cx="24" cy="34" rx="5" ry="6.5" fill="${AV_K}" transform="rotate(-20 24 34)"/><ellipse cx="40" cy="34" rx="5" ry="6.5" fill="${AV_K}" transform="rotate(20 40 34)"/><circle cx="24" cy="34" r="2" fill="#FFF"/><circle cx="40" cy="34" r="2" fill="#FFF"/><ellipse cx="32" cy="43" rx="3" ry="2.2" fill="${AV_K}"/>`],
+  grenouille: ["Grenouille", `<circle cx="22" cy="22" r="7" fill="#16A34A"/><circle cx="42" cy="22" r="7" fill="#16A34A"/><ellipse cx="32" cy="38" rx="20" ry="15" fill="#22C55E"/><circle cx="22" cy="22" r="3.5" fill="#FFF"/><circle cx="42" cy="22" r="3.5" fill="#FFF"/><circle cx="22" cy="22" r="1.8" fill="${AV_K}"/><circle cx="42" cy="22" r="1.8" fill="${AV_K}"/><path d="M22 40q10 8 20 0" stroke="${AV_K}" stroke-width="2.4" fill="none" stroke-linecap="round"/>`],
+  aigle: ["Aigle", `<path d="M14 26q18-18 36 0v10q-18 18-36 0z" fill="#78350F"/><path d="M20 24q12-10 24 0v8q-12 8-24 0z" fill="#FFF"/><circle cx="27" cy="27" r="2.4" fill="${AV_K}"/><circle cx="37" cy="27" r="2.4" fill="${AV_K}"/><path d="M28 32h8l-2 12-4-4z" fill="#F59E0B"/>`],
+  tortue: ["Tortue", `<circle cx="32" cy="18" r="7" fill="#65A30D"/><circle cx="29.5" cy="17" r="1.6" fill="${AV_K}"/><circle cx="34.5" cy="17" r="1.6" fill="${AV_K}"/><ellipse cx="32" cy="38" rx="18" ry="15" fill="#15803D"/><path d="M32 25l7 6-3 9h-8l-3-9z M18 36l7 1 3 8M46 36l-7 1-3 8" fill="none" stroke="#BBF7D0" stroke-width="2"/><ellipse cx="14" cy="46" rx="4" ry="3" fill="#65A30D"/><ellipse cx="50" cy="46" rx="4" ry="3" fill="#65A30D"/>`],
+  lion: ["Lion", `<circle cx="32" cy="34" r="22" fill="#C2410C"/><circle cx="32" cy="35" r="14" fill="#F59E0B"/><circle cx="27" cy="32" r="2.4" fill="${AV_K}"/><circle cx="37" cy="32" r="2.4" fill="${AV_K}"/><ellipse cx="32" cy="40" rx="5" ry="4" fill="#FEF3C7"/><path d="M30 38h4l-2 2z" fill="${AV_K}"/>`],
+  pingouin: ["Pingouin", `<ellipse cx="32" cy="34" rx="16" ry="20" fill="${AV_K}"/><ellipse cx="32" cy="38" rx="10" ry="14" fill="#FFF"/><circle cx="27" cy="26" r="2.4" fill="#FFF"/><circle cx="37" cy="26" r="2.4" fill="#FFF"/><circle cx="27" cy="26" r="1.2" fill="${AV_K}"/><circle cx="37" cy="26" r="1.2" fill="${AV_K}"/><path d="M28 31h8l-4 5z" fill="#F59E0B"/>`],
+  cerf: ["Cerf", `<path d="M20 22l-6-10M20 22l-8-2M44 22l6-10M44 22l8-2" stroke="#78350F" stroke-width="3" stroke-linecap="round"/><path d="M20 24h24l-4 18-8 10-8-10z" fill="#B45309"/><path d="M26 42l6 10 6-10z" fill="#FDE68A"/><circle cx="26" cy="32" r="2.4" fill="${AV_K}"/><circle cx="38" cy="32" r="2.4" fill="${AV_K}"/><circle cx="32" cy="47" r="2" fill="${AV_K}"/>`],
+  dauphin: ["Dauphin", `<path d="M10 40q14-22 36-16l8-6-2 10q2 8-6 12-14 6-28 4z" fill="#0EA5E9"/><path d="M14 42q14 2 26-2" stroke="#E0F2FE" stroke-width="3" fill="none"/><circle cx="44" cy="30" r="2" fill="${AV_K}"/><path d="M28 24l4-8 4 9" fill="#0284C7"/>`],
+  cible: ["Cible", `<circle cx="32" cy="32" r="20" fill="#1E293B"/><circle cx="32" cy="32" r="15" fill="#06B6D4"/><circle cx="32" cy="32" r="10" fill="#EF4444"/><circle cx="32" cy="32" r="5" fill="#FFD700"/><path d="M33 31l14-14M44 14l3 3 3-1-4-4z" stroke="${AV_K}" stroke-width="2.4" stroke-linecap="round"/>`],
+  arc: ["Arc", `<path d="M22 10q22 22 0 44" stroke="#92400E" stroke-width="4.5" fill="none" stroke-linecap="round"/><path d="M22 10v44" stroke="${AV_K}" stroke-width="1.4"/><path d="M14 32h38" stroke="${AV_K}" stroke-width="2.4"/><path d="M52 32l-7-4v8z" fill="${AV_K}"/><path d="M14 32l-3-3M14 32l-3 3M17 32l-3-3M17 32l-3 3" stroke="#EF4444" stroke-width="2"/>`],
+  fleches: ["Flèches", `<path d="M14 50L48 16M50 50L16 16" stroke="${AV_K}" stroke-width="2.8" stroke-linecap="round"/><path d="M48 16l-8 1 7 7z M16 16l8 1-7 7z" fill="${AV_K}"/><path d="M14 50l-1-7 4 3zM14 50l7 1-3-4z M50 50l1-7-4 3zM50 50l-7 1 3-4z" fill="#EF4444"/>`],
+  etoile: ["Étoile", `<path d="M32 10l6.5 14 15 1.5-11.3 10 3.4 15L32 43l-13.6 7.5 3.4-15L10.5 25.5l15-1.5z" fill="#F59E0B" stroke="#B45309" stroke-width="1.5" stroke-linejoin="round"/>`],
+  eclair: ["Éclair", `<path d="M36 8L16 36h13l-4 20 22-30H34z" fill="#FACC15" stroke="#A16207" stroke-width="1.5" stroke-linejoin="round"/>`],
+  flamme: ["Flamme", `<path d="M32 8q14 14 12 28a12 12 0 0 1-24 0q0-8 6-14 0 8 6 8-4-10 0-22z" fill="#F97316"/><path d="M32 30q8 8 5 15a6 6 0 0 1-10 0q-1-6 5-15z" fill="#FDE047"/>`],
+  montagne: ["Montagne", `<path d="M6 50l18-28 10 14 6-8 18 22z" fill="#475569"/><path d="M24 22l-5 8 4-2 3 3 3-3z M40 28l-3 5 3-1 2 2 2-2z" fill="#FFF"/><circle cx="48" cy="16" r="5" fill="#FBBF24"/>`],
+};
+const avHash = (s) => [...String(s || "")].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
+const avInit = (a) => ((a?.prenom || "").trim()[0] || "") + ((a?.nom || "").trim()[0] || "") || "?";
+// Avatar d'un archer (ou de toute fiche {prenom, nom, avatar}) ; size en px
+function avatarSvg(a, size = 40) {
+  const av = a?.avatar, d = av && AV[av.id];
+  const fond = (av && av.fond) || AV_FONDS[avHash(a?.id || (a?.prenom || "") + (a?.nom || "")) % AV_FONDS.length];
+  const inner = d ? d[1] : `<text x="32" y="41" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="24" font-weight="800" fill="${AV_K}">${esc(avInit(a).toUpperCase())}</text>`;
+  return `<svg class="av" width="${size}" height="${size}" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="32" fill="${fond}"/><g>${inner}</g></svg>`;
+}
+// Fenêtre de choix : onPick({id, fond} | null pour revenir aux initiales)
+function avatarPicker(a, onPick) {
+  let cur = { id: a?.avatar?.id || "", fond: a?.avatar?.fond || "" };
+  const el = document.createElement("div"); el.className = "sheet-bg av-layer"; document.body.appendChild(el);
+  const draw = () => {
+    const prev = { ...a, avatar: cur.id ? cur : null };
+    el.innerHTML = `<div class="sheet" role="dialog" aria-label="Choisir un avatar"><h3>Choisir un avatar</h3>
+      <div class="av-prev">${avatarSvg(cur.id ? { ...prev, avatar: { id: cur.id, fond: cur.fond || AV_FONDS[0] } } : prev, 88)}<b>${esc(cur.id ? AV[cur.id][0] : "Initiales")}</b></div>
+      <div class="av-grid" role="group" aria-label="Dessins">${[["", "Initiales"], ...Object.entries(AV).map(([k, v]) => [k, v[0]])].map(([k, n]) => `<button type="button" class="av-pick" data-av="${k}" aria-pressed="${cur.id === k}" aria-label="${esc(n)}">${avatarSvg(k ? { avatar: { id: k, fond: cur.fond || AV_FONDS[0] } } : a, 52)}</button>`).join("")}</div>
+      <div class="f">Couleur du fond<div class="av-cols">${AV_FONDS.map((c) => `<button type="button" class="av-col" data-fond="${c}" aria-pressed="${(cur.fond || "") === c}" aria-label="Fond ${c}" style="background:${c}"></button>`).join("")}</div></div>
+      <div class="acts"><button type="button" class="btn" data-avx="no">Annuler</button><button type="button" class="btn primary" data-avx="ok">Choisir</button></div></div>`;
+  };
+  el.addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-av],[data-fond],[data-avx]"); if (!b) { if (ev.target === el) el.remove(); return; }
+    if (b.dataset.av != null) { cur.id = b.dataset.av; if (cur.id && !cur.fond) cur.fond = AV_FONDS[avHash(a?.id) % AV_FONDS.length]; draw(); return; }
+    if (b.dataset.fond) { cur.fond = b.dataset.fond; draw(); return; }
+    if (b.dataset.avx === "no") { el.remove(); return; }
+    if (b.dataset.avx === "ok") { el.remove(); onPick(cur.id ? { id: cur.id, fond: cur.fond || AV_FONDS[0] } : null); }
+  });
+  draw();
+}
 // ---------- Chrono d'entraînement (feux et signaux comme en concours, réglages personnalisés) ----------
 const CHRONO_DEF = [
   { nom: "Salle · 3 flèches", prep: 10, tir: 120, orange: 30, volees: 10, vagues: 1, alterner: false, pause: 0, son: true },
@@ -3158,7 +3236,7 @@ const ICON = {
 function dashResRow(x) {
   const d = x.moy == null ? null : Math.round((x.score - x.moy) * 10) / 10, f = (v) => String(Math.round(v * 10) / 10).replace(".", ","), pc = (v) => (x.moy ? String(Math.round((v / x.moy) * 1000) / 10).replace(".", ",") : "0");
   const evo = d == null ? `<span class="evo">1er concours</span>` : d > 0 ? `<span class="evo up" title="Points de plus que sa moyenne précédente">▲ +${f(d)} pts <small>(+${pc(d)} %)</small></span>` : d < 0 ? `<span class="evo down" title="Points de moins que sa moyenne précédente">▼ ${f(d)} pts <small>(${pc(d)} %)</small></span>` : `<span class="evo">= stable</span>`;
-  return `<div class="row"><span class="main"><span class="t">${esc(fullName(x.a))}</span><span class="m">${x.moy == null ? "pas de concours précédent" : `moyenne précédente ${f(x.moy)} pts sur ${x.n} concours`}${x.r.categorie ? " · " + esc(x.r.categorie) : ""}</span></span><span class="count">${esc(x.r.score)}<small> pts</small></span>${evo}</div>`;
+  return `<div class="row"><span class="row-av">${avatarSvg(x.a, 36)}</span><span class="main"><span class="t">${esc(fullName(x.a))}</span><span class="m">${x.moy == null ? "pas de concours précédent" : `moyenne précédente ${f(x.moy)} pts sur ${x.n} concours`}${x.r.categorie ? " · " + esc(x.r.categorie) : ""}</span></span><span class="count">${esc(x.r.score)}<small> pts</small></span>${evo}</div>`;
 }
 function viewAccueil() {
   if (!S.clubs.length) return startHere();
@@ -3307,7 +3385,7 @@ function viewArchers() {
   let h = clubChips() + (S.clubs.length ? `<div class="bar"><span class="grow"></span><button class="btn" data-act="print-batch">Imprimer des fiches à l'avance</button></div>` : "")
     + `<input type="search" id="search" placeholder="Rechercher un archer" value="${esc(S.q)}" aria-label="Rechercher un archer">`;
   if (!S.archers.length) return h + `<div class="empty"><h3>Aucun archer</h3><p>Ajoute les archers que tu suis, avec leur club, leur type d'arc et leur catégorie.</p><button class="btn primary" data-act="new-archer">Ajouter un archer</button></div>`;
-  const row = (a) => `<button class="row" data-archer="${a.id}"><span class="main"><span class="t">${esc(fullName(a))} ${pretTag(a.id)}</span>
+  const row = (a) => `<button class="row" data-archer="${a.id}"><span class="row-av">${avatarSvg(a, 44)}</span><span class="main"><span class="t">${esc(fullName(a))} ${pretTag(a.id)}</span>
       <span class="m">${esc(roleOf(a) === "encadrant" ? (a.clubIds || []).map(clubName).join(", ") + " · encadrant / animateur" : archerMeta(a) + (roleOf(a) === "les-deux" ? " · encadre aussi" : ""))}</span></span><span class="count" aria-hidden="true">›</span></button>`;
   h += actifs.length ? `<div class="list">${actifs.map(row).join("")}</div>` : `<p class="notice">Aucun archer ne correspond.</p>`;
   if (staff.length) h += `<h2 class="sec">Encadrants et animateurs</h2><div class="list">${staff.map(row).join("")}</div>`;
@@ -3331,7 +3409,7 @@ async function previewArcher(aid, testWrite = false) {
   const build = async () => {
     const entrees = S.db ? (await S.db.collection("carnetEntrees").where("archerId", "==", aid).get()).docs.map((d) => ({ id: d.id, ...d.data() })) : [];
     return {
-      archer: { id: aid, prenom: a.prenom, nom: a.nom, arcs: a.arcs, clubIds: a.clubIds, federations: a.federations, role: roleOf(a) },
+      archer: { id: aid, prenom: a.prenom, nom: a.nom, arcs: a.arcs, clubIds: a.clubIds, federations: a.federations, role: roleOf(a), avatar: a.avatar || null },
       clubs: S.clubs.filter((c) => (a.clubIds || []).includes(c.id)).map((c) => ({ id: c.id, nom: c.nom, couleur: c.couleur })),
       entrees,
       carnets: S.carnets.filter((c) => c.archerId === aid).map((c) => ({ id: c.id, saison: c.saison, objectifs: c.objectifs, dates: c.dates })),
@@ -3361,6 +3439,7 @@ async function previewArcher(aid, testWrite = false) {
       dashCache.at = 0;
     };
     api.supprimer = async (_, id) => { if (String(id).startsWith("a_")) await S.db.collection("carnetEntrees").doc(id).delete(); };
+    api.avatar = async (_, v) => { a.avatar = v; await S.db.collection("archers").doc(aid).update({ avatar: v }); };
     api.repondre = async (_, sid, rep) => {
       const id = `r_${sid}_${aid}`;
       if (!rep) { S.reponses = S.reponses.filter((r) => r.id !== id); await S.db.collection("reponses").doc(id).delete(); return; }
@@ -3549,7 +3628,7 @@ function viewArcher() {
   if (!a) { S.archer = null; return viewArchers(); }
   const evs = evalsOf(a.id);
   return `<div class="bar"><button class="btn ghost" data-act="back">← Archers</button><span class="grow"></span><button class="btn primary" data-act="open-carnet">Carnet d'entraînement</button>${S.canWrite ? `<button class="btn" data-act="new-eval">+ Évaluation technique</button><button class="btn" data-act="edit-archer">Modifier</button>` : ""}</div>
-    <div class="head"><span class="m">${esc((a.clubIds || []).map(clubName).join(", "))}${a.actif === false ? " · inactif" : ""}</span><h2>${esc(fullName(a))}</h2>
+    <div class="head"><span class="m">${esc((a.clubIds || []).map(clubName).join(", "))}${a.actif === false ? " · inactif" : ""}</span><div class="av-head">${S.canWrite ? `<button type="button" class="av-btn" data-act="avatar" aria-label="Changer l'avatar de ${esc(fullName(a))}">${avatarSvg(a, 64)}<span class="av-edit" aria-hidden="true">✎</span></button>` : avatarSvg(a, 64)}<h2>${esc(fullName(a))}</h2></div>
       <span class="m">${esc([a.naissance ? `${ageSaison(a)} ans en ${saisonLabel()}` : "", a.sexe === "F" ? "Femme" : a.sexe === "H" ? "Homme" : "", (a.arcs || []).join(", ") || "Type d'arc non renseigné"].filter(Boolean).join(" · "))}</span>
       <span class="clubline">${(a.federations || []).map((f) => {
         const cat = catOf(a, f), lic = (a.licences || {})[f];
@@ -4443,6 +4522,7 @@ document.addEventListener("click", (e) => {
   if (a === "restore") startRestore();
   if (a === "logout" && window.carnetLogout) window.carnetLogout();
   if (a === "new-annonce") formAnnonce();
+  if (a === "avatar") { const ar = S.archers.find((x) => x.id === S.archer); if (ar) avatarPicker(ar, (v) => { ar.avatar = v; patch("archers", ar.id, { avatar: v }); toast("Avatar enregistré"); render(); }); }
   if (a === "chrono") openChrono(coachChronoStore);
   if (a === "new-partage") formPartage();
   if (a === "rep-cocher") {
