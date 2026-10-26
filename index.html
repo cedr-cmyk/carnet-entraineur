@@ -580,6 +580,7 @@ svg.chart .szl { stroke: var(--line-2, var(--line)); stroke-dasharray: 3 3; }
 .hum { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .hum-b { border: 2px solid var(--line); background: var(--sunk); border-radius: 16px; padding: 10px 4px; display: grid; justify-items: center; gap: 4px; cursor: pointer; color: var(--ink); min-height: 76px; }
 .hum-b span { font-size: 2.2rem; line-height: 1; } .hum-b[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.ar-more { border: 1px solid var(--line); border-radius: 14px; padding: 4px 12px 10px; display: grid; gap: 10px; } .ar-more > summary { cursor: pointer; padding: 8px 0; font-weight: 700; color: var(--ink); }
 .ar-params { display: grid; gap: 14px; max-width: 720px; } .ar-params .card { gap: 10px; }
 .ar-quick.one { grid-template-columns: 1fr; }
 .ar-quick { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
@@ -1043,12 +1044,18 @@ window.CarnetArcherUI = (API, opts = {}) => {
   }
   function formEntry(e = null) {
     // fiche courte (option des profils) : pour les séances du club et les séances notées par l'archer, pas pour les concours ni les tirs comptés
-    if (M().has("courte") && !e?.concoursId && !(e && e.objectif === "Tir compté" && !e.seanceId)) return formSimple(e || { id: "a_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), date: today(), __new: true });
+    const courte = M().has("courte") && !e?.concoursId && !(e && e.objectif === "Tir compté" && !e.seanceId);
+    // fiche courte + carnet (ou tir compté) : smileys en haut, la fiche complète repliée dans « Plus de détails »
+    const hyb = courte && (M().has("carnet") || TC());
+    if (courte && !hyb) return formSimple(e || { id: "a_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), date: today(), __new: true });
     const d = e || { date: today() }, el = $("#sheet");
     const lock = e?.concoursId ? "readonly" : "";
     const tcLast = e ? {} : St.data.entrees.filter((x) => x.tcDistance || x.tcBlason).sort((a, b) => (b.date || "").localeCompare(a.date || ""))[0] || {}; // reprend la dernière distance // flèches et score d'un concours : saisis par l'entraîneur
     el.innerHTML = `<div class="sheet-bg" data-close><form class="sheet" id="ar-form"><h3>${e?.__new ? "Ma séance du " + esc(dObj(e.date).toLocaleDateString("fr-FR")) : e ? "Ma séance" : "Noter une séance"}</h3>
       <div class="grid2"><label class="f">Date<input type="date" name="date" required value="${esc(d.date)}" ${e?.seanceId || e?.concoursId ? "readonly" : ""}></label><label class="f">Objectif<input type="text" name="objectif" value="${esc(d.objectif)}"></label></div>
+      ${hyb ? `<div class="f">Comment ça s'est passé ?<div class="hum" role="group" aria-label="Mon ressenti">${HUMEURS.map(([v, ic, l]) => `<button type="button" class="hum-b" data-humf="${v}" aria-pressed="${num(d.note) != null && HUMEURS.reduce((m, h) => (Math.abs(h[0] - d.note) < Math.abs(m[0] - d.note) ? h : m), HUMEURS[0])[0] === v}"><span aria-hidden="true">${ic}</span><small>${l}</small></button>`).join("")}</div><input type="hidden" name="note" id="ar-note" value="${esc(d.note ?? "")}"></div>
+        <label class="f">Qu'as-tu appris aujourd'hui ?<textarea name="commentaire" placeholder="Ex. garder l'épaule basse, bien viser le jaune…">${esc(d.commentaire)}</textarea></label>
+        <details class="ar-more" ${VOL.some(([k]) => num(d[k]) != null) || num(d.scoreCompte) != null || d.emotion || d.atteint ? "open" : ""}><summary>➕ Plus de détails : flèches, tir compté, objectif atteint, émotion</summary>` : ""}
       <div class="f">Flèches tirées<div class="grid5">${VOL.filter(([k]) => k !== "compte" || e?.concoursId).map(([k, l]) => `<label class="f" style="font-weight:500">${l}<input type="number" inputmode="numeric" min="0" name="${k}" value="${esc(d[k])}" placeholder="${d.auto?.[k] ? "+" + d.auto[k] : "0"}" ${lock}></label>`).join("")}</div>${e?.auto ? `<span class="tirline">Les chiffres grisés viennent des feuilles de marque de ton entraîneur.</span>` : ""}</div>
       ${e?.concoursId ? `<input type="hidden" name="scoreCompte" value="${esc(d.scoreCompte)}"><label class="f">Score du concours<input type="number" name="scoreCompet" value="${esc(d.scoreCompet)}" readonly></label>`
       : !TC() ? `<input type="hidden" name="scoreCompte" value="${esc(d.scoreCompte)}"><input type="hidden" name="tcDistance" value="${esc(d.tcDistance ?? "")}"><input type="hidden" name="tcBlason" value="${esc(d.tcBlason ?? "")}"><input type="hidden" name="compte" value="${esc(d.compte ?? "")}"><input type="hidden" name="scoreCompet" value="${esc(d.scoreCompet)}"><input type="hidden" name="tcTir" value="${esc(d.tcTir ? JSON.stringify(d.tcTir) : "")}">`
@@ -1062,12 +1069,14 @@ window.CarnetArcherUI = (API, opts = {}) => {
         <input type="hidden" name="tcTir" id="ar-tctir" value="${esc(d.tcTir ? JSON.stringify(d.tcTir) : "")}"></div>
       <input type="hidden" name="scoreCompet" value="${esc(d.scoreCompet)}">`}
       <div class="f">Objectif atteint<div class="radio">${[["", "Je ne sais pas"], ["O", "Oui"], ["N", "Non"]].map(([v, l]) => `<label><input type="radio" name="atteint" value="${v}" ${(d.atteint || "") === v ? "checked" : ""}> ${l}</label>`).join("")}</div></div>
-      <div class="grid2"><label class="f">Ressenti (0 à 10)<select name="note"><option value="">—</option>${Array.from({ length: 11 }, (_, i) => `<option ${String(d.note ?? "") === String(i) ? "selected" : ""}>${i}</option>`).join("")}</select></label>
+      <div class="grid2">${hyb ? "" : `<label class="f">Ressenti (0 à 10)<select name="note"><option value="">—</option>${Array.from({ length: 11 }, (_, i) => `<option ${String(d.note ?? "") === String(i) ? "selected" : ""}>${i}</option>`).join("")}</select></label>`}
         <label class="f">Émotion<select name="emotion"><option value="">—</option>${EMOTIONS.map((x) => `<option ${d.emotion === x ? "selected" : ""}>${x}</option>`).join("")}</select></label></div>
+      ${hyb ? "</details>" : ""}
       ${d.commentaireCoach ? `<div class="coach-mot"><b>💬 Le mot de ton entraîneur</b><p style="margin:4px 0 0;color:var(--ink)">${esc(d.commentaireCoach)}</p></div>` : ""}
-      <label class="f">Mes commentaires<textarea name="commentaire">${esc(d.commentaire)}</textarea></label>
+      ${hyb ? "" : `<label class="f">Mes commentaires<textarea name="commentaire">${esc(d.commentaire)}</textarea></label>`}
       <div class="acts">${e && !e.__new && String(e.id).startsWith("a_") ? `<button type="button" class="btn danger left" id="ar-del">${e.objectif === "Tir compté" ? "Supprimer ce tir" : "Supprimer la séance"}</button>` : ""}${e && !e.__new && !e.concoursId && !(String(e.id).startsWith("a_") && e.objectif === "Tir compté") && (num(e.scoreCompte) != null || e.tcTir) ? `<button type="button" class="btn danger left" id="ar-tcdel">Effacer le tir compté</button>` : ""}<button type="button" class="btn" data-close>Annuler</button><button class="btn primary">Enregistrer</button></div></form></div>`;
     el.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", (ev) => { if (ev.target === b) el.innerHTML = ""; }));
+    el.querySelectorAll("[data-humf]").forEach((b) => b.addEventListener("click", () => { $("#ar-note").value = b.dataset.humf; el.querySelectorAll("[data-humf]").forEach((x) => x.setAttribute("aria-pressed", x === b)); }));
     const tcm = () => { const n = Number($("#ar-tcn")?.value), sc = Number($("#ar-tcs")?.value), o = $("#ar-tcm"); if (!o) return; o.textContent = n > 0 && sc > 0 ? `Moyenne : ${(sc / n).toFixed(2).replace(".", ",")} point${sc / n >= 2 ? "s" : ""} par flèche` : ""; };
     $("#ar-tcn")?.addEventListener("input", tcm); $("#ar-tcs")?.addEventListener("input", tcm); tcm();
     $("#ar-cible")?.addEventListener("click", () => {
