@@ -555,6 +555,11 @@ svg.chart .szl { stroke: var(--line-2, var(--line)); stroke-dasharray: 3 3; }
 .esp-m { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; opacity: .55; }
 .esp-m.on { opacity: 1; border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); } .esp-m input { accent-color: var(--accent); width: 18px; height: 18px; margin-top: 2px; }
 .esp-m span { display: grid; gap: 2px; } .esp-m small { color: var(--muted); font-size: .82rem; }
+.ar-new { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); background: color-mix(in srgb, var(--accent) 7%, var(--surface)); gap: 8px; }
+.ar-new-l { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; } .ar-new-l .lnk { text-align: left; }
+.hum { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.hum-b { border: 2px solid var(--line); background: var(--sunk); border-radius: 16px; padding: 10px 4px; display: grid; justify-items: center; gap: 4px; cursor: pointer; color: var(--ink); min-height: 76px; }
+.hum-b span { font-size: 2.2rem; line-height: 1; } .hum-b[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); }
 .ar-params { display: grid; gap: 14px; max-width: 720px; } .ar-params .card { gap: 10px; }
 .ar-quick.one { grid-template-columns: 1fr; }
 .ar-quick { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
@@ -744,6 +749,21 @@ window.CarnetArcherUI = (API, opts = {}) => {
   const prefKey = () => "carnet-ar-prefs-" + (who()?.archer_id || "");
   const prefs = () => lsGet(prefKey(), {});
   const setPref = (k, v) => { const p = prefs(); if (v === "" || v == null) delete p[k]; else p[k] = v; lsSet(prefKey(), p); };
+  // Nouveautés depuis la dernière visite : évaluations partagées, mots de l'entraîneur, documents, infos du club
+  const vuKey = () => "carnet-ar-vu-" + (who()?.archer_id || "");
+  function nouvItems() {
+    const m = M(), it = [];
+    (St.data.evaluations || []).forEach((x) => it.push({ k: "e:" + x.id, txt: `Une évaluation partagée (${dObj(x.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })})`, go: `data-eval="${esc(x.id)}" data-asub-go="evaluations"` }));
+    St.data.entrees.filter((x) => x.commentaireCoach).forEach((x) => it.push({ k: "m:" + x.id + ":" + x.commentaireCoach.length, txt: `Un mot de ton entraîneur (${dObj(x.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })})`, go: `data-entry="${esc(x.id)}"` }));
+    if (m.has("documents")) (St.data.documents || []).forEach((x) => it.push({ k: "d:" + x.id, txt: `Document : ${x.titre || x.nomFichier || "nouveau document"}`, go: `data-atab="documents"` }));
+    (St.data.annonces || []).forEach((x) => it.push({ k: "a:" + x.id, txt: `Info du club : ${x.titre || ""}`, go: `data-act="vu-info"` }));
+    return it;
+  }
+  function nouveautes() {
+    const it = nouvItems(), seen = lsGet(vuKey(), null);
+    if (!seen) { lsSet(vuKey(), it.map((x) => x.k)); return []; } // première visite : rien de « nouveau »
+    const s = new Set(seen); return it.filter((x) => !s.has(x.k));
+  }
   const chronoStore = { list: () => lsGet(LSK, []), save: (l) => lsSet(LSK, l), last: () => lsGet(LSK + "-dernier", ""), setLast: (n) => lsSet(LSK + "-dernier", n) };
   // ---------- Accueil : infos du club et entraînements proposés ----------
   // Parties visibles, choisies par l'entraîneur (profil Découverte, Loisir, Compétiteur ou personnalisé)
@@ -755,8 +775,11 @@ window.CarnetArcherUI = (API, opts = {}) => {
     const ann = (St.data.annonces || []).slice().sort((a, b) => (b.important ? 1 : 0) - (a.important ? 1 : 0) || (b.date || "").localeCompare(a.date || ""));
     const ent = St.data.entrainements, prenom = St.data.archer?.prenom || "";
     const mots = St.data.entrees.filter((e) => e.commentaireCoach).sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, 2);
+    const nouv = nouveautes();
     const m = M(), q = [TC() ? `<button class="btn primary ar-big" data-act="tc-new">🎯 Nouveau tir compté</button>` : "", window.CarnetChrono && m.has("chrono") ? `<button class="btn ar-big" data-act="chrono">⏱ Chrono</button>` : ""].filter(Boolean);
     let h = q.length ? `<div class="ar-quick${q.length === 1 ? " one" : ""}">${q.join("")}</div>` : "";
+    if (nouv.length) h += `<div class="card ar-new"><div class="bar"><b>✨ Du nouveau depuis ta dernière visite</b><span class="grow"></span><button class="btn" data-act="vu">Vu ✓</button></div>
+      <ul class="ar-new-l">${nouv.map((n) => `<li><button class="lnk" ${n.go}>${esc(n.txt)}</button></li>`).join("")}</ul></div>`;
     h += mots.map((e) => `<button class="card coach-mot ar-mot" data-entry="${esc(e.id)}"><b>💬 Le mot de ton entraîneur · ${esc(dObj(e.date).toLocaleDateString("fr-FR"))}</b><span>${esc(e.commentaireCoach)}</span></button>`).join("");
     h += `<div class="card ar-infos"><h3 class="hub-h">Infos du club</h3>${ann.length ? ann.map((n) => `<div class="ar-info${n.important ? " imp" : ""}">
       <b>${n.important ? '<span class="tag imp">Important</span> ' : ""}${esc(n.titre || "Info")}</b>${n.texte ? `<p>${esc(n.texte).replace(/\n/g, "<br>")}</p>` : ""}
@@ -976,7 +999,30 @@ window.CarnetArcherUI = (API, opts = {}) => {
       St.saison = saisonOf(date); load();
     });
   }
+  // Fiche courte pour les plus jeunes (sans « Mon carnet ») : smileys et « qu'as-tu appris aujourd'hui ? »
+  const HUMEURS = [[2, "😞", "Dur"], [5, "😐", "Moyen"], [7, "🙂", "Bien"], [9, "😄", "Super"]];
+  function formSimple(e) {
+    const el = $("#sheet"); let note = num(e.note);
+    const sel = () => HUMEURS.reduce((m, h) => (note != null && Math.abs(h[0] - note) < Math.abs(m[0] - note) ? h : m), HUMEURS[0]);
+    const draw = () => {
+      el.innerHTML = `<div class="sheet-bg" data-close><form class="sheet ar-simple" id="ar-sform"><h3>Ma séance du ${esc(dObj(e.date).toLocaleDateString("fr-FR", { day: "numeric", month: "long" }))}</h3>
+        <div class="f">Comment ça s'est passé ?<div class="hum" role="group" aria-label="Mon ressenti">${HUMEURS.map(([v, ic, l]) => `<button type="button" class="hum-b" data-hum="${v}" aria-pressed="${note != null && sel()[0] === v}"><span aria-hidden="true">${ic}</span><small>${l}</small></button>`).join("")}</div></div>
+        ${e.objectif ? `<span class="tirline">Thème de la séance : ${esc(e.objectif)}</span>` : ""}
+        <label class="f">Qu'as-tu appris aujourd'hui ?<textarea name="commentaire" placeholder="Ex. garder l'épaule basse, bien viser le jaune…">${esc(e.commentaire || "")}</textarea></label>
+        ${e.commentaireCoach ? `<div class="coach-mot"><b>💬 Le mot de ton entraîneur</b><p style="margin:4px 0 0;color:var(--ink)">${esc(e.commentaireCoach)}</p></div>` : ""}
+        <div class="acts"><button type="button" class="btn" data-close>Annuler</button><button class="btn primary">Enregistrer</button></div></form></div>`;
+      el.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", (ev) => { if (ev.target === b) el.innerHTML = ""; }));
+      el.querySelectorAll("[data-hum]").forEach((b) => b.addEventListener("click", () => { e.commentaire = $("#ar-sform").commentaire.value; note = Number(b.dataset.hum); draw(); }));
+      $("#ar-sform").addEventListener("submit", async (ev) => {
+        ev.preventDefault(); if (PREVIEW) { toast("Aperçu : l'archer pourra enregistrer ici, pas toi"); return; }
+        const data = { date: e.date, saison: `${saisonOf(e.date) - 1}-${saisonOf(e.date)}`, objectif: e.objectif || "", note: note == null ? "" : String(note), commentaire: $("#ar-sform").commentaire.value.trim() };
+        try { await API.ecrire(who(), e.id, data); el.innerHTML = ""; toast("C'est noté, bravo !"); load(); } catch (err) { toast("Enregistrement impossible : " + err.message); }
+      });
+    };
+    draw();
+  }
   function formEntry(e = null) {
+    if (e && e.seanceId && !M().has("carnet") && !M().has("tir") && !M().has("impacts")) return formSimple(e);
     const d = e || { date: today() }, el = $("#sheet");
     const lock = e?.concoursId ? "readonly" : "";
     const tcLast = e ? {} : St.data.entrees.filter((x) => x.tcDistance || x.tcBlason).sort((a, b) => (b.date || "").localeCompare(a.date || ""))[0] || {}; // reprend la dernière distance // flèches et score d'un concours : saisis par l'entraîneur
@@ -1124,7 +1170,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     if (t.dataset.act === "close-preview") { root.remove(); return; }
     if (t.id === "ar-out") return API.deconnexion();
     if (t.dataset.atab) { St.tab = t.dataset.atab; render(); return; }
-    if (t.dataset.eval) { St.evalId = t.dataset.eval; render(); return; }
+    if (t.dataset.eval) { St.evalId = t.dataset.eval; if (t.dataset.asubGo) { St.tab = "entrainement"; St.sub = "evaluations"; } render(); return; }
     if (t.dataset.rep) {
       const [sid, val] = t.dataset.rep.split("|"), e = (St.data.entrainements || []).find((x) => x.id === sid); if (!e) return;
       if (PREVIEW) { toast("Aperçu : l'archer répondra ici, pas toi"); return; }
@@ -1144,6 +1190,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
       formEntry(e || { id: `s_${x.id}_${who().archer_id}`, seanceId: x.id, date: x.date, objectif: x.theme || "", __new: true });
       return;
     }
+    if (t.dataset.act === "vu" || t.dataset.act === "vu-info") { const seen = new Set(lsGet(vuKey(), [])); nouvItems().forEach((x) => seen.add(x.k)); lsSet(vuKey(), [...seen]); render(); return; }
     if (t.dataset.act === "all-ent") { St.allEnt = !St.allEnt; render(); return; }
     if (t.dataset.act === "avatar" && window.CarnetAvatar) {
       window.CarnetAvatar.choisir(St.data.archer, async (v) => {

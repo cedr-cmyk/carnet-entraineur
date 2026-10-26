@@ -556,6 +556,11 @@ svg.chart .szl { stroke: var(--line-2, var(--line)); stroke-dasharray: 3 3; }
 .esp-m { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; opacity: .55; }
 .esp-m.on { opacity: 1; border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); } .esp-m input { accent-color: var(--accent); width: 18px; height: 18px; margin-top: 2px; }
 .esp-m span { display: grid; gap: 2px; } .esp-m small { color: var(--muted); font-size: .82rem; }
+.ar-new { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); background: color-mix(in srgb, var(--accent) 7%, var(--surface)); gap: 8px; }
+.ar-new-l { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; } .ar-new-l .lnk { text-align: left; }
+.hum { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.hum-b { border: 2px solid var(--line); background: var(--sunk); border-radius: 16px; padding: 10px 4px; display: grid; justify-items: center; gap: 4px; cursor: pointer; color: var(--ink); min-height: 76px; }
+.hum-b span { font-size: 2.2rem; line-height: 1; } .hum-b[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); }
 .ar-params { display: grid; gap: 14px; max-width: 720px; } .ar-params .card { gap: 10px; }
 .ar-quick.one { grid-template-columns: 1fr; }
 .ar-quick { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
