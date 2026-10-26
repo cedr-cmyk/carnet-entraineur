@@ -3227,6 +3227,14 @@ function coachTir(id) {
     ${e.commentaire ? `<div class="f">Ressenti de l'archer<p class="prev" style="color:var(--ink)">${esc(e.commentaire)}</p></div>` : ""}
     <label class="f" for="ct-com">Mot de l'entraîneur (l'archer le lit dans son espace)<textarea id="ct-com" name="commentaireCoach" placeholder="Ex. Beau groupement, garde ce placement d'épaule.">${esc(e.commentaireCoach)}</textarea></label>`, {
     onSave(fd) { const v = (fd.get("commentaireCoach") || "").trim(); e.commentaireCoach = v; patch("carnetEntrees", e.id, { commentaireCoach: v }); toast(v ? "Mot envoyé à l'archer" : "Mot retiré"); render(); },
+    // un tir seul (ligne « Tir compté ») part entièrement ; dans une séance, seul le tir est effacé
+    onDelete: S.canWrite ? () => {
+      const seul = String(e.id).startsWith("a_") && e.objectif === "Tir compté";
+      if (seul) { remove("carnetEntrees", e.id); tcCache.list = tcCache.list.filter((x) => x.id !== e.id); }
+      else { const v = { scoreCompte: "", compte: "", tcDistance: "", tcBlason: "", tcTir: null }; Object.assign(e, v); patch("carnetEntrees", e.id, v); }
+      toast("Tir supprimé"); render();
+    } : null,
+    deleteLabel: "Supprimer ce tir",
   });
   const box = $("#ct-tv");
   if (box) box.addEventListener("click", (ev) => { const b = ev.target.closest("[data-tv]"); if (!b) return; ev.preventDefault(); box.innerHTML = tirViewer(e.tcTir, b.dataset.tv === "all" ? "all" : Number(b.dataset.tv), "data-tv", others); });

@@ -354,7 +354,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
         <label class="f">Émotion<select name="emotion"><option value="">—</option>${EMOTIONS.map((x) => `<option ${d.emotion === x ? "selected" : ""}>${x}</option>`).join("")}</select></label></div>
       ${d.commentaireCoach ? `<div class="coach-mot"><b>💬 Le mot de ton entraîneur</b><p style="margin:4px 0 0;color:var(--ink)">${esc(d.commentaireCoach)}</p></div>` : ""}
       <label class="f">Mes commentaires<textarea name="commentaire">${esc(d.commentaire)}</textarea></label>
-      <div class="acts">${e && String(e.id).startsWith("a_") ? `<button type="button" class="btn danger left" id="ar-del">Supprimer</button>` : ""}<button type="button" class="btn" data-close>Annuler</button><button class="btn primary">Enregistrer</button></div></form></div>`;
+      <div class="acts">${e && !e.__new && String(e.id).startsWith("a_") ? `<button type="button" class="btn danger left" id="ar-del">${e.objectif === "Tir compté" ? "Supprimer ce tir" : "Supprimer la séance"}</button>` : ""}${e && !e.__new && !e.concoursId && !(String(e.id).startsWith("a_") && e.objectif === "Tir compté") && (num(e.scoreCompte) != null || e.tcTir) ? `<button type="button" class="btn danger left" id="ar-tcdel">Effacer le tir compté</button>` : ""}<button type="button" class="btn" data-close>Annuler</button><button class="btn primary">Enregistrer</button></div></form></div>`;
     el.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", (ev) => { if (ev.target === b) el.innerHTML = ""; }));
     const tcm = () => { const n = Number($("#ar-tcn")?.value), sc = Number($("#ar-tcs")?.value), o = $("#ar-tcm"); if (!o) return; o.textContent = n > 0 && sc > 0 ? `Moyenne : ${(sc / n).toFixed(2).replace(".", ",")} point${sc / n >= 2 ? "s" : ""} par flèche` : ""; };
     $("#ar-tcn")?.addEventListener("input", tcm); $("#ar-tcs")?.addEventListener("input", tcm); tcm();
@@ -367,7 +367,11 @@ window.CarnetArcherUI = (API, opts = {}) => {
       });
     });
     const del = $("#ar-del");
-    if (del) del.onclick = async () => { if (!del.dataset.ok) { del.dataset.ok = 1; del.textContent = "Confirmer"; return; } try { await API.supprimer(who(), e.id); el.innerHTML = ""; toast("Séance supprimée"); load(); } catch (err) { toast(err.message); } };
+    if (del) del.onclick = async () => { if (!del.dataset.ok) { del.dataset.ok = 1; del.textContent = "Confirmer la suppression"; return; } if (PREVIEW) { toast("Aperçu : l'archer pourra supprimer ici"); return; } try { await API.supprimer(who(), e.id); el.innerHTML = ""; toast(e.objectif === "Tir compté" ? "Tir supprimé" : "Séance supprimée"); load(); } catch (err) { toast(err.message); } };
+    // Effacer seulement le tir compté d'une séance (la séance, les flèches et le ressenti restent)
+    const tcd = $("#ar-tcdel");
+    if (tcd) tcd.onclick = async () => { if (!tcd.dataset.ok) { tcd.dataset.ok = 1; tcd.textContent = "Confirmer : effacer le tir"; return; } if (PREVIEW) { toast("Aperçu : l'archer pourra effacer son tir ici"); return; }
+      try { await API.ecrire(who(), e.id, { scoreCompte: "", compte: "", tcDistance: "", tcBlason: "", tcTir: null }); el.innerHTML = ""; toast("Tir compté effacé"); load(); } catch (err) { toast(err.message); } };
     $("#ar-form").addEventListener("submit", async (ev) => {
       ev.preventDefault();
       if (PREVIEW) { toast("Aperçu : l'archer pourra enregistrer ici, pas toi"); return; } const fd = new FormData(ev.target), date = fd.get("date"); if (!date) return;
