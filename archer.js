@@ -102,7 +102,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
   const chronoStore = { list: () => lsGet(LSK, []), save: (l) => lsSet(LSK, l), last: () => lsGet(LSK + "-dernier", ""), setLast: (n) => lsSet(LSK + "-dernier", n) };
   // ---------- Accueil : infos du club et entraînements proposés ----------
   // Parties visibles, choisies par l'entraîneur (profil Découverte, Loisir, Compétiteur ou personnalisé)
-  const M = () => (window.CarnetModules && St.data ? window.CarnetModules(St.data.archer, (St.data.concours || []).filter((c) => num(c.resultat?.score) != null).length) : new Set(["seances", "carnet", "tir", "evals", "concours", "documents", "chrono"]));
+  const M = () => (window.CarnetModules && St.data ? window.CarnetModules(St.data.archer, (St.data.concours || []).filter((c) => num(c.resultat?.score) != null).length, St.data.reglagesEspace || {}) : new Set(["seances", "carnet", "tir", "evals", "concours", "documents", "chrono"]));
   const ENC = () => ["encadrant", "les-deux"].includes(St.data.archer?.role);
   const clubNom = (id) => (St.data.clubs || []).find((c) => c.id === id)?.nom || "";
   function vAccueil() {

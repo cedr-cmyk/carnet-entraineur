@@ -31,6 +31,9 @@ begin
       where t.owner = p_owner and t.col = 'attributions' and t.data->>'archerId' = p_archer and t.data->>'visible' = 'true'), '[]'::jsonb),
     'evaluations', coalesce((select jsonb_agg(jsonb_build_object('id', id, 'date', data->>'date', 'notes', data->'notes', 'observation', data->>'observation')) from docs
       where owner = p_owner and col = 'evaluations' and data->>'archerId' = p_archer and data->>'partage' = 'true'), '[]'::jsonb),
+    -- réglages des profils choisis par l'entraîneur (Paramètres › Espace archers)
+    'reglagesEspace', coalesce((select jsonb_build_object('profils', data->'profils', 'age', data->'profilAge', 'defaut', data->'profilDefaut') from docs
+      where owner = p_owner and col = 'parametres' and id = 'general'), '{}'::jsonb),
     -- séances du club où l'archer a été pointé présent (journal, sans compteur), avec les titres des fiches travaillées
     'seances', coalesce((select jsonb_agg(jsonb_build_object('id', s.id, 'date', s.data->>'date', 'heure', s.data->>'heure', 'groupe', s.data->>'groupe', 'theme', s.data->>'theme',
         'lieu', s.data->>'lieu', 'clubId', s.data->>'clubId',
