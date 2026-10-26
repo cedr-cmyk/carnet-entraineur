@@ -1187,7 +1187,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
       ${PREVIEW ? "" : `<section class="card"><h3 class="hub-h">Mon compte</h3>
         <div class="bar"><button class="btn" data-act="add-code">Ajouter un autre archer (frère, sœur…)</button>${TESTW ? "" : `<button class="btn danger" id="ar-out">Se déconnecter</button>`}</div></section>`}
       <span class="tirline">Ces préférences sont gardées sur cet appareil.</span>
-      ${window.CARNET_VERSION ? `<p class="ar-ver">Appli version ${esc(window.CARNET_VERSION.v)}${PREVIEW && window.CARNET_VERSION.test && window.CARNET_VERSION.site !== window.CARNET_VERSION.v ? ` (test · les archers ont la ${esc(window.CARNET_VERSION.site)})` : ""}</p>` : ""}</div>`;
+      ${window.CARNET_VERSION ? `<p class="ar-ver">Appli ${esc("V." + window.CARNET_VERSION.v)}${PREVIEW && window.CARNET_VERSION.test && window.CARNET_VERSION.site !== window.CARNET_VERSION.v ? ` (test · les archers ont la ${esc("V." + window.CARNET_VERSION.site)})` : ""}</p>` : ""}</div>`;
   }
   // ---------- Documents : partagés avec le club + fiches d'exercices de l'archer ----------
   function vDocs() {
@@ -3635,15 +3635,16 @@ function cleanConcoursLines() {
 }
 // ---------- Numéro de version (fichier VERSION, ajouté par build.py) ----------
 const VER = window.CARNET_VERSION || { v: "?", date: "", site: "?", test: !!window.CARNET_TEST };
-document.querySelectorAll(".test-v").forEach((e) => (e.textContent = VER.v + " "));
+const vNom = (v) => (/^\d/.test(String(v)) ? "V." + v : String(v));
+document.querySelectorAll(".test-v").forEach((e) => (e.textContent = vNom(VER.v) + " "));
 const verDate = (d) => (d ? new Date(d + "T12:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) : "");
 function versionCard() {
   const same = VER.v === VER.site;
   return `<h2 class="sec">Version</h2>
     <div class="card"><div class="ver-grid">
-      <div class="ver-b"><span class="ver-l">${VER.test ? "Ce carnet (test)" : "Ce carnet"}</span><b class="ver-n">${esc(VER.v)}</b><span class="ver-d">${VER.date ? "construit le " + verDate(VER.date) : ""}</span></div>
-      <div class="ver-b"><span class="ver-l">Site des archers</span><b class="ver-n">${esc(VER.site)}</b><span class="ver-d">version mise à leur disposition</span></div></div>
-      <p class="${same ? "tirline" : "notice"}" style="margin:8px 0 0">${same ? "✓ Ton carnet et le site des archers sont à la même version." : VER.test ? `Cette version de test (${esc(VER.v)}) n'est pas encore chez les archers : ils ont la ${esc(VER.site)}. Elle leur arrivera quand tu feras le transfert.` : `Le site des archers n'est pas à la même version que ce carnet.`}</p>
+      <div class="ver-b"><span class="ver-l">${VER.test ? "Ce carnet (test)" : "Ce carnet"}</span><b class="ver-n">${esc(vNom(VER.v))}</b><span class="ver-d">${VER.date ? "construit le " + verDate(VER.date) : ""}</span></div>
+      <div class="ver-b"><span class="ver-l">Site des archers</span><b class="ver-n">${esc(vNom(VER.site))}</b><span class="ver-d">version mise à leur disposition</span></div></div>
+      <p class="${same ? "tirline" : "notice"}" style="margin:8px 0 0">${same ? "✓ Ton carnet et le site des archers sont à la même version." : VER.test ? `Cette version de test (${esc(vNom(VER.v))}) n'est pas encore chez les archers : ils ont la ${esc(vNom(VER.site))}. Elle leur arrivera quand tu feras le transfert.` : `Le site des archers n'est pas à la même version que ce carnet.`}</p>
       <span class="tirline">Sur le site, l'archer voit le numéro en bas de son onglet Paramètres. S'il n'a pas le bon, il ferme et rouvre l'appli.</span></div>`;
 }
 const ICON = {
