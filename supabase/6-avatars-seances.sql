@@ -32,7 +32,8 @@ begin
     'evaluations', coalesce((select jsonb_agg(jsonb_build_object('id', id, 'date', data->>'date', 'notes', data->'notes', 'observation', data->>'observation')) from docs
       where owner = p_owner and col = 'evaluations' and data->>'archerId' = p_archer and data->>'partage' = 'true'), '[]'::jsonb),
     -- réglages des profils choisis par l'entraîneur (Paramètres › Espace archers)
-    'reglagesEspace', coalesce((select jsonb_build_object('profils', data->'profils', 'age', data->'profilAge', 'defaut', data->'profilDefaut') from docs
+    'reglagesEspace', coalesce((select jsonb_build_object('profils', data->'profils', 'age', data->'profilAge', 'defaut', data->'profilDefaut', 'noms', data->'profilNoms',
+        'perso', data->'profilsPerso', 'regles', data->'reglesAuto', 'sinon', data->'profilSinon') from docs
       where owner = p_owner and col = 'parametres' and id = 'general'), '{}'::jsonb),
     -- séances du club où l'archer a été pointé présent (journal, sans compteur), avec les titres des fiches travaillées
     'seances', coalesce((select jsonb_agg(jsonb_build_object('id', s.id, 'date', s.data->>'date', 'heure', s.data->>'heure', 'groupe', s.data->>'groupe', 'theme', s.data->>'theme',
@@ -108,5 +109,13 @@ begin
     on conflict (owner, col, id) do update set data = docs.data || v, updated_at = now();
 end $$;
 
-revoke execute on function public.espace_archer(uuid, text), public.archer_avatar(uuid, text, jsonb), public.archer_ecrire_entree(uuid, text, text, jsonb) from public, anon;
-grant execute on function public.espace_archer(uuid, text), public.archer_avatar(uuid, text, jsonb), public.archer_ecrire_entree(uuid, text, text, jsonb) to authenticated;
+-- Pour l'entraîneur : qui a un compte (ou un code en attente) pour chaque archer, en une seule fois
+create or replace function public.acces_tous() returns jsonb language sql stable security definer set search_path = public as $$
+  select case when not est_coach() then null else coalesce((select jsonb_object_agg(archer_id, jsonb_build_object('comptes', n, 'codes', c)) from (
+    select archer_id, sum(n)::int n, sum(c)::int c from (
+      select archer_id, count(*) n, 0 c from acces where owner = auth.uid() group by archer_id
+      union all select archer_id, 0, count(*) from invitations where owner = auth.uid() and used_by is null group by archer_id) z group by archer_id) t), '{}'::jsonb) end
+$$;
+
+revoke execute on function public.espace_archer(uuid, text), public.archer_avatar(uuid, text, jsonb), public.archer_ecrire_entree(uuid, text, text, jsonb), public.acces_tous() from public, anon;
+grant execute on function public.espace_archer(uuid, text), public.archer_avatar(uuid, text, jsonb), public.archer_ecrire_entree(uuid, text, text, jsonb), public.acces_tous() to authenticated;

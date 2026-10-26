@@ -169,6 +169,7 @@
     inviter: (archerId) => rpc("creer_invitation", { p_archer: archerId }),
     liste: (archerId) => rpc("acces_archer", { p_archer: archerId }),
     retirer: (userId, archerId) => rpc("retirer_acces", { p_user: userId, p_archer: archerId }),
+    tous: () => rpc("acces_tous"),
   };
 
   // ---------- Espace archer ----------

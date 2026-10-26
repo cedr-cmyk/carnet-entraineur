@@ -562,6 +562,9 @@ svg.chart .szl { stroke: var(--line-2, var(--line)); stroke-dasharray: 3 3; }
 .hum-b { border: 2px solid var(--line); background: var(--sunk); border-radius: 16px; padding: 10px 4px; display: grid; justify-items: center; gap: 4px; cursor: pointer; color: var(--ink); min-height: 76px; }
 .hum-b span { font-size: 2.2rem; line-height: 1; } .hum-b[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); }
 .ar-more { border: 1px solid var(--line); border-radius: 14px; padding: 4px 12px 10px; display: grid; gap: 10px; } .ar-more > summary { cursor: pointer; padding: 8px 0; font-weight: 700; color: var(--ink); }
+.esp-theme { display: grid; gap: 6px; } .esp-th { font-size: .78rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.rg-card { gap: 10px; } .rg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; } .rg-to { max-width: 320px; }
+table.qvq td, table.qvq th { white-space: nowrap; } .qvq-auto { display: block; color: var(--muted); font-size: .78rem; margin-top: 2px; } .qvq-c { text-align: center; font-weight: 800; } .qvq-a { display: flex; align-items: center; gap: 8px; } table.qvq select { min-width: 150px; }
 .ar-params { display: grid; gap: 14px; max-width: 720px; } .ar-params .card { gap: 10px; }
 .ar-quick.one { grid-template-columns: 1fr; }
 .ar-quick { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
@@ -3230,38 +3233,124 @@ document.addEventListener("click", (e) => {
   addArrow(scoreAt(faceOf(t), Math.hypot(x, y)), { x, y });
 });
 
-// ---------- Ce que l'archer voit dans son espace : profils simples pour ne pas perdre les plus jeunes ----------
-const AR_MODULES = [["seances", "Mes séances", "Le journal des séances du club où il était présent"], ["carnet", "Mon carnet", "Noter ses séances, ses flèches et son ressenti"],
-  ["tir", "Tir compté et courbe", "Noter son score de tir compté et suivre sa courbe de progression"], ["impacts", "Cible et « où vont les flèches »", "Placer ses flèches sur la cible volée par volée, et voir sa tendance"],
-  ["concours", "Mes concours", "Résultats, courbe des scores, classements PDF"], ["documents", "Documents", "Documents du club et fiches d'exercices"], ["chrono", "Chrono", "Le chrono d'entraînement"],
-  ["courte", "Fiche de séance courte", "Smileys et « qu'as-tu appris aujourd'hui ? » à la place de la fiche complète"]];
-const AR_PROFILS = { decouverte: ["Découverte", ["seances", "documents", "courte"]], loisir: ["Loisir", ["seances", "carnet", "tir", "impacts", "documents", "chrono"]], competiteur: ["Compétiteur", AR_MODULES.map(([k]) => k)] };
-// profil « auto » : jeunes jusqu'à 12 ans dans la saison → Découverte ; archer avec un résultat en concours → Compétiteur ; sinon Loisir
-// Réglages de l'entraîneur (Paramètres › Espace archers) : parties de chaque profil, âge limite de Découverte, profil par défaut
-const espaceCfg = () => ({ profils: prm().profils, age: prm().profilAge, defaut: prm().profilDefaut });
+// ---------- Ce que l'archer voit dans son espace : profils, règles automatiques, qui voit quoi ----------
+const AR_THEMES = [["entr", "Entraînement"], ["tir", "Tir"], ["conc", "Concours"], ["outils", "Documents et outils"]];
+const AR_MODULES = [["seances", "Mes séances", "Le journal des séances du club où il était présent", "entr"], ["carnet", "Mon carnet", "Noter ses séances, ses flèches et son ressenti", "entr"],
+  ["courte", "Fiche de séance courte", "Smileys et « qu'as-tu appris aujourd'hui ? » (avec Mon carnet : le reste dans « Plus de détails »)", "entr"],
+  ["tir", "Tir compté et courbe", "Noter son score de tir compté et suivre sa courbe de progression", "tir"], ["impacts", "Cible et « où vont les flèches »", "Placer ses flèches sur la cible volée par volée, et voir sa tendance", "tir"],
+  ["concours", "Mes concours", "Résultats, courbe des scores, classements PDF", "conc"],
+  ["documents", "Documents", "Documents du club et fiches d'exercices", "outils"], ["chrono", "Chrono", "Le chrono d'entraînement", "outils"]];
+const AR_PROFILS = { decouverte: ["Découverte", ["seances", "documents", "courte"]], loisir: ["Loisir", ["seances", "carnet", "tir", "impacts", "documents", "chrono"]], competiteur: ["Compétiteur", AR_MODULES.map(([k]) => k).filter((k) => k !== "courte")] };
+const MOD_COURT = { seances: "Séances", carnet: "Carnet", courte: "Fiche courte", tir: "Tir compté", impacts: "Cible", concours: "Concours", documents: "Docs", chrono: "Chrono" };
+// Réglages de l'entraîneur (Paramètres › Espace archers)
+const espaceCfg = () => ({ profils: prm().profils, age: prm().profilAge, defaut: prm().profilDefaut, noms: prm().profilNoms, perso: prm().profilsPerso, regles: prm().reglesAuto, sinon: prm().profilSinon });
 const cfgAge = (cfg) => (cfg?.age !== "" && cfg?.age != null && !isNaN(Number(cfg.age)) ? Number(cfg.age) : 12);
-const profilMods = (k, cfg) => (Array.isArray(cfg?.profils?.[k]) ? cfg.profils[k] : AR_PROFILS[k]?.[1] || AR_PROFILS.competiteur[1]);
-function arProfilAuto(a, nbConcours, cfg = espaceCfg()) {
-  const n = a?.naissance ? saisonOfDate(todayISO()) - Number(String(a.naissance).slice(0, 4)) : null;
-  return n != null && n <= cfgAge(cfg) ? "decouverte" : nbConcours > 0 ? "competiteur" : "loisir";
+function profilsList(cfg = espaceCfg()) {
+  const noms = cfg?.noms || {}, mods = (id, d) => (Array.isArray(cfg?.profils?.[id]) ? cfg.profils[id] : d);
+  const base = Object.entries(AR_PROFILS).map(([id, [nom, m]]) => ({ id, nom: noms[id] || nom, modules: mods(id, m), builtin: true }));
+  const perso = (Array.isArray(cfg?.perso) ? cfg.perso : []).filter((p) => p && p.id && !p.supprime).map((p) => ({ id: p.id, nom: noms[p.id] || p.nom || "Profil", modules: mods(p.id, []), builtin: false }));
+  return [...base, ...perso];
+}
+const profilById = (id, cfg = espaceCfg()) => profilsList(cfg).find((p) => p.id === id);
+const profilNom = (id, cfg = espaceCfg()) => (id === "auto" ? "Automatique" : id === "perso" ? "Personnalisé" : profilById(id, cfg)?.nom || "Profil supprimé");
+const profilMods = (k, cfg = espaceCfg()) => profilById(k, cfg)?.modules || AR_PROFILS.competiteur[1];
+// Règles automatiques, lues dans l'ordre : la première qui convient donne le profil ; sinon le profil « sinon »
+function reglesOf(cfg = espaceCfg()) {
+  if (Array.isArray(cfg?.regles)) return cfg.regles.filter(Boolean);
+  return [{ id: "r1", ageMax: cfgAge(cfg), profil: "decouverte" }, { id: "r2", concours: "oui", profil: "competiteur" }];
+}
+const sinonOf = (cfg = espaceCfg()) => (cfg?.sinon && profilById(cfg.sinon, cfg) ? cfg.sinon : "loisir");
+const ageArcher = (a) => (a?.naissance ? saisonOfDate(todayISO()) - Number(String(a.naissance).slice(0, 4)) : null);
+const vide = (v) => v === "" || v == null;
+function regleMatch(r, a, nbc) {
+  const age = ageArcher(a);
+  if (r.club && !(a?.clubIds || []).includes(r.club)) return false;
+  if (!vide(r.ageMin) && !(age != null && age >= Number(r.ageMin))) return false;
+  if (!vide(r.ageMax) && !(age != null && age <= Number(r.ageMax))) return false;
+  if (r.concours === "oui" && !(nbc > 0)) return false;
+  if (r.concours === "non" && nbc > 0) return false;
+  if (r.arc && !(a?.arcs || []).includes(r.arc)) return false;
+  if (r.role === "encadrant" && !["encadrant", "les-deux"].includes(a?.role || "archer")) return false;
+  if (r.role === "archer" && (a?.role || "archer") !== "archer") return false;
+  return true;
+}
+function arProfilAuto(a, nbc, cfg = espaceCfg()) {
+  const r = reglesOf(cfg).find((x) => x.profil && profilById(x.profil, cfg) && regleMatch(x, a, nbc));
+  return r ? r.profil : sinonOf(cfg);
 }
 // Les évaluations ne dépendent pas du profil : elles apparaissent dès qu'une évaluation est partagée (nbEvals > 0)
 function arModules(a, nbConcours = 0, cfg = espaceCfg(), nbEvals = 0) {
   const e = a?.espace || {}, p = e.profil || cfg?.defaut || "auto";
-  const set = new Set(p === "perso" ? (Array.isArray(e.modules) ? e.modules : profilMods("competiteur", cfg)) : profilMods(p === "auto" ? arProfilAuto(a, nbConcours, cfg) : p, cfg));
+  const set = new Set(p === "perso" ? (Array.isArray(e.modules) ? e.modules : profilMods("competiteur", cfg)) : profilMods(p === "auto" || !profilById(p, cfg) ? arProfilAuto(a, nbConcours, cfg) : p, cfg));
   set.delete("evals"); if (nbEvals > 0) set.add("evals");
   return set;
 }
+const nbConcoursOf = (aid) => S.concours.filter((c) => c.resultats && c.resultats[aid] && typeof c.resultats[aid] === "object").length;
+const modsGrid = (on, attr, editable) => AR_THEMES.map(([t, tl]) => `<div class="esp-theme"><span class="esp-th">${tl}</span><div class="esp-mods">${AR_MODULES.filter((m) => m[3] === t).map(([k, l, d]) => `<label class="esp-m${on.has(k) ? " on" : ""}"><input type="checkbox" ${attr(k)} ${on.has(k) ? "checked" : ""} ${editable ? "" : "disabled"}><span><b>${l}</b><small>${d}</small></span></label>`).join("")}</div></div>`).join("");
+function profilOptions(cur, withAuto = true, a = null, court = false) {
+  const auto = a && !court ? ` (ici : ${esc(profilNom(arProfilAuto(a, nbConcoursOf(a.id))))})` : "";
+  return `${withAuto ? `<option value="auto" ${cur === "auto" ? "selected" : ""}>Automatique${auto}</option>` : ""}${profilsList().map((p) => `<option value="${p.id}" ${cur === p.id ? "selected" : ""}>${esc(p.nom)}</option>`).join("")}${a ? `<option value="perso" ${cur === "perso" ? "selected" : ""}>Personnalisé</option>` : ""}`;
+}
 function espaceCard(a) {
-  const nbc = S.concours.filter((c) => c.resultats && c.resultats[a.id] && typeof c.resultats[a.id] === "object").length;
-  const e = a.espace || {}, def = prm().profilDefaut || "auto", p = e.profil || def, m = arModules(a, nbc), auto = arProfilAuto(a, nbc), dis = S.canWrite ? "" : "disabled";
+  const e = a.espace || {}, def = prm().profilDefaut || "auto", p = e.profil || def, m = arModules(a, nbConcoursOf(a.id)), dis = S.canWrite ? "" : "disabled";
   return `<h2 class="sec">Ce que l'archer voit dans son espace</h2><div class="card esp-card">
-    <label class="f" for="esp-p">Profil<select id="esp-p" data-esp="profil" ${dis}>
-      <option value="auto" ${p === "auto" ? "selected" : ""}>Automatique (ici : ${AR_PROFILS[auto][0]})</option>${Object.entries(AR_PROFILS).map(([k, [l]]) => `<option value="${k}" ${p === k ? "selected" : ""}>${l}</option>`).join("")}<option value="perso" ${p === "perso" ? "selected" : ""}>Personnalisé</option></select></label>
-    <span class="tirline">Automatique : Découverte jusqu'à ${cfgAge(espaceCfg())} ans, Compétiteur dès qu'il a un résultat en concours, Loisir sinon. L'accueil et ses paramètres restent toujours visibles. Ses évaluations apparaissent dès que vous en partagez une${S.evaluations.some((x) => x.archerId === a.id && x.partage === true) ? " (c'est le cas)" : ""}. Le contenu des profils se règle dans Paramètres › Espace archers.</span>
-    <div class="esp-mods">${AR_MODULES.map(([k, l, d]) => `<label class="esp-m${m.has(k) ? " on" : ""}"><input type="checkbox" data-espm="${k}" ${m.has(k) ? "checked" : ""} ${p === "perso" && S.canWrite ? "" : "disabled"}><span><b>${l}</b><small>${d}</small></span></label>`).join("")}</div>
+    <label class="f" for="esp-p">Profil<select id="esp-p" data-esp="profil" ${dis}>${profilOptions(p, true, a)}</select></label>
+    <span class="tirline">L'accueil et ses paramètres restent toujours visibles. Ses évaluations apparaissent dès que vous en partagez une${S.evaluations.some((x) => x.archerId === a.id && x.partage === true) ? " (c'est le cas)" : ""}. Les profils et les règles automatiques se règlent dans Paramètres › Espace archers.</span>
+    ${modsGrid(m, (k) => `data-espm="${k}"`, p === "perso" && S.canWrite)}
     ${p === "perso" ? "" : `<span class="tirline">Choisissez « Personnalisé » pour cocher vous-même chaque partie.</span>`}</div>`;
 }
+// Paramètres › Espace archers : trois rubriques
+let accTous = null;
+async function loadAccTous(force = false) {
+  if (!window.carnetAcces?.tous || (accTous && !force)) return;
+  try { accTous = (await window.carnetAcces.tous()) || {}; if (S.tab === "parametres") render(); } catch (e) { accTous = {}; }
+}
+function viewEspaceParams(ro) {
+  const cfg = espaceCfg(), et = S.espTab || "profils", tabs = [["profils", "Profils"], ["regles", "Règles automatiques"], ["qui", "Qui voit quoi"]];
+  let h = `<div class="chips" role="tablist" aria-label="Espace archers">${tabs.map(([k, l]) => `<button class="chip" role="tab" data-esptab="${k}" aria-pressed="${et === k}" aria-selected="${et === k}">${l}</button>`).join("")}</div>`;
+  if (et === "profils") {
+    h += `<span class="tirline">Chaque profil choisit ce que voient les archers. L'accueil (infos du club, entraînements proposés, mot de l'entraîneur) et leurs paramètres restent toujours visibles ; les évaluations apparaissent dès que vous en partagez une.</span>`;
+    h += profilsList(cfg).map((p) => { const on = new Set(p.modules), n = S.archers.filter((a) => roleOf(a) !== "encadrant" && (a.espace?.profil || prm().profilDefaut || "auto") !== "perso" && [...arModules(a, nbConcoursOf(a.id))].sort().join() === [...on].filter((k) => k !== "evals").sort().join() && (a.espace?.profil === p.id || ((a.espace?.profil || prm().profilDefaut || "auto") === "auto" && arProfilAuto(a, nbConcoursOf(a.id)) === p.id))).length;
+      return `<div class="card esp-card"><div class="bar"><label class="f" style="flex:1;min-width:200px">Nom du profil<input type="text" data-pnom="${p.id}" value="${esc(p.nom)}" ${ro}></label>
+        <span class="tag">${n} archer${n > 1 ? "s" : ""}</span>
+        ${S.canWrite ? (p.builtin ? (Array.isArray(cfg.profils?.[p.id]) || cfg.noms?.[p.id] ? `<button class="btn ghost" data-act="prof-reset" data-prof-k="${p.id}">Revenir à l'origine</button>` : "") : `<button class="btn danger" data-act="prof-del" data-prof-k="${p.id}">Supprimer</button>`) : ""}</div>
+        ${modsGrid(on, (k) => `data-prof="${p.id}|${k}"`, S.canWrite)}</div>`; }).join("");
+    if (S.canWrite) h += `<div><button class="btn" data-act="prof-new">+ Nouveau profil</button></div>`;
+  } else if (et === "regles") {
+    const rs = reglesOf(cfg), opt = (cur) => profilsList(cfg).map((p) => `<option value="${p.id}" ${cur === p.id ? "selected" : ""}>${esc(p.nom)}</option>`).join("");
+    h += `<span class="tirline">Pour un archer en profil « Automatique », les règles sont lues dans l'ordre : la première qui lui correspond donne son profil. Les cases laissées vides ne comptent pas.</span>`;
+    h += rs.map((r, i) => `<div class="card rg-card"><div class="bar"><b>Règle ${i + 1}</b><span class="grow"></span>${S.canWrite ? `<button class="btn ghost" data-act="rg-up" data-rg-i="${i}" aria-label="Monter" ${i ? "" : "disabled"}>↑</button><button class="btn ghost" data-act="rg-down" data-rg-i="${i}" aria-label="Descendre" ${i < rs.length - 1 ? "" : "disabled"}>↓</button><button class="btn ghost" data-act="rg-del" data-rg-i="${i}" aria-label="Supprimer la règle">×</button>` : ""}</div>
+      <div class="rg-grid"><label class="f">Club<select data-rg="${i}|club" ${ro}><option value="">Tous les clubs</option>${S.clubs.map((c) => `<option value="${c.id}" ${r.club === c.id ? "selected" : ""}>${esc(c.nom)}</option>`).join("")}</select></label>
+        <label class="f">Âge à partir de<input type="number" inputmode="numeric" min="0" max="99" data-rg="${i}|ageMin" value="${esc(r.ageMin ?? "")}" placeholder="—" ${ro}></label>
+        <label class="f">Âge jusqu'à<input type="number" inputmode="numeric" min="0" max="99" data-rg="${i}|ageMax" value="${esc(r.ageMax ?? "")}" placeholder="—" ${ro}></label>
+        <label class="f">Concours<select data-rg="${i}|concours" ${ro}><option value="">Peu importe</option><option value="oui" ${r.concours === "oui" ? "selected" : ""}>A au moins un résultat</option><option value="non" ${r.concours === "non" ? "selected" : ""}>Aucun résultat</option></select></label>
+        <label class="f">Type d'arc<select data-rg="${i}|arc" ${ro}><option value="">Tous</option>${ARCS.map((x) => `<option ${r.arc === x ? "selected" : ""}>${x}</option>`).join("")}</select></label>
+        <label class="f">Rôle<select data-rg="${i}|role" ${ro}><option value="">Tous</option><option value="archer" ${r.role === "archer" ? "selected" : ""}>Archers seulement</option><option value="encadrant" ${r.role === "encadrant" ? "selected" : ""}>Encadrants</option></select></label></div>
+      <label class="f rg-to">Alors le profil<select data-rg="${i}|profil" ${ro}>${opt(r.profil)}</select></label>
+      <span class="tirline">${regleTexte(r)} · ${S.archers.filter((a) => roleOf(a) !== "encadrant" || r.role === "encadrant").filter((a) => regleMatch(r, a, nbConcoursOf(a.id))).length} archer(s) concerné(s)</span></div>`).join("");
+    h += `${S.canWrite ? `<div><button class="btn" data-act="rg-add">+ Ajouter une règle</button></div>` : ""}
+      <div class="card"><div class="grid2"><label class="f">Sinon, le profil<select data-prm="profilSinon" ${ro}>${opt(sinonOf(cfg))}</select></label>
+        <label class="f">Profil des archers sans réglage<select data-prm="profilDefaut" ${ro}>${profilOptions(cfg.defaut || "auto", true)}</select></label></div>
+        <span class="tirline">« Sans réglage » : les archers dont vous n'avez pas choisi le profil sur leur fiche. Laissez « Automatique » pour que les règles s'appliquent.</span></div>`;
+  } else {
+    if (window.carnetAcces?.tous && !accTous) loadAccTous();
+    const list = S.archers.filter((a) => a.actif !== false && (S.club === "all" || (a.clubIds || []).includes(S.club))).sort(byName);
+    h += clubChips() + `<span class="tirline">Ce que voit chaque archer dans son espace. Changez son profil directement ici. ✓ = visible ; les évaluations s'ajoutent dès qu'une est partagée.</span>
+      <div class="scroll"><table class="vol qvq"><thead><tr><th>Archer</th><th>Profil</th>${AR_MODULES.map(([k]) => `<th>${MOD_COURT[k]}</th>`).join("")}<th>Éval.</th>${window.carnetAcces?.tous ? "<th>Compte</th>" : ""}</tr></thead><tbody>
+      ${list.map((a) => { const nbc = nbConcoursOf(a.id), ne = S.evaluations.filter((x) => x.archerId === a.id && x.partage === true).length, m = arModules(a, nbc, cfg, ne), p = a.espace?.profil || cfg.defaut || "auto", ac = accTous?.[a.id];
+        return `<tr><th><span class="qvq-a">${avatarSvg(a, 28)}<button class="lnk" data-archer="${a.id}">${esc(fullName(a))}</button></span></th>
+          <td><select data-qprof="${a.id}" ${ro}>${profilOptions(p, true, a, true)}</select>${p === "auto" ? `<small class="qvq-auto">→ ${esc(profilNom(arProfilAuto(a, nbc, cfg), cfg))}</small>` : ""}</td>
+          ${AR_MODULES.map(([k]) => `<td class="qvq-c">${m.has(k) ? "✓" : "·"}</td>`).join("")}<td class="qvq-c">${ne ? "✓" : "·"}</td>
+          ${window.carnetAcces?.tous ? `<td>${!accTous ? "…" : ac?.comptes ? `${ac.comptes} compte${ac.comptes > 1 ? "s" : ""}` : ac?.codes ? "code en attente" : "—"}</td>` : ""}</tr>`; }).join("")}
+      </tbody></table></div>`;
+  }
+  return h;
+}
+function regleTexte(r) {
+  const c = [r.club ? clubName(r.club) : "", !vide(r.ageMin) && !vide(r.ageMax) ? `de ${r.ageMin} à ${r.ageMax} ans` : !vide(r.ageMin) ? `${r.ageMin} ans et plus` : !vide(r.ageMax) ? `jusqu'à ${r.ageMax} ans` : "", r.concours === "oui" ? "avec un résultat en concours" : r.concours === "non" ? "sans résultat en concours" : "", r.arc || "", r.role === "encadrant" ? "encadrants" : r.role === "archer" ? "archers" : ""].filter(Boolean);
+  return `${c.length ? "Si " + c.join(", ") : "Tous les archers"} → ${profilNom(r.profil)}`;
+}
+const setRegles = (fn) => { const rs = reglesOf().map((r) => ({ ...r })); fn(rs); setParam({ reglesAuto: rs }); render(); };
 // ---------- Avatars : dessins originaux à choisir (aucune photo), initiales en couleur par défaut ----------
 const AV_FONDS = ["#FDE68A", "#A5F3FC", "#FECACA", "#BBF7D0", "#DDD6FE", "#FBCFE8", "#FED7AA", "#E2E8F0"];
 const AV_K = "#0F172A"; // traits
@@ -4166,16 +4255,7 @@ function viewData() {
         <label class="f" for="pr-${f}-nv">Nombre de volées<input type="number" inputmode="numeric" min="0" id="pr-${f}-nv" data-prm="${k}nbVolees" value="${esc(q.nbVolees)}" placeholder="Libre" ${ro}></label></div></div>`; }).join("")}
     <span class="tirline">Dans une séance, « Nouveau tir » demande d'abord la fédération, puis propose ses distances et ces valeurs. Pour les tirs suivants d'un archer dans la même fédération, ce sont les réglages de son tir précédent qui sont repris.</span>
 `,
-    archers: () => { const cfg = espaceCfg();
-      return `    <h2 class="sec">Profils de l'espace archer</h2>
-    <span class="tirline">Choisissez ce que chaque profil montre aux archers. L'accueil (infos du club, entraînements proposés, mot de l'entraîneur) et leurs paramètres restent toujours visibles. Les évaluations apparaissent d'elles-mêmes dès que vous en partagez une avec l'archer, quel que soit son profil. Un archer en profil « Personnalisé » garde ses propres cases.</span>
-    ${Object.entries(AR_PROFILS).map(([k, [l]]) => { const on = new Set(profilMods(k, cfg));
-      return `<div class="card esp-card"><div class="bar"><h3 class="hub-h" style="margin:0">${l}</h3><span class="grow"></span>${Array.isArray(cfg.profils?.[k]) && S.canWrite ? `<button class="btn ghost" data-act="prof-reset" data-prof-k="${k}">Revenir aux parties d'origine</button>` : ""}</div>
-      <div class="esp-mods">${AR_MODULES.map(([m, ml, d]) => `<label class="esp-m${on.has(m) ? " on" : ""}"><input type="checkbox" data-prof="${k}|${m}" ${on.has(m) ? "checked" : ""} ${ro}><span><b>${ml}</b><small>${d}</small></span></label>`).join("")}</div></div>`; }).join("")}
-    <h2 class="sec">Profil automatique</h2>
-    <div class="card"><div class="grid2"><label class="f" for="pr-page">Découverte jusqu'à (âge dans la saison)<input type="number" inputmode="numeric" min="0" max="99" id="pr-page" data-prm="profilAge" value="${cfgAge(cfg)}" ${ro}></label>
-      <label class="f" for="pr-pdef">Profil des archers sans réglage<select id="pr-pdef" data-prm="profilDefaut" ${ro}>${[["auto", "Automatique"], ...Object.entries(AR_PROFILS).map(([k, [l]]) => [k, l])].map(([v, l]) => `<option value="${v}" ${(cfg.defaut || "auto") === v ? "selected" : ""}>${l}</option>`).join("")}</select></label></div>
-      <span class="tirline">Automatique : Découverte jusqu'à l'âge indiqué, Compétiteur dès qu'un archer a un résultat en concours, Loisir sinon. Chaque archer peut avoir son propre profil sur sa fiche.</span></div>`; },
+    archers: () => viewEspaceParams(ro),
     concours: () => `    <h2 class="sec">Concours : valeurs par défaut</h2>
     ${(() => { const cd = p.co || {}, rr = (key, cur, opts) => `<div class="radio">${opts.map(([v, l]) => `<label><input type="radio" name="pco-${key}" data-prm="co.${key}" value="${v}" ${String(cur || "") === String(v) ? "checked" : ""} ${ro}> ${l}</label>`).join("")}</div>`;
       return `<div class="card"><h3 class="hub-h">Nouveaux concours</h3><span class="tirline">Déjà cochés quand tu ajoutes un ou plusieurs concours. Tu peux toujours les changer au cas par cas.</span>
@@ -4596,7 +4676,7 @@ function formSeance(s = null) {
 
 // ---------- Événements ----------
 document.addEventListener("click", (e) => {
-  const t = e.target.closest("[data-tab],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen]");
+  const t = e.target.closest("[data-tab],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab]");
   if (!t || t.closest("#sheet")) return;
   if (t.dataset.dashSuivi) { const [sid, aid] = t.dataset.dashSuivi.split("|"); S.seance = sid; S.suivi = aid; S.tirOpen = null; render(); window.scrollTo(0, 0); return; }
   if (t.dataset.tab) { go(t.dataset.tab); try { history.replaceState(null, "", "#" + t.dataset.tab); } catch (_) {} return; }
@@ -4606,6 +4686,7 @@ document.addEventListener("click", (e) => {
     const presents = [...set]; s.presents = presents; render(); patch("seances", s.id, { presents }); return;
   }
   if (t.dataset.folder !== undefined) { S.folder = t.dataset.folder || null; render(); window.scrollTo(0, 0); return; }
+  if (t.dataset.esptab) { S.espTab = t.dataset.esptab; render(); return; }
   if (t.dataset.tccombo) { S.tcCombo = t.dataset.tccombo; render(); return; }
   if (t.dataset.tcper) { S.tcPer = t.dataset.tcper; render(); return; }
   if (t.dataset.tcopen) { coachTir(t.dataset.tcopen); return; }
@@ -4735,7 +4816,17 @@ document.addEventListener("click", (e) => {
   if (a === "restore") startRestore();
   if (a === "logout" && window.carnetLogout) window.carnetLogout();
   if (a === "new-annonce") formAnnonce();
-  if (a === "prof-reset") { const k = t.dataset.profK; setParam({ profils: { [k]: null } }); toast("Profil remis à l'origine"); render(); }
+  if (a === "prof-reset") { const k = t.dataset.profK; setParam({ profils: { [k]: null }, profilNoms: { [k]: null } }); toast("Profil remis à l'origine"); render(); }
+  if (a === "prof-new") { const id = "p_" + Date.now().toString(36); const l = (Array.isArray(prm().profilsPerso) ? prm().profilsPerso : []).filter(Boolean);
+    setParam({ profilsPerso: [...l, { id, nom: "Nouveau profil" }], profils: { [id]: [...AR_PROFILS.loisir[1]] } }); toast("Profil ajouté : donnez-lui un nom et cochez ses parties"); render(); }
+  if (a === "prof-del") { const k = t.dataset.profK; if (!t.dataset.ok) { t.dataset.ok = 1; t.textContent = "Confirmer la suppression"; return; }
+    const l = (Array.isArray(prm().profilsPerso) ? prm().profilsPerso : []).filter((p) => p && p.id !== k); setParam({ profilsPerso: l });
+    S.archers.filter((x) => x.espace?.profil === k).forEach((x) => { x.espace = { ...x.espace, profil: "auto" }; patch("archers", x.id, { espace: x.espace }); });
+    if (reglesOf().some((r) => r.profil === k)) setRegles((rs) => rs.forEach((r) => { if (r.profil === k) r.profil = sinonOf(); }));
+    toast("Profil supprimé : ses archers repassent en Automatique"); render(); }
+  if (a === "rg-add") setRegles((rs) => rs.push({ id: "r" + Date.now().toString(36), profil: sinonOf() }));
+  if (a === "rg-del") setRegles((rs) => rs.splice(+t.dataset.rgI, 1));
+  if (a === "rg-up" || a === "rg-down") setRegles((rs) => { const i = +t.dataset.rgI, j = a === "rg-up" ? i - 1 : i + 1; if (rs[j]) [rs[i], rs[j]] = [rs[j], rs[i]]; });
   if (a === "avatar") { const ar = S.archers.find((x) => x.id === S.archer); if (ar) avatarPicker(ar, (v) => { ar.avatar = v; patch("archers", ar.id, { avatar: v }); toast("Avatar enregistré"); render(); }); }
   if (a === "chrono") openChrono(coachChronoStore);
   if (a === "new-partage") formPartage();
@@ -4784,14 +4875,24 @@ document.addEventListener("change", (e) => {
   const prof = e.target.dataset?.prof;
   if (prof && S.canWrite) {
     const [k, m] = prof.split("|"), set = new Set(profilMods(k, espaceCfg())); e.target.checked ? set.add(m) : set.delete(m);
-    setParam({ profils: { [k]: AR_MODULES.map(([x]) => x).filter((x) => set.has(x)) } }); toast(`Profil ${AR_PROFILS[k][0]} mis à jour`); render(); return;
+    setParam({ profils: { [k]: AR_MODULES.map(([x]) => x).filter((x) => set.has(x)) } }); toast(`Profil ${profilNom(k)} mis à jour`); render(); return;
+  }
+  const pnom = e.target.dataset?.pnom;
+  if (pnom && S.canWrite) { const v = e.target.value.trim(); setParam({ profilNoms: { [pnom]: v || null } }); toast("Nom du profil enregistré"); render(); return; }
+  const rg = e.target.dataset?.rg;
+  if (rg && S.canWrite) { const [i, f] = rg.split("|"); setRegles((rs) => { if (rs[+i]) rs[+i][f] = e.target.value.trim(); }); toast("Règle enregistrée"); return; }
+  const qprofId = e.target.dataset?.qprof;
+  if (qprofId && S.canWrite) {
+    const a = S.archers.find((x) => x.id === qprofId); if (!a) return;
+    const v = { ...(a.espace || {}), profil: e.target.value }; if (v.profil === "perso" && !Array.isArray(v.modules)) v.modules = [...arModules(a, nbConcoursOf(a.id))].filter((k) => k !== "evals");
+    a.espace = v; patch("archers", a.id, { espace: v }); toast(`${fullName(a)} : ${profilNom(v.profil)}`); render(); return;
   }
   const esp = e.target.dataset?.esp, espm = e.target.dataset?.espm;
   if ((esp || espm) && S.archer && S.canWrite) {
     const a = S.archers.find((x) => x.id === S.archer); if (!a) return;
     const nbc = S.concours.filter((c) => c.resultats && c.resultats[a.id] && typeof c.resultats[a.id] === "object").length;
     let v = { ...(a.espace || {}) };
-    if (esp) { v.profil = e.target.value; if (v.profil === "perso" && !Array.isArray(v.modules)) v.modules = [...arModules(a, nbc)]; }
+    if (esp) { v.profil = e.target.value; if (v.profil === "perso" && !Array.isArray(v.modules)) v.modules = [...arModules(a, nbc)].filter((k) => k !== "evals"); }
     else { const set = new Set(v.modules || []); e.target.checked ? set.add(espm) : set.delete(espm); v.modules = AR_MODULES.map(([k]) => k).filter((k) => set.has(k)); }
     a.espace = v; patch("archers", a.id, { espace: v }); toast("Espace de l'archer mis à jour"); render(); return;
   }
