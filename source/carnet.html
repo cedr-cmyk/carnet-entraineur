@@ -551,6 +551,7 @@ svg.chart .szl { stroke: var(--line-2, var(--line)); stroke-dasharray: 3 3; }
 .av-pick { border: 2px solid transparent; background: var(--sunk); border-radius: 16px; padding: 4px; display: grid; place-items: center; cursor: pointer; min-height: 60px; }
 .av-pick[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .av-cols { display: flex; gap: 8px; flex-wrap: wrap; } .av-col { width: 40px; height: 40px; border-radius: 50%; border: 3px solid transparent; cursor: pointer; } .av-col[aria-pressed="true"] { border-color: var(--ink); }
+.ar-subs { margin-bottom: 4px; } .ar-hint { color: var(--accent) !important; }
 .ar-params { display: grid; gap: 14px; max-width: 720px; } .ar-params .card { gap: 10px; }
 .ar-quick { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
 .ar-big { width: 100%; min-height: 56px; font-size: 1.1rem; }
@@ -2981,6 +2982,7 @@ async function previewArcher(aid, testWrite = false) {
       exercices: S.attributions.filter((x) => x.archerId === aid && x.visible === true).map((x) => { const d = docOf(x.documentId), se = S.seances.find((y) => y.id === x.seanceId);
         return { id: x.id, remarque: x.remarque, fait: x.fait, seanceId: x.seanceId, date: se?.date || null, createdAt: x.createdAt, document: d ? { id: d.id, titre: d.titre, description: d.description, assetId: d.assetId, contentType: d.contentType, nomFichier: d.nomFichier } : null }; }),
       evaluations: S.evaluations.filter((e) => e.archerId === aid && e.partage === true).map((e) => ({ id: e.id, date: e.date, notes: e.notes, observation: e.observation })),
+      seances: S.seances.filter((x) => (x.presents || []).includes(aid)).map((x) => ({ id: x.id, date: x.date, heure: x.heure, groupe: x.groupe, theme: x.theme, lieu: x.lieu, clubId: x.clubId, exercices: (x.exercices || []).map((d) => docOf(d)?.titre).filter(Boolean) })),
       annonces: S.annonces.filter((n) => annActive(n) && (!(n.clubIds || []).length || n.clubIds.some((id) => (a.clubIds || []).includes(id)))),
       documents: S.documents.filter((d) => (d.partageClubs || []).some((id) => id === "*" || (a.clubIds || []).includes(id))).map((d) => ({ id: d.id, titre: d.titre, description: d.description, assetId: d.assetId, contentType: d.contentType, nomFichier: d.nomFichier, partageLe: d.partageLe })),
       entrainements: S.seances.filter((s) => s.public && s.date >= todayISO() && s.date <= addDaysISO(todayISO(), 42) && concerne(s, a)).sort((p, q) => (p.date + (p.heure || "")).localeCompare(q.date + (q.heure || ""))).map((s) => {
@@ -2995,10 +2997,12 @@ async function previewArcher(aid, testWrite = false) {
   if (testWrite) {
     api.ecrire = async (_, id, data) => {
       const cur = (await S.db.collection("carnetEntrees").doc(id).get()), ex = cur.exists ? cur.data() : null;
-      if (ex && ex.archerId !== aid) throw new Error("accès refusé"); if (!ex && !String(id).startsWith("a_")) throw new Error("identifiant invalide");
+      if (ex && ex.archerId !== aid) throw new Error("accès refusé"); const sl = !ex && String(id).startsWith("s_") ? S.seances.find((x) => id === `s_${x.id}_${aid}` && (x.presents || []).includes(aid)) : null;
+      if (!ex && !String(id).startsWith("a_") && !sl) throw new Error("identifiant invalide");
+      if (sl) { data = { ...data, date: sl.date }; }
       const champs = ex?.concoursId ? ["atteint", "note", "emotion", "commentaire"] : AR_CHAMPS, v = {};
       champs.forEach((k) => { if (k in data) v[k] = data[k]; });
-      Object.assign(v, { archerId: aid, saisiParArcher: true, majArcher: Date.now() });
+      Object.assign(v, { archerId: aid, saisiParArcher: true, majArcher: Date.now() }); if (sl) Object.assign(v, { seanceId: sl.id, date: sl.date, saison: saisonKey(saisonOfDate(sl.date)) });
       if (ex) await S.db.collection("carnetEntrees").doc(id).update(v); else await S.db.collection("carnetEntrees").doc(id).set({ createdAt: Date.now(), ...v });
       dashCache.at = 0;
     };

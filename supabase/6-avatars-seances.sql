@@ -1,4 +1,4 @@
--- 6. Avatars : l'archer choisit un dessin (aucune photo) ; son entraîneur le voit sur les listes
+-- 6. Avatars et journal des séances : l'archer choisit un dessin (aucune photo) et retrouve les séances du club où il était présent
 -- À exécuter une fois dans Supabase › SQL Editor, après les scripts 2 à 5 (relançable sans risque).
 
 create or replace function public.espace_archer(p_owner uuid, p_archer text) returns jsonb language plpgsql stable security definer set search_path = public as $$
@@ -30,6 +30,13 @@ begin
       where t.owner = p_owner and t.col = 'attributions' and t.data->>'archerId' = p_archer and t.data->>'visible' = 'true'), '[]'::jsonb),
     'evaluations', coalesce((select jsonb_agg(jsonb_build_object('id', id, 'date', data->>'date', 'notes', data->'notes', 'observation', data->>'observation')) from docs
       where owner = p_owner and col = 'evaluations' and data->>'archerId' = p_archer and data->>'partage' = 'true'), '[]'::jsonb),
+    -- séances du club où l'archer a été pointé présent (journal, sans compteur), avec les titres des fiches travaillées
+    'seances', coalesce((select jsonb_agg(jsonb_build_object('id', s.id, 'date', s.data->>'date', 'heure', s.data->>'heure', 'groupe', s.data->>'groupe', 'theme', s.data->>'theme',
+        'lieu', s.data->>'lieu', 'clubId', s.data->>'clubId',
+        'exercices', coalesce((select jsonb_agg(d.data->>'titre') from jsonb_array_elements_text(case when jsonb_typeof(s.data->'exercices') = 'array' then s.data->'exercices' else '[]'::jsonb end) x
+          join docs d on d.owner = s.owner and d.col = 'documents' and d.id = x), '[]'::jsonb)) order by s.data->>'date' desc)
+      from docs s where s.owner = p_owner and s.col = 'seances' and jsonb_typeof(s.data->'presents') = 'array' and s.data->'presents' ? p_archer
+        and s.data->>'date' <= to_char(current_date, 'YYYY-MM-DD')), '[]'::jsonb),
     -- infos importantes du club (sans club coché = tous les clubs), tant qu'elles ne sont pas expirées
     'annonces', coalesce((select jsonb_agg(jsonb_build_object('id', id, 'titre', data->>'titre', 'texte', data->>'texte', 'date', data->>'date', 'jusquau', data->>'jusquau', 'clubIds', data->'clubIds', 'important', data->'important'))
       from docs where owner = p_owner and col = 'annonces' and (coalesce(data->>'jusquau', '') = '' or data->>'jusquau' >= jour)
@@ -72,5 +79,30 @@ begin
   update docs set data = data || jsonb_build_object('avatar', v), updated_at = now() where owner = p_owner and col = 'archers' and id = p_archer;
 end $$;
 
-revoke execute on function public.espace_archer(uuid, text), public.archer_avatar(uuid, text, jsonb) from public, anon;
-grant execute on function public.espace_archer(uuid, text), public.archer_avatar(uuid, text, jsonb) to authenticated;
+-- L'archer remplit son carnet ; il peut aussi ouvrir la ligne d'une séance du club où il était présent (identifiant s_<séance>_<archer>)
+create or replace function public.archer_ecrire_entree(p_owner uuid, p_archer text, p_id text, p_data jsonb) returns void language plpgsql security definer set search_path = public as $$
+declare cur jsonb; sd jsonb; sid text; y int; allowed text[] := array['date','saison','objectif','atteint','note','emotion','commentaire','paille','visuel','blason','compte','compet','autre','scoreCompte','scoreCompet','tcDistance','tcBlason','tcTir']; k text; v jsonb := '{}'::jsonb;
+begin
+  if not exists (select 1 from acces where user_id = auth.uid() and owner = p_owner and archer_id = p_archer) then raise exception 'acces refuse'; end if;
+  select data into cur from docs where owner = p_owner and col = 'carnetEntrees' and id = p_id;
+  if found and cur->>'archerId' is distinct from p_archer then raise exception 'acces refuse'; end if;
+  if not found and p_id not like 'a\_%' then
+    sid := substr(p_id, 3, length(p_id) - 3 - length(p_archer));
+    if p_id is distinct from 's_' || sid || '_' || p_archer then raise exception 'identifiant invalide'; end if;
+    select data into sd from docs where owner = p_owner and col = 'seances' and id = sid;
+    if sd is null or jsonb_typeof(sd->'presents') is distinct from 'array' or not (sd->'presents' ? p_archer) then raise exception 'identifiant invalide'; end if;
+  end if;
+  -- les lignes de concours gardent le score et les flèches saisis par l'entraîneur
+  if cur is not null and coalesce(cur->>'concoursId', '') <> '' then allowed := array['atteint','note','emotion','commentaire']; end if;
+  foreach k in array allowed loop if p_data ? k then v := v || jsonb_build_object(k, p_data->k); end if; end loop;
+  v := v || jsonb_build_object('archerId', p_archer, 'saisiParArcher', true, 'majArcher', extract(epoch from now()) * 1000);
+  if sd is not null then
+    y := left(sd->>'date', 4)::int + case when substr(sd->>'date', 6, 2)::int >= 9 then 1 else 0 end;
+    v := v || jsonb_build_object('seanceId', sid, 'date', sd->>'date', 'saison', (y - 1) || '-' || y);
+  end if;
+  insert into docs (owner, col, id, data, updated_at) values (p_owner, 'carnetEntrees', p_id, coalesce(cur, jsonb_build_object('createdAt', extract(epoch from now()) * 1000)) || v, now())
+    on conflict (owner, col, id) do update set data = docs.data || v, updated_at = now();
+end $$;
+
+revoke execute on function public.espace_archer(uuid, text), public.archer_avatar(uuid, text, jsonb), public.archer_ecrire_entree(uuid, text, text, jsonb) from public, anon;
+grant execute on function public.espace_archer(uuid, text), public.archer_avatar(uuid, text, jsonb), public.archer_ecrire_entree(uuid, text, text, jsonb) to authenticated;

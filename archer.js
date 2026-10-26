@@ -71,7 +71,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     render();
   }
   function header() {
-    const tabs = [["accueil", "Accueil"], ["carnet", "Mon carnet"], ["concours", "Mes concours"], ["documents", "Documents"], ["evaluations", "Évaluations"], ["parametres", "Paramètres"]];
+    const tabs = [["accueil", "Accueil"], ["entrainement", "Entraînement"], ["concours", "Mes concours"], ["documents", "Documents"], ["parametres", "Paramètres"]];
     top.innerHTML = `<div class="top-in"><div class="brand">${window.CarnetAvatar && St.data?.archer ? "" : `<span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/></svg></span>`}
       ${window.CarnetAvatar && St.data?.archer ? window.CarnetAvatar.svg(St.data.archer, 40) : ""}
       <h1>Espace <em>${esc(St.data?.archer ? name(St.data.archer) : name(who()))}</em></h1><span class="sub">${PREVIEW || TESTW ? "" : `<button class="btn ghost" id="ar-out">Se déconnecter</button>`}</span></div>
@@ -85,7 +85,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     else h += `<div class="bar"><span class="grow"></span><button class="btn ghost" data-act="add-code">J'ai un autre code (frère, sœur…)</button></div>`;
     if (St.err) h += `<p class="notice">${esc(St.err)}</p><button class="btn" data-act="reload">Réessayer</button>`;
     else if (!St.data) h += `<p class="notice">Chargement…</p>`;
-    else h += ({ accueil: vAccueil, carnet: vCarnet, concours: vConcours, documents: vDocs, evaluations: vEvals, parametres: vParams }[St.tab] || vAccueil)();
+    else h += ({ accueil: vAccueil, entrainement: vEntrainement, carnet: vEntrainement, evaluations: vEntrainement, concours: vConcours, documents: vDocs, parametres: vParams }[St.tab] || vAccueil)();
     view.innerHTML = h;
   }
   // Réglages du chrono de l'archer : gardés sur son appareil
@@ -129,6 +129,29 @@ window.CarnetArcherUI = (API, opts = {}) => {
     if (shown.length < ent.length) h += `<button class="btn ghost" data-act="all-ent">${ent.length - shown.length > 1 ? `Voir les ${ent.length - shown.length} autres entraînements proposés` : "Voir l'autre entraînement proposé"}</button>`;
     else if (St.allEnt && nb && ent.length > nb) h += `<button class="btn ghost" data-act="all-ent">${nb > 1 ? `N'afficher que les ${nb} prochains` : "N'afficher que le prochain"}</button>`;
     return h;
+  }
+  // ---------- Entraînement : mes séances au club, mon carnet, mes évaluations ----------
+  function vEntrainement() {
+    if (St.tab === "carnet" || St.tab === "evaluations") { St.sub = St.tab; St.tab = "entrainement"; }
+    const sub = St.sub || "seances", subs = [["seances", "Mes séances"], ["carnet", "Mon carnet"], ["evaluations", "Évaluations"]];
+    return `<div class="chips ar-subs" role="tablist" aria-label="Entraînement">${subs.map(([k, l]) => `<button class="chip" role="tab" data-asub="${k}" aria-selected="${sub === k}" aria-pressed="${sub === k}">${l}</button>`).join("")}</div>`
+      + ({ seances: vSeances, carnet: vCarnet, evaluations: vEvals }[sub] || vSeances)();
+  }
+  // Journal des séances du club où l'archer a été pointé présent (sans compteur ni taux de présence)
+  function vSeances() {
+    const end = St.saison, all = St.data.seances;
+    let h = `<div class="bar"><button class="btn" data-saison="-1" aria-label="Saison précédente">‹</button><b>Saison ${end - 1}-${end}</b><button class="btn" data-saison="1" aria-label="Saison suivante">›</button></div>`;
+    if (!all) return h + `<p class="notice">Ton journal des séances arrivera avec la prochaine mise à jour de ton club.</p>`;
+    const list = all.filter((x) => x.date && x.date <= today() && saisonOf(x.date) === end).sort((a, b) => b.date.localeCompare(a.date));
+    if (!list.length) return h + `<p class="notice">Aucune séance du club pour cette saison. Les séances où ton entraîneur te pointe présent apparaissent ici.</p>`;
+    const aid = who().archer_id;
+    return h + `<span class="tirline">Les séances du club où tu étais présent. Touche une séance pour noter ton ressenti, tes flèches ou ton tir compté.</span>
+      <div class="list">${list.map((x) => { const e = St.data.entrees.find((y) => y.seanceId === x.id), clubN = clubNom(x.clubId);
+        const info = e ? [vol(e) ? vol(e) + " flèches" : "", num(e.scoreCompte ?? e.auto?.scoreCompte) != null ? `tir compté ${e.scoreCompte || e.auto?.scoreCompte} pts` : "", num(e.note) != null ? `ressenti ${e.note}/10` : "", e.commentaireCoach ? "💬 mot de l'entraîneur" : ""].filter(Boolean).join(" · ") : "";
+        return `<button class="row" data-seance-ar="${esc(x.id)}"><span class="date"><span class="d">${dObj(x.date).getDate()}</span><span class="mo">${dObj(x.date).toLocaleDateString("fr-FR", { month: "short" }).replace(".", "")}</span></span>
+          <span class="main"><span class="t">${esc(x.theme || "Entraînement")}</span><span class="m">${[clubN, x.heure, x.groupe, x.lieu].filter(Boolean).map(esc).join(" · ")}</span>
+          ${(x.exercices || []).length ? `<span class="m">Exercices : ${x.exercices.map(esc).join(", ")}</span>` : ""}
+          <span class="m ${info ? "" : "ar-hint"}">${esc(info || "Touche pour noter ton ressenti")}</span></span><span class="count" aria-hidden="true">›</span></button>`; }).join("")}</div>`;
   }
   // ---------- Carnet ----------
   function vCarnet() {
@@ -277,7 +300,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     const d = e || { date: today() }, el = $("#sheet");
     const lock = e?.concoursId ? "readonly" : "";
     const tcLast = e ? {} : St.data.entrees.filter((x) => x.tcDistance || x.tcBlason).sort((a, b) => (b.date || "").localeCompare(a.date || ""))[0] || {}; // reprend la dernière distance // flèches et score d'un concours : saisis par l'entraîneur
-    el.innerHTML = `<div class="sheet-bg" data-close><form class="sheet" id="ar-form"><h3>${e ? "Ma séance" : "Noter une séance"}</h3>
+    el.innerHTML = `<div class="sheet-bg" data-close><form class="sheet" id="ar-form"><h3>${e?.__new ? "Ma séance du " + esc(dObj(e.date).toLocaleDateString("fr-FR")) : e ? "Ma séance" : "Noter une séance"}</h3>
       <div class="grid2"><label class="f">Date<input type="date" name="date" required value="${esc(d.date)}" ${e?.seanceId || e?.concoursId ? "readonly" : ""}></label><label class="f">Objectif<input type="text" name="objectif" value="${esc(d.objectif)}"></label></div>
       <div class="f">Flèches tirées<div class="grid5">${VOL.filter(([k]) => k !== "compte" || e?.concoursId).map(([k, l]) => `<label class="f" style="font-weight:500">${l}<input type="number" inputmode="numeric" min="0" name="${k}" value="${esc(d[k])}" placeholder="${d.auto?.[k] ? "+" + d.auto[k] : "0"}" ${lock}></label>`).join("")}</div>${e?.auto ? `<span class="tirline">Les chiffres grisés viennent des feuilles de marque de ton entraîneur.</span>` : ""}</div>
       ${e?.concoursId ? `<input type="hidden" name="scoreCompte" value="${esc(d.scoreCompte)}"><label class="f">Score du concours<input type="number" name="scoreCompet" value="${esc(d.scoreCompet)}" readonly></label>`
@@ -411,7 +434,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     if (t.hasAttribute("data-pref-chrono")) { chronoStore.setLast(t.value); toast("Réglage du chrono enregistré"); }
   });
   root.addEventListener("click", async (ev) => {
-    const t = ev.target.closest("[data-atab],[data-who],[data-act],[data-saison],[data-entry],[data-eval],[data-arcombo],[data-rep],[data-artc],[data-artcp],#ar-out"); if (!t) return;
+    const t = ev.target.closest("[data-atab],[data-who],[data-act],[data-saison],[data-entry],[data-eval],[data-arcombo],[data-rep],[data-artc],[data-artcp],[data-asub],[data-seance-ar],#ar-out"); if (!t) return;
     ev.stopPropagation();
     if (t.dataset.act === "close-preview") { root.remove(); return; }
     if (t.id === "ar-out") return API.deconnexion();
@@ -429,6 +452,13 @@ window.CarnetArcherUI = (API, opts = {}) => {
     if (t.dataset.artc) { St.tcCombo = t.dataset.artc; render(); return; }
     if (t.dataset.artcp) { St.tcPer = t.dataset.artcp; render(); return; }
     if (t.dataset.act === "tc-new") { tirDirect(); return; }
+    if (t.dataset.asub) { St.sub = t.dataset.asub; render(); return; }
+    if (t.dataset.seanceAr) {
+      const x = (St.data.seances || []).find((y) => y.id === t.dataset.seanceAr); if (!x) return;
+      const e = St.data.entrees.find((y) => y.seanceId === x.id);
+      formEntry(e || { id: `s_${x.id}_${who().archer_id}`, seanceId: x.id, date: x.date, objectif: x.theme || "", __new: true });
+      return;
+    }
     if (t.dataset.act === "all-ent") { St.allEnt = !St.allEnt; render(); return; }
     if (t.dataset.act === "avatar" && window.CarnetAvatar) {
       window.CarnetAvatar.choisir(St.data.archer, async (v) => {
