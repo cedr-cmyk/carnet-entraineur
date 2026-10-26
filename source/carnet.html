@@ -564,7 +564,8 @@ svg.chart .szl { stroke: var(--line-2, var(--line)); stroke-dasharray: 3 3; }
 .ar-more { border: 1px solid var(--line); border-radius: 14px; padding: 4px 12px 10px; display: grid; gap: 10px; } .ar-more > summary { cursor: pointer; padding: 8px 0; font-weight: 700; color: var(--ink); }
 .esp-theme { display: grid; gap: 6px; } .esp-th { font-size: .78rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .rg-card { gap: 10px; } .rg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; } .rg-to { max-width: 320px; }
-table.qvq td, table.qvq th { white-space: nowrap; } .qvq-auto { display: block; color: var(--muted); font-size: .78rem; margin-top: 2px; } .qvq-c { text-align: center; font-weight: 800; } .qvq-a { display: flex; align-items: center; gap: 8px; } table.qvq select { min-width: 150px; }
+table.qvq td, table.qvq th { white-space: nowrap; } .qvq-f { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; } .qvq-f input, .qvq-f select { min-height: 40px; } .qvq-f input { flex: 1; min-width: 180px; }
+.qvq-sort { font-weight: 800; text-decoration: none; text-transform: inherit; letter-spacing: inherit; color: inherit; } .qvq-auto { display: block; color: var(--muted); font-size: .78rem; margin-top: 2px; } .qvq-c { text-align: center; font-weight: 800; } .qvq-a { display: flex; align-items: center; gap: 8px; } table.qvq select { min-width: 150px; }
 .ar-params { display: grid; gap: 14px; max-width: 720px; } .ar-params .card { gap: 10px; }
 .ar-quick.one { grid-template-columns: 1fr; }
 .ar-quick { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
@@ -2755,10 +2756,26 @@ function viewEspaceParams(ro) {
         <span class="tirline">« Sans réglage » : les archers dont vous n'avez pas choisi le profil sur leur fiche. Laissez « Automatique » pour que les règles s'appliquent.</span></div>`;
   } else {
     if (window.carnetAcces?.tous && !accTous) loadAccTous();
-    const list = S.archers.filter((a) => a.actif !== false && (S.club === "all" || (a.clubIds || []).includes(S.club))).sort(byName);
-    h += clubChips() + `<span class="tirline">Ce que voit chaque archer dans son espace. Changez son profil directement ici. ✓ = visible ; les évaluations s'ajoutent dès qu'une est partagée.</span>
-      <div class="scroll"><table class="vol qvq"><thead><tr><th>Archer</th><th>Profil</th>${AR_MODULES.map(([k]) => `<th>${MOD_COURT[k]}</th>`).join("")}<th>Éval.</th>${window.carnetAcces?.tous ? "<th>Compte</th>" : ""}</tr></thead><tbody>
-      ${list.map((a) => { const nbc = nbConcoursOf(a.id), ne = S.evaluations.filter((x) => x.archerId === a.id && x.partage === true).length, m = arModules(a, nbc, cfg, ne), p = a.espace?.profil || cfg.defaut || "auto", ac = accTous?.[a.id];
+    // Tri (en touchant un titre de colonne) et filtres : profil, compte, recherche
+    const so = S.qvqSort || { k: "nom", d: 1 }, F = S.qvqF || {}, hasAcc = !!window.carnetAcces?.tous;
+    const rows = S.archers.filter((a) => a.actif !== false && (S.club === "all" || (a.clubIds || []).includes(S.club))).map((a) => {
+      const nbc = nbConcoursOf(a.id), ne = S.evaluations.filter((x) => x.archerId === a.id && x.partage === true).length, p = a.espace?.profil || cfg.defaut || "auto";
+      const eff = p === "auto" ? arProfilAuto(a, nbc, cfg) : p, ac = accTous?.[a.id], cpt = ac?.comptes ? 2 : ac?.codes ? 1 : 0;
+      return { a, nbc, ne, p, eff, m: arModules(a, nbc, cfg, ne), cpt, ac };
+    }).filter((r) => (!F.profil || (F.profil === "perso" ? r.p === "perso" : F.profil === "auto" ? r.p === "auto" : r.eff === F.profil && r.p !== "perso"))
+      && (!F.compte || (F.compte === "oui" ? r.cpt === 2 : F.compte === "code" ? r.cpt === 1 : r.cpt === 0))
+      && (!F.q || fullName(r.a).toLowerCase().includes(F.q.toLowerCase())));
+    const key = (r) => (so.k === "nom" ? `${r.a.nom || ""} ${r.a.prenom || ""}`.toLowerCase() : so.k === "profil" ? (r.p === "perso" ? "zz" : profilNom(r.eff, cfg).toLowerCase()) : so.k === "compte" ? r.cpt : so.k === "evals" ? (r.ne ? 1 : 0) : r.m.has(so.k) ? 1 : 0);
+    rows.sort((x, y) => { const a1 = key(x), b1 = key(y); return (a1 < b1 ? -1 : a1 > b1 ? 1 : 0) * so.d || byName(x.a, y.a); });
+    const th = (k, l) => `<th><button class="lnk qvq-sort" data-qsort="${k}" aria-label="Trier par ${esc(l)}">${esc(l)}${so.k === k ? (so.d > 0 ? " ▲" : " ▼") : ""}</button></th>`;
+    const list = rows;
+    h += clubChips() + `<span class="tirline">Ce que voit chaque archer dans son espace. Changez son profil directement ici. ✓ = visible ; les évaluations s'ajoutent dès qu'une est partagée. Touchez un titre de colonne pour trier.</span>
+      <div class="qvq-f"><input type="search" data-qf="q" value="${esc(F.q || "")}" placeholder="Rechercher un archer" aria-label="Rechercher un archer">
+        <select data-qf="profil" aria-label="Filtrer par profil"><option value="">Tous les profils</option>${profilsList(cfg).map((x) => `<option value="${x.id}" ${F.profil === x.id ? "selected" : ""}>${esc(x.nom)}</option>`).join("")}<option value="auto" ${F.profil === "auto" ? "selected" : ""}>En automatique</option><option value="perso" ${F.profil === "perso" ? "selected" : ""}>Personnalisés</option></select>
+        ${hasAcc ? `<select data-qf="compte" aria-label="Filtrer par compte"><option value="">Comptes : tous</option><option value="oui" ${F.compte === "oui" ? "selected" : ""}>Avec un compte</option><option value="code" ${F.compte === "code" ? "selected" : ""}>Code en attente</option><option value="non" ${F.compte === "non" ? "selected" : ""}>Sans compte ni code</option></select>` : ""}
+        <span class="tirline">${rows.length} archer${rows.length > 1 ? "s" : ""}</span>${F.q || F.profil || F.compte ? `<button class="btn ghost" data-act="qf-reset">Effacer les filtres</button>` : ""}</div>
+      <div class="scroll"><table class="vol qvq"><thead><tr>${th("nom", "Archer")}${th("profil", "Profil")}${AR_MODULES.map(([k]) => th(k, MOD_COURT[k])).join("")}${th("evals", "Éval.")}${hasAcc ? th("compte", "Compte") : ""}</tr></thead><tbody>
+      ${list.map(({ a, nbc, ne, m, p, ac }) => {
         return `<tr><th><span class="qvq-a">${avatarSvg(a, 28)}<button class="lnk" data-archer="${a.id}">${esc(fullName(a))}</button></span></th>
           <td><select data-qprof="${a.id}" ${ro}>${profilOptions(p, true, a, true)}</select>${p === "auto" ? `<small class="qvq-auto">→ ${esc(profilNom(arProfilAuto(a, nbc, cfg), cfg))}</small>` : ""}</td>
           ${AR_MODULES.map(([k]) => `<td class="qvq-c">${m.has(k) ? "✓" : "·"}</td>`).join("")}<td class="qvq-c">${ne ? "✓" : "·"}</td>
@@ -4097,7 +4114,7 @@ function formSeance(s = null) {
 
 // ---------- Événements ----------
 document.addEventListener("click", (e) => {
-  const t = e.target.closest("[data-tab],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab]");
+  const t = e.target.closest("[data-tab],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab],[data-qsort]");
   if (!t || t.closest("#sheet")) return;
   if (t.dataset.dashSuivi) { const [sid, aid] = t.dataset.dashSuivi.split("|"); S.seance = sid; S.suivi = aid; S.tirOpen = null; render(); window.scrollTo(0, 0); return; }
   if (t.dataset.tab) { go(t.dataset.tab); try { history.replaceState(null, "", "#" + t.dataset.tab); } catch (_) {} return; }
@@ -4107,6 +4124,7 @@ document.addEventListener("click", (e) => {
     const presents = [...set]; s.presents = presents; render(); patch("seances", s.id, { presents }); return;
   }
   if (t.dataset.folder !== undefined) { S.folder = t.dataset.folder || null; render(); window.scrollTo(0, 0); return; }
+  if (t.dataset.qsort) { const k = t.dataset.qsort, so = S.qvqSort || { k: "nom", d: 1 }; S.qvqSort = { k, d: so.k === k ? -so.d : k === "nom" || k === "profil" ? 1 : -1 }; render(); return; }
   if (t.dataset.esptab) { S.espTab = t.dataset.esptab; render(); return; }
   if (t.dataset.tccombo) { S.tcCombo = t.dataset.tccombo; render(); return; }
   if (t.dataset.tcper) { S.tcPer = t.dataset.tcper; render(); return; }
@@ -4238,6 +4256,7 @@ document.addEventListener("click", (e) => {
   if (a === "logout" && window.carnetLogout) window.carnetLogout();
   if (a === "new-annonce") formAnnonce();
   if (a === "prof-reset") { const k = t.dataset.profK; setParam({ profils: { [k]: null }, profilNoms: { [k]: null } }); toast("Profil remis à l'origine"); render(); }
+  if (a === "qf-reset") { S.qvqF = {}; render(); }
   if (a === "prof-new") { const id = "p_" + Date.now().toString(36); const l = (Array.isArray(prm().profilsPerso) ? prm().profilsPerso : []).filter(Boolean);
     setParam({ profilsPerso: [...l, { id, nom: "Nouveau profil" }], profils: { [id]: [...AR_PROFILS.loisir[1]] } }); toast("Profil ajouté : donnez-lui un nom et cochez ses parties"); render(); }
   if (a === "prof-del") { const k = t.dataset.profK; if (!t.dataset.ok) { t.dataset.ok = 1; t.textContent = "Confirmer la suppression"; return; }
@@ -4263,6 +4282,7 @@ document.addEventListener("click", (e) => {
   }
 });
 document.addEventListener("input", (e) => {
+  if (e.target.dataset?.qf === "q") { S.qvqF = { ...(S.qvqF || {}), q: e.target.value }; const pos = e.target.selectionStart; render(); const i = document.querySelector('[data-qf="q"]'); if (i) { i.focus(); i.setSelectionRange(pos, pos); } return; }
   if (e.target.id === "search") { S.q = e.target.value; const pos = e.target.selectionStart; render(); const i = $("#search"); if (i) { i.focus(); i.setSelectionRange(pos, pos); } }
 });
 let noteTimer; const attrRemT = {};
@@ -4302,6 +4322,8 @@ document.addEventListener("change", (e) => {
   if (pnom && S.canWrite) { const v = e.target.value.trim(); setParam({ profilNoms: { [pnom]: v || null } }); toast("Nom du profil enregistré"); render(); return; }
   const rg = e.target.dataset?.rg;
   if (rg && S.canWrite) { const [i, f] = rg.split("|"); setRegles((rs) => { if (rs[+i]) rs[+i][f] = e.target.value.trim(); }); toast("Règle enregistrée"); return; }
+  const qf = e.target.dataset?.qf;
+  if (qf && qf !== "q") { S.qvqF = { ...(S.qvqF || {}), [qf]: e.target.value }; render(); return; }
   const qprofId = e.target.dataset?.qprof;
   if (qprofId && S.canWrite) {
     const a = S.archers.find((x) => x.id === qprofId); if (!a) return;
