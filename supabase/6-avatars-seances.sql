@@ -1,4 +1,5 @@
--- 6. Avatars et journal des séances : l'archer choisit un dessin (aucune photo) et retrouve les séances du club où il était présent
+-- 6. Avatars, journal des séances et parties visibles : l'archer choisit un dessin (aucune photo), retrouve les séances du club où il était présent,
+--    et ne voit que les parties de son espace choisies par l'entraîneur (profil Découverte, Loisir, Compétiteur)
 -- À exécuter une fois dans Supabase › SQL Editor, après les scripts 2 à 5 (relançable sans risque).
 
 create or replace function public.espace_archer(p_owner uuid, p_archer text) returns jsonb language plpgsql stable security definer set search_path = public as $$
@@ -8,7 +9,7 @@ begin
   select data into ar from docs where owner = p_owner and col = 'archers' and id = p_archer;
   enc := coalesce(ar->>'role', '') in ('encadrant', 'les-deux');
   return jsonb_build_object(
-    'archer', jsonb_build_object('id', p_archer, 'prenom', ar->>'prenom', 'nom', ar->>'nom', 'arcs', ar->'arcs', 'clubIds', ar->'clubIds', 'federations', ar->'federations', 'role', coalesce(ar->>'role', 'archer'), 'avatar', ar->'avatar'),
+    'archer', jsonb_build_object('id', p_archer, 'prenom', ar->>'prenom', 'nom', ar->>'nom', 'arcs', ar->'arcs', 'clubIds', ar->'clubIds', 'federations', ar->'federations', 'role', coalesce(ar->>'role', 'archer'), 'avatar', ar->'avatar', 'espace', ar->'espace', 'naissance', ar->>'naissance'),
     'clubs', coalesce((select jsonb_agg(jsonb_build_object('id', id, 'nom', data->>'nom', 'couleur', data->>'couleur', 'lieu', data->>'lieu'))
       from docs where owner = p_owner and col = 'clubs' and coalesce(ar->'clubIds', '[]'::jsonb) ? id), '[]'::jsonb),
     'entrees', coalesce((select jsonb_agg(data || jsonb_build_object('id', id)) from docs
