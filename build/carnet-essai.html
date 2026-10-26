@@ -567,6 +567,9 @@ svg.chart .szl { stroke: var(--line-2, var(--line)); stroke-dasharray: 3 3; }
 table.qvq td, table.qvq th { white-space: nowrap; } .qvq-f { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; } .qvq-f input, .qvq-f select { min-height: 40px; } .qvq-f input { flex: 1; min-width: 180px; }
 .qvq-sort { font-weight: 800; text-decoration: none; text-transform: inherit; letter-spacing: inherit; color: inherit; } .qvq-auto { display: block; color: var(--muted); font-size: .78rem; margin-top: 2px; } .qvq-c { text-align: center; font-weight: 800; } .qvq-a { display: flex; align-items: center; gap: 8px; } table.qvq select { min-width: 150px; }
 [hidden] { display: none !important; }
+.cd-cat { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-top: 8px; } .cd-cat summary { cursor: pointer; }
+.cd-list { display: flex; flex-direction: column; gap: 6px; } .cd-it { display: flex; gap: 10px; align-items: flex-start; padding: 8px; border-radius: 10px; background: var(--card2, rgba(255,255,255,.03)); cursor: pointer; }
+.cd-it input { margin-top: 3px; width: 20px; height: 20px; flex: none; } .cd-it .main { display: flex; flex-direction: column; gap: 2px; } .cd-it .t { font-weight: 600; } .cd-it .m { font-size: .9rem; color: var(--muted); } .cd-why { font-style: italic; }
 .fmt-x { min-height: 28px; padding: 0 8px; margin-left: 4px; } .fmt-add { gap: 8px; } .fmt-add input { flex: 1; min-width: 200px; min-height: 40px; } .fmt-add select { min-height: 40px; }
 .ar-params { display: grid; gap: 14px; max-width: 720px; } .ar-params .card { gap: 10px; }
 .ar-quick.one { grid-template-columns: 1fr; }
@@ -4453,31 +4456,47 @@ function viewCarnetsData() {
       <span class="tirline">Archiver une saison terminée la met en lecture seule pour les archers : ils gardent tout leur historique mais ne peuvent plus le changer. Toi, tu peux toujours la modifier.</span></div>
     <div class="card"><h3 class="hub-h">Nettoyer les carnets</h3>
       <p style="margin:0;color:var(--muted)">Cherche les lignes inutiles : lignes vides, lignes d'une séance ou d'un concours supprimé, lignes d'un archer qui n'existe plus. Une ligne où l'archer ou toi avez écrit quelque chose n'est jamais retirée.</p>
-      ${cl ? `<div class="list">${[["vides", "Lignes vides"], ["seances", "Séances supprimées"], ["concours", "Concours supprimés ou archer retiré"], ["archers", "Archers qui n'existent plus"]].map(([k, l]) => `<div class="row"><span class="main"><span class="t">${l}</span><span class="m">${cl[k].length ? `${cl[k].length} ligne${cl[k].length > 1 ? "s" : ""} à retirer` : "rien à retirer"}</span></span></div>`).join("")}</div>
-        ${cl.gardees ? `<span class="tirline">${cl.gardees} ligne${cl.gardees > 1 ? "s" : ""} d'une séance supprimée ${cl.gardees > 1 ? "sont gardées" : "est gardée"} parce qu'il y a des notes dedans.</span>` : ""}` : ""}
-      <div class="bar">${S.canWrite ? `<button class="btn" data-act="cd-scan">${cl ? "Analyser à nouveau" : "Analyser les carnets"}</button>${cl && cl.total ? `<button class="btn danger" data-act="cd-clean" id="cd-clean">Retirer ${cl.total} ligne${cl.total > 1 ? "s" : ""}</button>` : ""}` : ""}</div></div>
+      ${cl ? (() => { const nSel = cdSel().length;
+        const item = (x, box) => `<label class="cd-it">${box ? `<input type="checkbox" data-cd-sel="${esc(x.id)}" ${cl.off.has(x.id) ? "" : "checked"}>` : `<span class="cd-keep" aria-hidden="true">🔒</span>`}
+          <span class="main"><span class="t">${esc(x.qui)} · ${x.date ? esc(dObj(x.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })) : "sans date"}</span><span class="m">${esc(x.quoi)}</span><span class="m cd-why">${esc(x.why)}</span></span></label>`;
+        return `${cl.total ? "" : `<p class="notice">Tout est propre : aucune ligne à retirer.</p>`}
+        ${CD_CATS.filter(([k]) => cl[k].length).map(([k, l, d]) => `<details class="cd-cat" open><summary><b>${l}</b> <span class="tag">${cl[k].length}</span></summary><p class="tirline" style="margin:4px 0 8px">${d}</p><div class="cd-list">${cl[k].map((x) => item(x, true)).join("")}</div></details>`).join("")}
+        ${cl.gardees.length ? `<details class="cd-cat"><summary><b>Gardées : séance supprimée mais notes dedans</b> <span class="tag">${cl.gardees.length}</span></summary><p class="tirline" style="margin:4px 0 8px">La séance n'existe plus dans le carnet du club, mais l'archer ou toi avez écrit dans la ligne : elle reste dans son carnet. Tu peux l'ouvrir depuis le carnet de l'archer si tu veux la supprimer.</p><div class="cd-list">${cl.gardees.map((x) => item(x, false)).join("")}</div></details>` : ""}
+        ${cl.total ? `<span class="tirline">Décoche une ligne pour la garder. ${nSel} ligne${nSel > 1 ? "s" : ""} sur ${cl.total} ${nSel > 1 ? "seront retirées" : "sera retirée"}.</span>` : ""}`; })() : ""}
+      <div class="bar">${S.canWrite ? `<button class="btn" data-act="cd-scan">${cl ? "Analyser à nouveau" : "Analyser les carnets"}</button>${cl && cdSel().length ? `<button class="btn danger" data-act="cd-clean" id="cd-clean">Retirer ${cdSel().length} ligne${cdSel().length > 1 ? "s" : ""}</button>` : ""}${cl ? `<button class="btn ghost" data-act="cd-close">Fermer l'analyse</button>` : ""}` : ""}</div></div>
     <div class="card"><h3 class="hub-h">Compléter les carnets</h3>
       <p style="margin:0;color:var(--muted)">Normalement, les carnets se remplissent tout seuls quand tu notes une séance. Ce bouton sert à rattraper les oublis : il ajoute aux carnets des archers les séances du club où tu as saisi des tirs ou une note, et recalcule les flèches et les scores venant des feuilles de marque.</p>
       <p style="margin:0;color:var(--muted)">Rien n'est jamais en double, et ce que l'archer ou toi avez écrit dans le carnet est gardé. Utile après une restauration de sauvegarde ou si une séance manque dans un carnet.</p>
       <div>${S.canWrite ? `<button class="btn" data-act="backfill" id="backfill-btn">Compléter les carnets</button>` : ""}</div>
       <span class="tirline" id="backfill-msg"></span></div>`;
 }
+const CD_CATS = [["vides", "Lignes vides", "Rien n'a été noté dedans : ni flèches, ni score, ni ressenti, ni commentaire."],
+  ["seances", "Séance supprimée", "La séance du club a été supprimée et rien n'a été écrit dans la ligne."],
+  ["concours", "Concours supprimé ou archer retiré du concours", "Le concours n'existe plus ou l'archer n'y est plus inscrit, et il n'a pas écrit de ressenti."],
+  ["archers", "Archer qui n'existe plus", "La fiche de l'archer a été supprimée : la ligne est restée seule."]];
+const cdSel = () => (cdClean ? CD_CATS.flatMap(([k]) => cdClean[k]).filter((x) => !cdClean.off.has(x.id)).map((x) => x.id) : []);
 async function cdScan() {
   await loadCarnetsData(true);
-  const ids = new Set(S.archers.map((a) => a.id)), sids = new Set(S.seances.map((x) => x.id)), r = { vides: [], seances: [], concours: [], archers: [], gardees: 0 };
+  const ids = new Set(S.archers.map((a) => a.id)), sids = new Set(S.seances.map((x) => x.id)), r = { vides: [], seances: [], concours: [], archers: [], gardees: [], off: new Set() };
+  const desc = (e, why) => { const a = S.archers.find((x) => x.id === e.archerId), c = e.concoursId && S.concours.find((x) => x.id === e.concoursId);
+    const fl = entVol(e);
+    return { id: e.id, archerId: e.archerId, qui: a ? fullName(a) : "Archer supprimé", date: e.date || "", why,
+      quoi: [e.concoursId ? `Concours${c ? " « " + c.nom + " »" : ""}` : e.seanceId ? `Séance du club${e.objectif ? " : " + e.objectif : ""}` : e.objectif || "Ligne notée dans le carnet", fl ? `${fl} flèches` : "", String(e.commentaire || "").trim() ? `« ${String(e.commentaire).trim().slice(0, 60)}${String(e.commentaire).trim().length > 60 ? "…" : ""} »` : ""].filter(Boolean).join(" · ") }; };
   (cdCache || []).forEach((e) => {
-    if (!ids.has(e.archerId)) { r.archers.push(e.id); return; }
+    if (!ids.has(e.archerId)) { r.archers.push(desc(e, "La fiche de cet archer n'existe plus.")); return; }
     const id = String(e.id);
     if (id.startsWith("c_") && e.concoursId) { const c = S.concours.find((x) => x.id === e.concoursId), res = c && (c.resultats || {})[e.archerId];
-      if ((!res || typeof res !== "object") && !e.note && !e.emotion && !String(e.commentaire || "").trim()) r.concours.push(e.id); return; }
-    if (e.seanceId && !sids.has(e.seanceId)) { if (ecritDans(e)) r.gardees++; else r.seances.push(e.id); return; }
-    if (!ecritDans(e, true)) r.vides.push(e.id);
+      if ((!res || typeof res !== "object") && !e.note && !e.emotion && !String(e.commentaire || "").trim()) r.concours.push(desc(e, c ? "L'archer n'est plus inscrit à ce concours." : "Ce concours a été supprimé.")); return; }
+    if (e.seanceId && !sids.has(e.seanceId)) { if (ecritDans(e)) r.gardees.push(desc(e, "Séance supprimée, mais des notes ont été écrites.")); else r.seances.push(desc(e, "Cette séance a été supprimée du carnet du club.")); return; }
+    if (!ecritDans(e, true)) r.vides.push(desc(e, "Rien n'est noté dans cette ligne."));
   });
-  r.total = r.vides.length + r.seances.length + r.concours.length + r.archers.length;
+  const ord = (a, b) => (a.date || "").localeCompare(b.date || "") || a.qui.localeCompare(b.qui, "fr");
+  [...CD_CATS.map(([k]) => k), "gardees"].forEach((k) => r[k].sort(ord));
+  r.total = CD_CATS.reduce((n, [k]) => n + r[k].length, 0);
   cdClean = r; render();
 }
 function cdDoClean() {
-  const r = cdClean; if (!r) return; const all = [...r.vides, ...r.seances, ...r.concours, ...r.archers];
+  const all = cdSel(); if (!all.length) return;
   all.forEach((id) => remove("carnetEntrees", id));
   cdCache = (cdCache || []).filter((e) => !all.includes(e.id)); dashCache.at = 0; cdClean = null;
   toast(`${all.length} ligne${all.length > 1 ? "s" : ""} retirée${all.length > 1 ? "s" : ""} des carnets`); render();
@@ -5009,6 +5028,7 @@ document.addEventListener("click", (e) => {
   if (t.dataset.act === "backfill") { backfillCarnets(); return; }
   if (t.dataset.act === "cd-export") { formExportCarnet(); return; }
   if (t.dataset.act === "cd-scan") { cdScan(); return; }
+  if (t.dataset.act === "cd-close") { cdClean = null; render(); return; }
   if (t.dataset.act === "cd-clean") { if (!t.dataset.ok) { t.dataset.ok = 1; t.textContent = "Confirmer : retirer ces lignes"; return; } cdDoClean(); return; }
   if (t.dataset.cdExp) { formExportCarnet(t.dataset.cdExp); return; }
   if (t.dataset.cdArch) { const k = t.dataset.cdArch, a = saisonsArch(), on = !a.includes(k); setParam({ saisonsArchivees: on ? [...a, k].sort() : a.filter((x) => x !== k) }); toast(on ? `Saison ${k} archivée : les archers la consultent sans la modifier` : `Saison ${k} désarchivée`); render(); return; }
@@ -5153,6 +5173,8 @@ document.addEventListener("change", (e) => {
     const [k, m] = prof.split("|"), set = new Set(profilMods(k, espaceCfg())); e.target.checked ? set.add(m) : set.delete(m);
     setParam({ profils: { [k]: AR_MODULES.map(([x]) => x).filter((x) => set.has(x)) } }); toast(`Profil ${profilNom(k)} mis à jour`); render(); return;
   }
+  const cds = e.target.dataset?.cdSel;
+  if (cds && cdClean) { e.target.checked ? cdClean.off.delete(cds) : cdClean.off.add(cds); render(); return; }
   const pnom = e.target.dataset?.pnom;
   if (pnom && S.canWrite) { const v = e.target.value.trim(); setParam({ profilNoms: { [pnom]: v || null } }); toast("Nom du profil enregistré"); render(); return; }
   const rg = e.target.dataset?.rg;
