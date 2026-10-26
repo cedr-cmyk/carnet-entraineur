@@ -567,6 +567,7 @@ svg.chart .szl { stroke: var(--line-2, var(--line)); stroke-dasharray: 3 3; }
 table.qvq td, table.qvq th { white-space: nowrap; } .qvq-f { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; } .qvq-f input, .qvq-f select { min-height: 40px; } .qvq-f input { flex: 1; min-width: 180px; }
 .qvq-sort { font-weight: 800; text-decoration: none; text-transform: inherit; letter-spacing: inherit; color: inherit; } .qvq-auto { display: block; color: var(--muted); font-size: .78rem; margin-top: 2px; } .qvq-c { text-align: center; font-weight: 800; } .qvq-a { display: flex; align-items: center; gap: 8px; } table.qvq select { min-width: 150px; }
 [hidden] { display: none !important; }
+.fmt-x { min-height: 28px; padding: 0 8px; margin-left: 4px; } .fmt-add { gap: 8px; } .fmt-add input { flex: 1; min-width: 200px; min-height: 40px; } .fmt-add select { min-height: 40px; }
 .ar-params { display: grid; gap: 14px; max-width: 720px; } .ar-params .card { gap: 10px; }
 .ar-quick.one { grid-template-columns: 1fr; }
 .ar-quick { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
@@ -1888,7 +1889,13 @@ function formDate() {
 // ---------- Concours : calendrier, inscriptions, résultats ----------
 const C_TYPES = [["salle", "Salle"], ["exterieur", "Extérieur"], ["ufolarc_court", "Ufolarc court"], ["ufolarc_long", "Ufolarc long"], ["safari", "Safari"], ["campagne", "Campagne"], ["3d", "3D"], ["nature", "Nature"]];
 const C_NIVEAUX = [["", "Concours"], ["departemental", "Départemental"], ["regional", "Régional"], ["national", "National"]];
-const typeLab = (k) => (C_TYPES.find(([x]) => x === k) || [, k])[1];
+// Types de concours : ceux du règlement + ceux ajoutés par l'entraîneur (Paramètres › Concours › Format de secours)
+const typesPerso = () => (Array.isArray(prm().coTypesPerso) ? prm().coTypesPerso.filter((t) => t && t.id && t.label) : []);
+const cTypes = () => [...C_TYPES, ...typesPerso().map((t) => [t.id, t.label])];
+const typeLab = (k) => (cTypes().find(([x]) => x === k) || [, k])[1];
+// Lignes du format de secours, par fédération (réglables : ajouter, retirer)
+const FMT_ROWS_DEF = { FFTA: ["salle", "exterieur", "campagne", "nature", "3d"], UFOLEP: ["salle", "exterieur", "ufolarc_court", "ufolarc_long", "safari", "campagne", "nature", "3d"] };
+const fmtRows = (fed) => { const r = ((prm().co || {}).fmtRows || {})[fed]; return (Array.isArray(r) ? r : FMT_ROWS_DEF[fed] || C_TYPES.map(([k]) => k)).filter((k) => cTypes().some(([x]) => x === k)); };
 const nivLab = (k) => (C_NIVEAUX.find(([x]) => x === k) || [, ""])[1];
 const resOf = (c) => Object.entries(c.resultats || {}).filter(([, r]) => r && typeof r === "object");
 const fmtCDate = (c) => {
@@ -1912,7 +1919,8 @@ const FMT_DEF = {
   FFTA_salle: { adulte: "18", jeune: "", blason: "", fleches: "60" }, FFTA_exterieur: { adulte: "70", poulies: "50", barebow: "50", jeune: "", blason: "", fleches: "72" },
   UFOLEP_salle: { adulte: "18", jeune: "", blason: "", fleches: "" }, UFOLEP_exterieur: { adulte: "40 + 30", jeune: "", blason: "", fleches: "" },
 };
-const fmtOf = (fed, type) => ({ adulte: "", poulies: "", barebow: "", jeune: "", blason: "", fleches: "", ...(FMT_DEF[`${fed}_${type}`] || {}), ...(((prm().co || {}).fmt || {})[`${fed}_${type}`] || {}) });
+const fmtOf = (fed, type) => (fed && FMT_ROWS_DEF[fed] && !fmtRows(fed).includes(type) ? { adulte: "", poulies: "", barebow: "", jeune: "", blason: "", fleches: "" }
+  : { adulte: "", poulies: "", barebow: "", jeune: "", blason: "", fleches: "", ...(FMT_DEF[`${fed}_${type}`] || {}), ...(((prm().co || {}).fmt || {})[`${fed}_${type}`] || {}) });
 const splitDist = (t) => String(t || "").split(/[+,;/]/).map((x) => x.trim().replace(/\s*m$/i, "")).filter(Boolean);
 const isAdultFFTA = (a) => !/^U\d/.test(catFFTA(a) || "");
 // ---------- Barèmes officiels (règlements FFTA 2027 et UFOLEP) ----------
@@ -2091,7 +2099,7 @@ function formModele(m = null) {
   sheet(m ? "Modifier le modèle" : "Nouveau modèle de concours", `
     <label class="f" for="cm-t">Nom du modèle<input type="text" id="cm-t" name="titre" required value="${esc(v.titre)}" placeholder="Ex. Concours salle du club"></label>
     <div class="grid2"><label class="f" for="cm-l">Lieu<input type="text" id="cm-l" name="lieu" value="${esc(v.lieu)}"></label><label class="f" for="cm-n">Nom du concours<input type="text" id="cm-n" name="nom" value="${esc(v.nom)}"></label></div>
-    <div class="f">Type<div class="checks">${C_TYPES.map(([k, l]) => `<label><input type="checkbox" name="type" value="${k}" ${(v.types || []).includes(k) ? "checked" : ""}> ${l}</label>`).join("")}</div></div>
+    <div class="f">Type<div class="checks">${cTypes().map(([k, l]) => `<label><input type="checkbox" name="type" value="${k}" ${(v.types || []).includes(k) ? "checked" : ""}> ${l}</label>`).join("")}</div></div>
     <div class="f">Niveau<div class="radio">${C_NIVEAUX.map(([k, l]) => `<label><input type="radio" name="niveau" value="${k}" ${(v.niveau || "") === k ? "checked" : ""}> ${l}</label>`).join("")}</div></div>
     <div class="f">Fédération<div class="radio">${[["", "Non précisée"], ...FEDS.map((f) => [f, f])].map(([k, l]) => `<label><input type="radio" name="federation" value="${k}" ${(v.federation || "") === k ? "checked" : ""}> ${l}</label>`).join("")}</div></div>
     <label class="f" for="cm-no">Notes<textarea id="cm-no" name="notes">${esc(v.notes)}</textarea></label>`, {
@@ -2118,7 +2126,7 @@ function formConcours(c = null) {
     ${lieux.length ? `<div class="f">Lieux déjà enregistrés<span class="tirline">Touche un lieu pour l'ajouter en nouvelle ligne.</span><div class="chips">${lieux.map((l) => `<button type="button" class="chip" data-co-lieu="${esc(l)}">${esc(l)}</button>`).join("")}</div></div>` : ""}`;
   const mods = coModeles();
   sheet(c ? "Modifier le concours" : "Nouveaux concours", `${datalist}${!c && mods.length ? `<div class="f">Partir d'un modèle<div class="chips" id="co-mods">${mods.map((m) => `<button type="button" class="chip" data-com="${esc(m.id)}">${esc(m.titre)}</button>`).join("")}</div></div>` : ""}${top}
-    <div class="f">Type<div class="checks">${C_TYPES.map(([k, l]) => `<label><input type="checkbox" name="type" value="${k}" ${(dv.types || []).includes(k) ? "checked" : ""}> ${l}</label>`).join("")}</div></div>
+    <div class="f">Type<div class="checks">${cTypes().map(([k, l]) => `<label><input type="checkbox" name="type" value="${k}" ${(dv.types || []).includes(k) ? "checked" : ""}> ${l}</label>`).join("")}</div></div>
     <div class="f">Niveau<div class="radio">${C_NIVEAUX.map(([k, l]) => `<label><input type="radio" name="niveau" value="${k}" ${(dv.niveau || "") === k ? "checked" : ""}> ${l}</label>`).join("")}</div></div>
     <div class="f">Fédération<div class="radio">${[["", "Non précisée"], ...FEDS.map((f) => [f, f])].map(([k, l]) => `<label><input type="radio" name="federation" value="${k}" ${(dv.federation || "") === k ? "checked" : ""}> ${l}</label>`).join("")}</div></div>
     <div class="f" id="co-tae">Distances du tir extérieur FFTA<div class="radio"><label><input type="radio" name="tae" value="int" ${(dv.tae || "int") === "int" ? "checked" : ""}> Distances internationales</label><label><input type="radio" name="tae" value="nat" ${dv.tae === "nat" ? "checked" : ""}> Distances nationales</label></div></div>
@@ -3750,7 +3758,7 @@ function viewData() {
       const sec = {
       modeles: () => { const ms = coModeles();
         return `<div class="card"><h3 class="hub-h">Modèles de concours</h3><span class="tirline">Un modèle remplit d'un coup le lieu, le nom, la fédération, le type, le niveau et les notes quand vous ajoutez un concours (« Partir d'un modèle »). Créez-en un ici, ou depuis la fiche d'un concours avec « Enregistrer comme modèle ».</span>
-          ${ms.length ? `<div class="list">${ms.map((m) => `<div class="row"><span class="main"><span class="t">${esc(m.titre)}</span><span class="m">${esc([m.nom, m.lieu, m.federation, (m.types || []).map((t) => (C_TYPES.find(([k]) => k === t) || [, t])[1]).join(", ")].filter(Boolean).join(" · "))}</span></span>${S.canWrite ? `<button class="btn" data-com-edit="${esc(m.id)}">Modifier</button>` : ""}</div>`).join("")}</div>` : `<p class="notice">Aucun modèle pour l'instant. Exemple : « Concours salle du club » avec son lieu, FFTA, salle, notes sur le mandat.</p>`}
+          ${ms.length ? `<div class="list">${ms.map((m) => `<div class="row"><span class="main"><span class="t">${esc(m.titre)}</span><span class="m">${esc([m.nom, m.lieu, m.federation, (m.types || []).map(typeLab).join(", ")].filter(Boolean).join(" · "))}</span></span>${S.canWrite ? `<button class="btn" data-com-edit="${esc(m.id)}">Modifier</button>` : ""}</div>`).join("")}</div>` : `<p class="notice">Aucun modèle pour l'instant. Exemple : « Concours salle du club » avec son lieu, FFTA, salle, notes sur le mandat.</p>`}
           ${S.canWrite ? `<div><button class="btn" data-act="com-new">+ Nouveau modèle</button></div>` : ""}</div>`; },
       import: () => `<div class="card"><h3 class="hub-h">Import d'un classement PDF</h3>
         <label class="f" for="pco-iclub">Club proposé pour les archers créés depuis un classement<select id="pco-iclub" data-prm="co.importClub" ${ro}><option value="">Le club lu dans le classement</option>${S.clubs.map((k) => `<option value="${k.id}" ${cd.importClub === k.id ? "selected" : ""}>${esc(k.nom)}</option>`).join("")}</select></label>
@@ -3766,22 +3774,28 @@ function viewData() {
       if (sec[ct]) return chips + sec[ct]();
       return chips + `<div class="card" ${ct === "nouveaux" ? "" : "hidden"}><h3 class="hub-h">Nouveaux concours</h3><span class="tirline">Déjà cochés quand tu ajoutes un ou plusieurs concours. Tu peux toujours les changer au cas par cas.</span>
       <div class="f">Fédération${rr("federation", cd.federation, [["", "Non précisée"], ...FEDS.map((f) => [f, f])])}</div>
-      <div class="f">Type<div class="checks">${C_TYPES.map(([k, l]) => `<label><input type="checkbox" data-prm-type value="${k}" ${(cd.types || []).includes(k) ? "checked" : ""} ${ro}> ${l}</label>`).join("")}</div></div>
+      <div class="f">Type<div class="checks">${cTypes().map(([k, l]) => `<label><input type="checkbox" data-prm-type value="${k}" ${(cd.types || []).includes(k) ? "checked" : ""} ${ro}> ${l}</label>`).join("")}</div></div>
       <div class="f">Niveau${rr("niveau", cd.niveau, C_NIVEAUX)}</div>
       <label class="f" for="pco-notes">Notes proposées<textarea id="pco-notes" data-prm="co.notes" placeholder="Ex. Mandat à demander au club, inscriptions 15 jours avant…" ${ro}>${esc(cd.notes || "")}</textarea></label></div>
       <div class="card" ${ct === "baremes" ? "" : "hidden"}><h3 class="hub-h">Barèmes officiels</h3><span class="tirline">Repris des règlements FFTA (saison 2027) et UFOLEP. À l'inscription ou à l'import d'un classement, chaque archer reçoit d'office les distances, le blason et le nombre de flèches de sa catégorie et de son arc, en salle et en extérieur. Pour le tir extérieur FFTA, choisis « distances internationales » ou « nationales » dans la fiche du concours. Ufolarc long : il faut le sexe de l'archer. Les cas particuliers (25 m FFTA, 40 cm à 18 m en petite salle UFOLEP) se corrigent sur le concours.</span>
       ${offTables()}</div>
       <div class="card" ${ct === "secours" ? "" : "hidden"}><h3 class="hub-h">Format de secours</h3><span class="tirline">Utilisé quand la catégorie de l'archer n'est pas connue (pas de date de naissance ni de catégorie) ou que le concours n'a pas de type. Distances séparées par « + » (ex. 40 + 30). Les colonnes poulies et barebow sont facultatives : vides, ces archers ont les distances de la colonne classique. Si les distances des jeunes sont vides, ils ont les mêmes séries que les adultes avec la distance à compléter. Jeune : moins de 17 ans en UFOLEP, catégories U11 à U21 en FFTA.</span>
+      <div class="chips" role="tablist" aria-label="Fédération">${FEDS.map((f) => `<button type="button" class="chip" data-fmtfed="${f}" aria-pressed="${(S.fmtFed || "FFTA") === f}">${f}</button>`).join("")}</div>
       <div class="scroll"><table class="vol fmt-t"><thead><tr><th>Concours</th><th>Adultes<br><small>classique</small></th><th>Adultes<br><small>poulies</small></th><th>Adultes<br><small>barebow</small></th><th>Jeunes</th><th>Blason</th><th>Flèches par distance</th></tr></thead><tbody>
-      ${FEDS.flatMap((fd) => C_TYPES.map(([t, l]) => { const f = fmtOf(fd, t), k = `co.fmt.${fd}_${t}.`, id = `fm-${fd}-${t}`;
-        return `<tr><th><span class="tag fed">${fd}</span> ${l}</th>
+      ${[S.fmtFed || "FFTA"].flatMap((fd) => fmtRows(fd).map((t) => [t, typeLab(t)]).map(([t, l]) => { const f = fmtOf(fd, t), k = `co.fmt.${fd}_${t}.`, id = `fm-${fd}-${t}`;
+        return `<tr><th>${esc(l)}${S.canWrite ? ` <button type="button" class="btn ghost fmt-x" data-fmt-del="${fd}|${t}" aria-label="Retirer ${esc(l)}">×</button>` : ""}</th>
           <td><input type="text" id="${id}-a" data-prm="${k}adulte" value="${esc(f.adulte)}" placeholder="—" aria-label="${fd} ${l} : distances adultes" ${ro}></td>
           <td><input type="text" id="${id}-p" data-prm="${k}poulies" value="${esc(f.poulies)}" placeholder="idem" aria-label="${fd} ${l} : distances adultes poulies" ${ro}></td>
           <td><input type="text" id="${id}-bb" data-prm="${k}barebow" value="${esc(f.barebow)}" placeholder="idem" aria-label="${fd} ${l} : distances adultes barebow" ${ro}></td>
           <td><input type="text" id="${id}-j" data-prm="${k}jeune" value="${esc(f.jeune)}" placeholder="—" aria-label="${fd} ${l} : distances jeunes" ${ro}></td>
           <td><select id="${id}-b" data-prm="${k}blason" aria-label="${fd} ${l} : blason" ${ro}><option value="">—</option>${blasonOpts(f.blason)}</select></td>
           <td><input type="number" inputmode="numeric" min="0" id="${id}-f" data-prm="${k}fleches" value="${esc(f.fleches)}" placeholder="—" aria-label="${fd} ${l} : flèches par distance" ${ro}></td></tr>`; })).join("")}
-      </tbody></table></div></div>`; })()}
+      </tbody></table></div>
+      ${S.canWrite ? (() => { const fd = S.fmtFed || "FFTA", dispo = cTypes().filter(([k]) => !fmtRows(fd).includes(k));
+        return `<div class="bar fmt-add">${dispo.length ? `<select id="fmt-add-sel" aria-label="Type à ajouter">${dispo.map(([k, l]) => `<option value="${k}">${esc(l)}</option>`).join("")}</select><button type="button" class="btn" data-act="fmt-add">+ Ajouter en ${fd}</button>` : ""}
+          <input type="text" id="fmt-new" placeholder="Nouveau type (ex. Tir en salle jeunes)" aria-label="Nouveau type de concours"><button type="button" class="btn" data-act="fmt-new">+ Créer ce type</button></div>
+        ${typesPerso().length ? `<div class="f">Types ajoutés<div class="chips">${typesPerso().map((t) => `<span class="chip">${esc(t.label)} <button type="button" class="lnk" data-type-del="${esc(t.id)}" aria-label="Supprimer le type ${esc(t.label)}">×</button></span>`).join("")}</div><span class="tirline">Un type créé apparaît aussi dans la liste « Type » des concours. Le supprimer le retire des listes ; les concours déjà enregistrés gardent leur type.</span></div>` : ""}
+        <span class="tirline">« × » retire une ligne de la fédération : ce type n'aura plus de format de secours en ${fd}.</span>`; })() : ""}</div>`; })()}
 `,
     donnees: () => `    <h2 class="sec">Sauvegarde des données</h2>
     <div class="card">
@@ -4182,7 +4196,7 @@ function formSeance(s = null) {
 
 // ---------- Événements ----------
 document.addEventListener("click", (e) => {
-  const t = e.target.closest("[data-tab],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab],[data-qsort],[data-coptab],[data-com-edit]");
+  const t = e.target.closest("[data-tab],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab],[data-qsort],[data-coptab],[data-com-edit],[data-fmtfed],[data-fmt-del],[data-type-del]");
   if (!t || t.closest("#sheet")) return;
   if (t.dataset.dashSuivi) { const [sid, aid] = t.dataset.dashSuivi.split("|"); S.seance = sid; S.suivi = aid; S.tirOpen = null; render(); window.scrollTo(0, 0); return; }
   if (t.dataset.tab) { go(t.dataset.tab); try { history.replaceState(null, "", "#" + t.dataset.tab); } catch (_) {} return; }
@@ -4193,6 +4207,9 @@ document.addEventListener("click", (e) => {
   }
   if (t.dataset.folder !== undefined) { S.folder = t.dataset.folder || null; render(); window.scrollTo(0, 0); return; }
   if (t.dataset.qsort) { const k = t.dataset.qsort, so = S.qvqSort || { k: "nom", d: 1 }; S.qvqSort = { k, d: so.k === k ? -so.d : k === "nom" || k === "profil" ? 1 : -1 }; render(); return; }
+  if (t.dataset.fmtfed) { S.fmtFed = t.dataset.fmtfed; render(); return; }
+  if (t.dataset.fmtDel) { const [fd, ty] = t.dataset.fmtDel.split("|"); setParam({ co: { fmtRows: { [fd]: fmtRows(fd).filter((k) => k !== ty) } } }); toast(`${typeLab(ty)} retiré du format de secours ${fd}`); render(); return; }
+  if (t.dataset.typeDel) { const id = t.dataset.typeDel; setParam({ coTypesPerso: typesPerso().filter((x) => x.id !== id) }); toast("Type supprimé"); render(); return; }
   if (t.dataset.coptab) { S.coPTab = t.dataset.coptab; render(); return; }
   if (t.dataset.comEdit) { const m = coModeles().find((x) => x.id === t.dataset.comEdit); if (m) formModele(m); return; }
   if (t.dataset.esptab) { S.espTab = t.dataset.esptab; render(); return; }
@@ -4327,6 +4344,9 @@ document.addEventListener("click", (e) => {
   if (a === "new-annonce") formAnnonce();
   if (a === "prof-reset") { const k = t.dataset.profK; setParam({ profils: { [k]: null }, profilNoms: { [k]: null } }); toast("Profil remis à l'origine"); render(); }
   if (a === "com-new") formModele();
+  if (a === "fmt-add") { const fd = S.fmtFed || "FFTA", ty = $("#fmt-add-sel")?.value; if (ty) { setParam({ co: { fmtRows: { [fd]: [...fmtRows(fd), ty] } } }); toast(`${typeLab(ty)} ajouté en ${fd}`); render(); } }
+  if (a === "fmt-new") { const fd = S.fmtFed || "FFTA", lab = ($("#fmt-new")?.value || "").trim(); if (!lab) { toast("Écrivez le nom du type"); return; }
+    const id = "t_" + Date.now().toString(36); setParam({ coTypesPerso: [...typesPerso(), { id, label: lab }], co: { fmtRows: { [fd]: [...fmtRows(fd), id] } } }); toast(`Type « ${lab} » créé en ${fd}`); render(); }
   if (a === "qf-reset") { S.qvqF = {}; render(); }
   if (a === "prof-new") { const id = "p_" + Date.now().toString(36); const l = (Array.isArray(prm().profilsPerso) ? prm().profilsPerso : []).filter(Boolean);
     setParam({ profilsPerso: [...l, { id, nom: "Nouveau profil" }], profils: { [id]: [...AR_PROFILS.loisir[1]] } }); toast("Profil ajouté : donnez-lui un nom et cochez ses parties"); render(); }
