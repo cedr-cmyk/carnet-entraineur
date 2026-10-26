@@ -566,6 +566,7 @@ svg.chart .szl { stroke: var(--line-2, var(--line)); stroke-dasharray: 3 3; }
 .rg-card { gap: 10px; } .rg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; } .rg-to { max-width: 320px; }
 table.qvq td, table.qvq th { white-space: nowrap; } .qvq-f { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; } .qvq-f input, .qvq-f select { min-height: 40px; } .qvq-f input { flex: 1; min-width: 180px; }
 .qvq-sort { font-weight: 800; text-decoration: none; text-transform: inherit; letter-spacing: inherit; color: inherit; } .qvq-auto { display: block; color: var(--muted); font-size: .78rem; margin-top: 2px; } .qvq-c { text-align: center; font-weight: 800; } .qvq-a { display: flex; align-items: center; gap: 8px; } table.qvq select { min-width: 150px; }
+[hidden] { display: none !important; }
 .ar-params { display: grid; gap: 14px; max-width: 720px; } .ar-params .card { gap: 10px; }
 .ar-quick.one { grid-template-columns: 1fr; }
 .ar-quick { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
@@ -2597,7 +2598,8 @@ function defaultSeries(c, a, arc = "") {
 }
 const defFleches = (c) => ((c.types || []).includes("salle") ? "60" : (c.types || []).includes("exterieur") ? "72" : "");
 function viewConcoursList() {
-  const end = S.coSaison || saisonYear(), key = (d) => saisonOfDate(d) === end;
+  if (!S.coSaison && (prm().co || {}).saisonDefaut === "derniere") { const lc = S.concours.filter((c) => resOf(c).some(([, r]) => num(r.score) != null)).sort((a, b) => b.date.localeCompare(a.date))[0]; if (lc) S.coSaison = saisonOfDate(lc.date); }
+  const end = S.coSaison || saisonYear(), key = (d) => saisonOfDate(d) === end, plier = (prm().co || {}).passesReplies === "oui";
   const list = S.concours.filter((c) => key(c.date)).sort((a, b) => a.date.localeCompare(b.date));
   const today = todayISO();
   let h = `<div class="bar"><button class="btn" data-cosaison="-1" aria-label="Saison précédente">‹</button><b style="font-family:var(--font-display);font-size:1.3rem;font-weight:800">Saison ${end - 1}-${end}</b><button class="btn" data-cosaison="1" aria-label="Saison suivante">›</button><span class="grow"></span></div>`;
@@ -2609,8 +2611,13 @@ function viewConcoursList() {
       <span class="main"><span class="tirline">Prochain concours</span><span class="t">${esc(cTitle(next))}</span><span class="m">${esc(fmtCDate(next))} ${cTags(next)}</span></span><span class="count">${n}<small> archer${n > 1 ? "s" : ""}</small></span></button>`;
   }
   const months = [...new Set(list.map((c) => c.date.slice(0, 7)))];
-  months.forEach((ym) => {
+  // concours passés repliés (réglage) : les mois entièrement passés vont dans un volet
+  const allPast = (ym) => list.filter((c) => c.date.slice(0, 7) === ym).every((c) => (c.dateFin || c.date) < today);
+  const pastMonths = plier ? months.filter(allPast) : [];
+  if (pastMonths.length) h += `<details class="pick co-past"><summary>Concours passés de la saison <span class="tirline">${list.filter((c) => pastMonths.includes(c.date.slice(0, 7))).length} concours</span></summary>`;
+  months.forEach((ym, mi) => {
     const m = Number(ym.slice(5, 7));
+    if (pastMonths.length && mi === pastMonths.length) h += `</details>`;
     h += `<h2 class="sec">${MOIS_NOM[m]} ${ym.slice(0, 4)}</h2><div class="list">${list.filter((c) => c.date.slice(0, 7) === ym).map((c) => {
       const past = (c.dateFin || c.date) < today, rs = resOf(c), done = rs.filter(([, r]) => num(r.score) != null).length;
       return `<button class="row ${past ? "past" : ""}" data-concours="${c.id}"><span class="date"><span class="d">${dObj(c.date).getDate()}${c.dateFin && c.dateFin !== c.date ? `<small>-${dObj(c.dateFin).getDate()}</small>` : ""}</span><span class="mo">${dObj(c.date).toLocaleDateString("fr-FR", { weekday: "short" }).replace(".", "")}</span></span>
@@ -2618,6 +2625,7 @@ function viewConcoursList() {
         <span class="count">${rs.length ? (past ? `${done}<small>/${rs.length} scores</small>` : `${rs.length}<small> inscrit${rs.length > 1 ? "s" : ""}</small>`) : "<small>—</small>"}</span></button>`;
     }).join("")}</div>`;
   });
+  if (pastMonths.length && pastMonths.length === months.length) h += `</details>`;
   return h;
 }
 function viewConcours() {
@@ -2655,6 +2663,25 @@ function viewConcours() {
     <span class="tirline">Le score total additionne les distances. Il s'ajoute au carnet d'entraînement de l'archer (volume « Compét » et score compétition) et à sa courbe de progression en concours.</span>`;
   return h;
 }
+// Modèles de concours : lieu, nom, fédération, type, niveau, notes, à réutiliser
+const coModeles = () => (Array.isArray(prm().coModeles) ? prm().coModeles.filter(Boolean) : []);
+function formModele(m = null) {
+  const v = m || { titre: "", nom: "", lieu: "", federation: "", types: [], niveau: "", tae: "int", notes: "" };
+  sheet(m ? "Modifier le modèle" : "Nouveau modèle de concours", `
+    <label class="f" for="cm-t">Nom du modèle<input type="text" id="cm-t" name="titre" required value="${esc(v.titre)}" placeholder="Ex. Concours salle du club"></label>
+    <div class="grid2"><label class="f" for="cm-l">Lieu<input type="text" id="cm-l" name="lieu" value="${esc(v.lieu)}"></label><label class="f" for="cm-n">Nom du concours<input type="text" id="cm-n" name="nom" value="${esc(v.nom)}"></label></div>
+    <div class="f">Type<div class="checks">${C_TYPES.map(([k, l]) => `<label><input type="checkbox" name="type" value="${k}" ${(v.types || []).includes(k) ? "checked" : ""}> ${l}</label>`).join("")}</div></div>
+    <div class="f">Niveau<div class="radio">${C_NIVEAUX.map(([k, l]) => `<label><input type="radio" name="niveau" value="${k}" ${(v.niveau || "") === k ? "checked" : ""}> ${l}</label>`).join("")}</div></div>
+    <div class="f">Fédération<div class="radio">${[["", "Non précisée"], ...FEDS.map((f) => [f, f])].map(([k, l]) => `<label><input type="radio" name="federation" value="${k}" ${(v.federation || "") === k ? "checked" : ""}> ${l}</label>`).join("")}</div></div>
+    <label class="f" for="cm-no">Notes<textarea id="cm-no" name="notes">${esc(v.notes)}</textarea></label>`, {
+    onSave(fd) {
+      const titre = fd.get("titre").trim(); if (!titre) { toast("Donnez un nom au modèle"); return false; }
+      const d = { id: m?.id || "m_" + Date.now().toString(36), titre, lieu: fd.get("lieu").trim(), nom: fd.get("nom").trim(), types: fd.getAll("type"), niveau: fd.get("niveau") || "", federation: fd.get("federation") || "", tae: v.tae || "int", notes: fd.get("notes").trim() };
+      setParam({ coModeles: m ? coModeles().map((x) => (x.id === m.id ? d : x)) : [...coModeles(), d] }); toast("Modèle enregistré"); render();
+    },
+    onDelete: m ? () => { setParam({ coModeles: coModeles().filter((x) => x.id !== m.id) }); toast("Modèle supprimé"); render(); } : null, deleteLabel: "Supprimer le modèle",
+  });
+}
 function formConcours(c = null) {
   const lieux = [...new Set(S.concours.map((x) => (x.lieu || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "fr"));
   const datalist = `<datalist id="co-lieux">${lieux.map((l) => `<option value="${esc(l)}"></option>`).join("")}</datalist>`;
@@ -2668,13 +2695,15 @@ function formConcours(c = null) {
     <div id="co-rows" style="display:grid;gap:8px"></div>
     <div class="bar"><button type="button" class="btn" id="co-add">+ Ajouter une date</button><span class="tirline">reprend le lieu de la ligne précédente, une semaine plus tard</span></div>
     ${lieux.length ? `<div class="f">Lieux déjà enregistrés<span class="tirline">Touche un lieu pour l'ajouter en nouvelle ligne.</span><div class="chips">${lieux.map((l) => `<button type="button" class="chip" data-co-lieu="${esc(l)}">${esc(l)}</button>`).join("")}</div></div>` : ""}`;
-  sheet(c ? "Modifier le concours" : "Nouveaux concours", `${datalist}${top}
+  const mods = coModeles();
+  sheet(c ? "Modifier le concours" : "Nouveaux concours", `${datalist}${!c && mods.length ? `<div class="f">Partir d'un modèle<div class="chips" id="co-mods">${mods.map((m) => `<button type="button" class="chip" data-com="${esc(m.id)}">${esc(m.titre)}</button>`).join("")}</div></div>` : ""}${top}
     <div class="f">Type<div class="checks">${C_TYPES.map(([k, l]) => `<label><input type="checkbox" name="type" value="${k}" ${(dv.types || []).includes(k) ? "checked" : ""}> ${l}</label>`).join("")}</div></div>
     <div class="f">Niveau<div class="radio">${C_NIVEAUX.map(([k, l]) => `<label><input type="radio" name="niveau" value="${k}" ${(dv.niveau || "") === k ? "checked" : ""}> ${l}</label>`).join("")}</div></div>
     <div class="f">Fédération<div class="radio">${[["", "Non précisée"], ...FEDS.map((f) => [f, f])].map(([k, l]) => `<label><input type="radio" name="federation" value="${k}" ${(dv.federation || "") === k ? "checked" : ""}> ${l}</label>`).join("")}</div></div>
     <div class="f" id="co-tae">Distances du tir extérieur FFTA<div class="radio"><label><input type="radio" name="tae" value="int" ${(dv.tae || "int") === "int" ? "checked" : ""}> Distances internationales</label><label><input type="radio" name="tae" value="nat" ${dv.tae === "nat" ? "checked" : ""}> Distances nationales</label></div></div>
     <label class="f" for="co-notes">Notes (horaires, mandat, inscriptions…)<textarea id="co-notes" name="notes">${esc(dv.notes)}</textarea></label>
-    ${c ? "" : `<span class="tirline">Les valeurs cochées par défaut se règlent dans Paramètres › Concours.</span>`}`, {
+    ${c ? "" : `<span class="tirline">Les valeurs cochées par défaut et les modèles se règlent dans Paramètres › Concours.</span>`}
+    <div><button type="button" class="btn ghost" id="co-asmod">Enregistrer comme modèle</button></div>`, {
     onSave(fd) {
       if (!c) {
         const ds = fd.getAll("r-date"), fs = fd.getAll("r-fin"), ls = fd.getAll("r-lieu"), ns = fd.getAll("r-nom");
@@ -2706,6 +2735,23 @@ function formConcours(c = null) {
   });
   const taeShow = () => { const t = [...document.querySelectorAll('#sheet input[name="type"]:checked')].map((x) => x.value), f = document.querySelector('#sheet input[name="federation"]:checked')?.value || ""; $("#co-tae").hidden = !(t.includes("exterieur") && f !== "UFOLEP"); };
   document.querySelectorAll('#sheet input[name="type"], #sheet input[name="federation"]').forEach((x) => x.addEventListener("change", taeShow)); taeShow();
+  $("#co-asmod").onclick = () => {
+    const f = $("#sheet-form"), g = (n) => f.querySelector(`[name="${n}"]`)?.value?.trim() || "", lieu = c ? g("lieu") : f.querySelector('[name="r-lieu"]')?.value.trim() || "", nom = c ? g("nom") : f.querySelector('[name="r-nom"]')?.value.trim() || "";
+    const titre = (prompt("Nom du modèle", nom || lieu || "Mon concours") || "").trim(); if (!titre) return;
+    const d = { id: "m_" + Date.now().toString(36), titre, lieu, nom, types: [...f.querySelectorAll('input[name="type"]:checked')].map((x) => x.value), niveau: f.querySelector('input[name="niveau"]:checked')?.value || "", federation: f.querySelector('input[name="federation"]:checked')?.value || "", tae: f.querySelector('input[name="tae"]:checked')?.value || "int", notes: f.querySelector('[name="notes"]').value.trim() };
+    setParam({ coModeles: [...coModeles().filter((x) => x.titre !== titre), d] }); toast(`Modèle « ${titre} » enregistré`);
+  };
+  $("#co-mods")?.addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-com]"); if (!b) return; const m = coModeles().find((x) => x.id === b.dataset.com); if (!m) return;
+    const f = $("#sheet-form"), row = f.querySelector("#co-rows .co-row:last-child");
+    if (row) { if (m.lieu) row.querySelector('[name="r-lieu"]').value = m.lieu; if (m.nom) row.querySelector('[name="r-nom"]').value = m.nom; }
+    f.querySelectorAll('input[name="type"]').forEach((x) => (x.checked = (m.types || []).includes(x.value)));
+    f.querySelectorAll('input[name="niveau"]').forEach((x) => (x.checked = x.value === (m.niveau || "")));
+    f.querySelectorAll('input[name="federation"]').forEach((x) => (x.checked = x.value === (m.federation || "")));
+    f.querySelectorAll('input[name="tae"]').forEach((x) => (x.checked = x.value === (m.tae || "int")));
+    f.querySelector('[name="notes"]').value = m.notes || ""; taeShow();
+    document.querySelectorAll("#co-mods .chip").forEach((x) => x.setAttribute("aria-pressed", x === b)); toast(`Modèle « ${m.titre} » appliqué : il reste la date`);
+  });
   if (c) return;
   let n = 0;
   const addRow = (r = {}) => {
@@ -2956,6 +3002,8 @@ function manualClaude(prompt, scanned, fileName) {
   });
 }
 function reviewImport(c, list, archers, stored = null) {
+  const ci = prm().co || {};
+  if (ci.importInconnus === "ignorer") list = list.filter((r) => !r.nouveau || r.archerId);
   if (!list.length) { $("#sheet").innerHTML = ""; toast("Aucun de tes archers n'a été trouvé dans ce classement"); return; }
   const newName = (r) => [r.prenom, r.nom].filter(Boolean).join(" ") || r.nomLu || "";
   const opts = (sel, r) => `<option value="">Ne pas importer</option>${r?.nouveau ? `<option value="__new" selected>➕ Créer : ${esc(newName(r))}</option>` : ""}${archers.slice().sort(byName).map((a) => `<option value="${a.id}" ${a.id === sel ? "selected" : ""}>${esc(fullName(a))}</option>`).join("")}`;
@@ -2964,9 +3012,9 @@ function reviewImport(c, list, archers, stored = null) {
     <p class="notice">Vérifie chaque ligne : l'archer reconnu, le total et la place. Décoche ce qui ne doit pas être importé. Les archers non inscrits au concours le seront automatiquement.</p>
     ${list.some((r) => r.nouveau) ? `<p class="notice">${list.filter((r) => r.nouveau).length} archer${list.filter((r) => r.nouveau).length > 1 ? "s" : ""} de tes clubs ${list.filter((r) => r.nouveau).length > 1 ? "ne sont" : "n'est"} pas encore dans le carnet. Avec « Créer », la fiche est créée (nom, club, arc, fédération du concours) puis le résultat est importé. Tu compléteras la date de naissance ensuite. Si c'est un archer déjà dans ton carnet sous un autre nom, choisis-le dans la liste à la place.</p>` : ""}
     <div class="scroll"><table class="vol quick imp"><thead><tr><th>Importer</th><th>Lu dans le classement</th><th>Archer du carnet</th><th>Détail</th><th>Total</th><th>Place</th></tr></thead><tbody>
-    ${list.map((r, i) => `<tr><td><input type="checkbox" class="qp" name="imp-on" value="${i}" ${r.archerId || r.nouveau ? "checked" : ""}></td>
+    ${list.map((r, i) => `<tr><td><input type="checkbox" class="qp" name="imp-on" value="${i}" ${r.archerId || (r.nouveau && ci.importInconnus !== "decoche") ? "checked" : ""}></td>
       <td style="text-align:left">${esc(r.nomLu || "")}<span class="tirline" style="display:block">${esc([r.categorie, r.arc].filter(Boolean).join(" · "))}</span></td>
-      <td><select name="imp-a-${i}" data-imp-new="${i}">${opts(r.archerId, r)}</select>${r.nouveau ? `<select name="imp-c-${i}" id="imp-c-${i}" aria-label="Club du nouvel archer" style="margin-top:4px">${S.clubs.map((k) => `<option value="${k.id}" ${k.id === r.clubId ? "selected" : ""}>${esc(k.nom)}</option>`).join("")}</select><span class="tirline" style="display:block">Pas encore dans ton carnet${r.clubLu ? " · " + esc(r.clubLu) : ""}</span>` : ""}</td>
+      <td><select name="imp-a-${i}" data-imp-new="${i}">${opts(r.archerId, r)}</select>${r.nouveau ? `<select name="imp-c-${i}" id="imp-c-${i}" aria-label="Club du nouvel archer" style="margin-top:4px">${S.clubs.map((k) => `<option value="${k.id}" ${k.id === (r.clubId || ci.importClub) ? "selected" : ""}>${esc(k.nom)}</option>`).join("")}</select><span class="tirline" style="display:block">Pas encore dans ton carnet${r.clubLu ? " · " + esc(r.clubLu) : ""}</span>` : ""}</td>
       <td class="txt" style="text-align:left">${det(r).map((d) => `${d.distance ? esc(d.distance) + " m : " : ""}${esc(d.score)}`).join("<br>") || "—"}</td>
       <td><input type="number" inputmode="numeric" min="0" name="imp-t-${i}" value="${esc(r.total ?? "")}" ${det(r).length > 1 ? "readonly title=\"Somme des distances\"" : ""}></td>
       <td><input type="text" name="imp-p-${i}" value="${esc(r.place != null ? (r.participants ? `${r.place}/${r.participants}` : r.place) : "")}" style="width:80px"></td></tr>`).join("")}
@@ -3536,6 +3584,7 @@ function dashResRow(x) {
 }
 function viewAccueil() {
   if (!S.clubs.length) return startHere();
+  const coA = prm().co || {}, showNext = coA.accProchain !== "non", showRes = coA.accResultats !== "non";
   const today = todayISO(), ym = today.slice(0, 7), inC = (cid) => S.club === "all" || cid === S.club;
   const archIds = new Set(S.archers.filter((a) => S.club === "all" || (a.clubIds || []).includes(S.club)).map((a) => a.id));
   const month = dashCache.entries.filter((e) => e.date?.startsWith(ym) && archIds.has(e.archerId));
@@ -3565,11 +3614,11 @@ function viewAccueil() {
     <div class="hub-grid">
       <div class="card"><div class="hub-bar"><h3 class="hub-h">Séances à venir</h3><button class="btn ghost" data-tab="seances">Tout voir</button></div>
         ${upcoming.length ? `<div class="list">${upcoming.map(seanceRow).join("")}</div>` : `<p class="notice">Aucune séance prévue. Crée les séances du mois depuis l'onglet Séances.</p>`}</div>
-      <div class="card"><div class="hub-bar"><h3 class="hub-h">Prochain concours</h3><button class="btn ghost" data-tab="concours">Calendrier</button></div>
-        ${nextCo ? `<button class="row" data-concours="${nextCo.id}"><span class="date"><span class="d">${dObj(nextCo.date).getDate()}</span><span class="mo">${dObj(nextCo.date).toLocaleDateString("fr-FR", { month: "short" }).replace(".", "")}</span></span><span class="main"><span class="t">${esc(cTitle(nextCo))}</span><span class="m">${cTags(nextCo)}</span></span><span class="count">${resOf(nextCo).length}<small> inscrit${resOf(nextCo).length > 1 ? "s" : ""}</small></span></button>` : `<p class="notice">Aucun concours à venir.</p>`}
-        <h3 class="hub-h" style="margin-top:6px">${lastCo ? `Derniers résultats · ${esc(cTitle(lastCo))}` : "Derniers résultats"}</h3>
-        ${lastCo ? `<span class="tirline">${esc(fmtLong(lastCo.date))} · comparé à la moyenne de ses concours précédents${lastTypes.length ? " du même type" : ""}</span><div class="list">${lastRes.map(dashResRow).join("")}</div><button class="btn ghost" data-concours="${lastCo.id}">Voir le concours ›</button>` : `<p class="notice">Aucun score saisi pour l'instant.</p>`}
-      </div>
+      ${showNext || showRes ? `<div class="card">${showNext ? `<div class="hub-bar"><h3 class="hub-h">Prochain concours</h3><button class="btn ghost" data-tab="concours">Calendrier</button></div>
+        ${nextCo ? `<button class="row" data-concours="${nextCo.id}"><span class="date"><span class="d">${dObj(nextCo.date).getDate()}</span><span class="mo">${dObj(nextCo.date).toLocaleDateString("fr-FR", { month: "short" }).replace(".", "")}</span></span><span class="main"><span class="t">${esc(cTitle(nextCo))}</span><span class="m">${cTags(nextCo)}</span></span><span class="count">${resOf(nextCo).length}<small> inscrit${resOf(nextCo).length > 1 ? "s" : ""}</small></span></button>` : `<p class="notice">Aucun concours à venir.</p>`}` : ""}
+        ${showRes ? `<h3 class="hub-h" style="margin-top:6px">${lastCo ? `Derniers résultats · ${esc(cTitle(lastCo))}` : "Derniers résultats"}</h3>
+        ${lastCo ? `<span class="tirline">${esc(fmtLong(lastCo.date))} · comparé à la moyenne de ses concours précédents${lastTypes.length ? " du même type" : ""}</span><div class="list">${lastRes.map(dashResRow).join("")}</div><button class="btn ghost" data-concours="${lastCo.id}">Voir le concours ›</button>` : `<p class="notice">Aucun score saisi pour l'instant.</p>`}` : ""}
+      </div>` : ""}
     </div>
     ${espaceArchersCard(inC)}
     ${todoL.length ? `<details class="card hub-todo"><summary><i class="hub-ico c-cyan">${ICON.list}</i><b>${todoL.length} exercice${todoL.length > 1 ? "s" : ""} attribué${todoL.length > 1 ? "s" : ""} pas encore fait${todoL.length > 1 ? "s" : ""}</b><span class="grow"></span><span class="hub-chev" aria-hidden="true">›</span></summary>
@@ -4273,16 +4322,35 @@ function viewData() {
     <span class="tirline">Dans une séance, « Nouveau tir » demande d'abord la fédération, puis propose ses distances et ces valeurs. Pour les tirs suivants d'un archer dans la même fédération, ce sont les réglages de son tir précédent qui sont repris.</span>
 `,
     archers: () => viewEspaceParams(ro),
-    concours: () => `    <h2 class="sec">Concours : valeurs par défaut</h2>
+    concours: () => `    <h2 class="sec">Concours</h2>
     ${(() => { const cd = p.co || {}, rr = (key, cur, opts) => `<div class="radio">${opts.map(([v, l]) => `<label><input type="radio" name="pco-${key}" data-prm="co.${key}" value="${v}" ${String(cur || "") === String(v) ? "checked" : ""} ${ro}> ${l}</label>`).join("")}</div>`;
-      return `<div class="card"><h3 class="hub-h">Nouveaux concours</h3><span class="tirline">Déjà cochés quand tu ajoutes un ou plusieurs concours. Tu peux toujours les changer au cas par cas.</span>
+      const ct = S.coPTab || "nouveaux", CT = [["nouveaux", "Nouveaux concours"], ["modeles", "Modèles"], ["import", "Import PDF"], ["affichage", "Affichage"], ["baremes", "Barèmes officiels"], ["secours", "Format de secours"]];
+      const chips = `<div class="chips" role="tablist" aria-label="Rubriques concours">${CT.map(([k, l]) => `<button class="chip" role="tab" data-coptab="${k}" aria-pressed="${ct === k}" aria-selected="${ct === k}">${l}</button>`).join("")}</div>`;
+      const sec = {
+      modeles: () => { const ms = coModeles();
+        return `<div class="card"><h3 class="hub-h">Modèles de concours</h3><span class="tirline">Un modèle remplit d'un coup le lieu, le nom, la fédération, le type, le niveau et les notes quand vous ajoutez un concours (« Partir d'un modèle »). Créez-en un ici, ou depuis la fiche d'un concours avec « Enregistrer comme modèle ».</span>
+          ${ms.length ? `<div class="list">${ms.map((m) => `<div class="row"><span class="main"><span class="t">${esc(m.titre)}</span><span class="m">${esc([m.nom, m.lieu, m.federation, (m.types || []).map((t) => (C_TYPES.find(([k]) => k === t) || [, t])[1]).join(", ")].filter(Boolean).join(" · "))}</span></span>${S.canWrite ? `<button class="btn" data-com-edit="${esc(m.id)}">Modifier</button>` : ""}</div>`).join("")}</div>` : `<p class="notice">Aucun modèle pour l'instant. Exemple : « Concours salle du club » avec son lieu, FFTA, salle, notes sur le mandat.</p>`}
+          ${S.canWrite ? `<div><button class="btn" data-act="com-new">+ Nouveau modèle</button></div>` : ""}</div>`; },
+      import: () => `<div class="card"><h3 class="hub-h">Import d'un classement PDF</h3>
+        <label class="f" for="pco-iclub">Club proposé pour les archers créés depuis un classement<select id="pco-iclub" data-prm="co.importClub" ${ro}><option value="">Le club lu dans le classement</option>${S.clubs.map((k) => `<option value="${k.id}" ${cd.importClub === k.id ? "selected" : ""}>${esc(k.nom)}</option>`).join("")}</select></label>
+        <div class="f">Archers de tes clubs qui ne sont pas encore dans le carnet${rr("importInconnus", cd.importInconnus || "coche", [["coche", "Proposer de les créer (cochés)"], ["decoche", "Les proposer, mais décochés"], ["ignorer", "Ne pas les proposer"]])}</div>
+        <span class="tirline">Ces réglages s'appliquent à l'écran « Vérifier l'import ». Vous pouvez toujours changer chaque ligne avant d'enregistrer.</span></div>`,
+      affichage: () => `<div class="card"><h3 class="hub-h">Onglet Concours</h3>
+        <div class="f">Saison affichée à l'ouverture${rr("saisonDefaut", cd.saisonDefaut || "courante", [["courante", "La saison en cours"], ["derniere", "La saison du dernier concours avec des résultats"]])}</div>
+        <div class="f">Concours déjà passés${rr("passesReplies", cd.passesReplies || "non", [["non", "Affichés normalement"], ["oui", "Repliés dans un volet « Concours passés »"]])}</div></div>
+        <div class="card"><h3 class="hub-h">Accueil</h3>
+        <div class="f">Prochain concours${rr("accProchain", cd.accProchain || "oui", [["oui", "Afficher"], ["non", "Masquer"]])}</div>
+        <div class="f">Derniers résultats${rr("accResultats", cd.accResultats || "oui", [["oui", "Afficher"], ["non", "Masquer"]])}</div></div>`,
+      };
+      if (sec[ct]) return chips + sec[ct]();
+      return chips + `<div class="card" ${ct === "nouveaux" ? "" : "hidden"}><h3 class="hub-h">Nouveaux concours</h3><span class="tirline">Déjà cochés quand tu ajoutes un ou plusieurs concours. Tu peux toujours les changer au cas par cas.</span>
       <div class="f">Fédération${rr("federation", cd.federation, [["", "Non précisée"], ...FEDS.map((f) => [f, f])])}</div>
       <div class="f">Type<div class="checks">${C_TYPES.map(([k, l]) => `<label><input type="checkbox" data-prm-type value="${k}" ${(cd.types || []).includes(k) ? "checked" : ""} ${ro}> ${l}</label>`).join("")}</div></div>
       <div class="f">Niveau${rr("niveau", cd.niveau, C_NIVEAUX)}</div>
       <label class="f" for="pco-notes">Notes proposées<textarea id="pco-notes" data-prm="co.notes" placeholder="Ex. Mandat à demander au club, inscriptions 15 jours avant…" ${ro}>${esc(cd.notes || "")}</textarea></label></div>
-      <div class="card"><h3 class="hub-h">Barèmes officiels</h3><span class="tirline">Repris des règlements FFTA (saison 2027) et UFOLEP. À l'inscription ou à l'import d'un classement, chaque archer reçoit d'office les distances, le blason et le nombre de flèches de sa catégorie et de son arc, en salle et en extérieur. Pour le tir extérieur FFTA, choisis « distances internationales » ou « nationales » dans la fiche du concours. Ufolarc long : il faut le sexe de l'archer. Les cas particuliers (25 m FFTA, 40 cm à 18 m en petite salle UFOLEP) se corrigent sur le concours.</span>
+      <div class="card" ${ct === "baremes" ? "" : "hidden"}><h3 class="hub-h">Barèmes officiels</h3><span class="tirline">Repris des règlements FFTA (saison 2027) et UFOLEP. À l'inscription ou à l'import d'un classement, chaque archer reçoit d'office les distances, le blason et le nombre de flèches de sa catégorie et de son arc, en salle et en extérieur. Pour le tir extérieur FFTA, choisis « distances internationales » ou « nationales » dans la fiche du concours. Ufolarc long : il faut le sexe de l'archer. Les cas particuliers (25 m FFTA, 40 cm à 18 m en petite salle UFOLEP) se corrigent sur le concours.</span>
       ${offTables()}</div>
-      <div class="card"><h3 class="hub-h">Format de secours</h3><span class="tirline">Utilisé quand la catégorie de l'archer n'est pas connue (pas de date de naissance ni de catégorie) ou que le concours n'a pas de type. Distances séparées par « + » (ex. 40 + 30). Les colonnes poulies et barebow sont facultatives : vides, ces archers ont les distances de la colonne classique. Si les distances des jeunes sont vides, ils ont les mêmes séries que les adultes avec la distance à compléter. Jeune : moins de 17 ans en UFOLEP, catégories U11 à U21 en FFTA.</span>
+      <div class="card" ${ct === "secours" ? "" : "hidden"}><h3 class="hub-h">Format de secours</h3><span class="tirline">Utilisé quand la catégorie de l'archer n'est pas connue (pas de date de naissance ni de catégorie) ou que le concours n'a pas de type. Distances séparées par « + » (ex. 40 + 30). Les colonnes poulies et barebow sont facultatives : vides, ces archers ont les distances de la colonne classique. Si les distances des jeunes sont vides, ils ont les mêmes séries que les adultes avec la distance à compléter. Jeune : moins de 17 ans en UFOLEP, catégories U11 à U21 en FFTA.</span>
       <div class="scroll"><table class="vol fmt-t"><thead><tr><th>Concours</th><th>Adultes<br><small>classique</small></th><th>Adultes<br><small>poulies</small></th><th>Adultes<br><small>barebow</small></th><th>Jeunes</th><th>Blason</th><th>Flèches par distance</th></tr></thead><tbody>
       ${FEDS.flatMap((fd) => C_TYPES.map(([t, l]) => { const f = fmtOf(fd, t), k = `co.fmt.${fd}_${t}.`, id = `fm-${fd}-${t}`;
         return `<tr><th><span class="tag fed">${fd}</span> ${l}</th>
@@ -4693,7 +4761,7 @@ function formSeance(s = null) {
 
 // ---------- Événements ----------
 document.addEventListener("click", (e) => {
-  const t = e.target.closest("[data-tab],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab],[data-qsort]");
+  const t = e.target.closest("[data-tab],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab],[data-qsort],[data-coptab],[data-com-edit]");
   if (!t || t.closest("#sheet")) return;
   if (t.dataset.dashSuivi) { const [sid, aid] = t.dataset.dashSuivi.split("|"); S.seance = sid; S.suivi = aid; S.tirOpen = null; render(); window.scrollTo(0, 0); return; }
   if (t.dataset.tab) { go(t.dataset.tab); try { history.replaceState(null, "", "#" + t.dataset.tab); } catch (_) {} return; }
@@ -4704,6 +4772,8 @@ document.addEventListener("click", (e) => {
   }
   if (t.dataset.folder !== undefined) { S.folder = t.dataset.folder || null; render(); window.scrollTo(0, 0); return; }
   if (t.dataset.qsort) { const k = t.dataset.qsort, so = S.qvqSort || { k: "nom", d: 1 }; S.qvqSort = { k, d: so.k === k ? -so.d : k === "nom" || k === "profil" ? 1 : -1 }; render(); return; }
+  if (t.dataset.coptab) { S.coPTab = t.dataset.coptab; render(); return; }
+  if (t.dataset.comEdit) { const m = coModeles().find((x) => x.id === t.dataset.comEdit); if (m) formModele(m); return; }
   if (t.dataset.esptab) { S.espTab = t.dataset.esptab; render(); return; }
   if (t.dataset.tccombo) { S.tcCombo = t.dataset.tccombo; render(); return; }
   if (t.dataset.tcper) { S.tcPer = t.dataset.tcper; render(); return; }
@@ -4835,6 +4905,7 @@ document.addEventListener("click", (e) => {
   if (a === "logout" && window.carnetLogout) window.carnetLogout();
   if (a === "new-annonce") formAnnonce();
   if (a === "prof-reset") { const k = t.dataset.profK; setParam({ profils: { [k]: null }, profilNoms: { [k]: null } }); toast("Profil remis à l'origine"); render(); }
+  if (a === "com-new") formModele();
   if (a === "qf-reset") { S.qvqF = {}; render(); }
   if (a === "prof-new") { const id = "p_" + Date.now().toString(36); const l = (Array.isArray(prm().profilsPerso) ? prm().profilsPerso : []).filter(Boolean);
     setParam({ profilsPerso: [...l, { id, nom: "Nouveau profil" }], profils: { [id]: [...AR_PROFILS.loisir[1]] } }); toast("Profil ajouté : donnez-lui un nom et cochez ses parties"); render(); }
