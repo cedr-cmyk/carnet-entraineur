@@ -663,6 +663,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
 // telles que les renvoie la base (fonction espace_archer), et remplit son carnet.
 // window.CarnetArcherUI(API, { preview }) : preview = aperçu ouvert par l'entraîneur, en lecture seule.
 window.CarnetArcherUI = (API, opts = {}) => {
+  const API0 = API;
   const PREVIEW = !!opts.preview && !opts.testWrite, TESTW = !!opts.testWrite, BLOB = window.CARNET_BLOB_BASE || "/_blob/";
   const VOL = [["paille", "Paille"], ["visuel", "Visuel"], ["blason", "Blason"], ["compte", "Tir compté"], ["compet", "Compét"], ["autre", "Autre"]];
   const EMOTIONS = ["Fierté", "Satisfaction", "Soulagement", "Espoir", "Tristesse", "Déception", "Honte", "Colère"];
@@ -714,6 +715,12 @@ window.CarnetArcherUI = (API, opts = {}) => {
   const toast = (m) => { const t = $("#toast"); if (!t) return; t.textContent = m; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => (t.hidden = true), 2400); };
 
   const St = { list: API.list, cur: 0, data: null, tab: "accueil", saison: saisonOf(today()), err: "" };
+  // Saisons archivées par l'entraîneur : consultables, plus modifiables (la base refuse aussi)
+  const archivee = (end) => ((St.data?.reglagesEspace || {}).archives || []).includes(`${end - 1}-${end}`);
+  const saisonDeLigne = (id, data = {}) => { const d = data.date || (St.data?.entrees || []).find((x) => x.id === id)?.date || (String(id).startsWith("s_") ? (St.data?.seances || []).find((x) => String(id) === `s_${x.id}_${who().archer_id}`)?.date : ""); return d ? saisonOf(d) : null; };
+  const MSG_ARCH = "cette saison est archivée par ton entraîneur, tu peux la consulter mais plus la modifier";
+  API = { ...API, ecrire: async (w, id, data) => { const end = saisonDeLigne(id, data); if (end && archivee(end)) throw new Error(MSG_ARCH); return API0.ecrire(w, id, data); },
+    supprimer: async (w, id) => { const end = saisonDeLigne(id); if (end && archivee(end)) throw new Error(MSG_ARCH); return API0.supprimer(w, id); } };
   const who = () => St.list[St.cur];
   const name = (a) => `${a.prenom || ""} ${a.nom || ""}`.trim() || "Archer";
 
@@ -850,12 +857,28 @@ window.CarnetArcherUI = (API, opts = {}) => {
     let h = `<div class="bar"><button class="btn" data-saison="-1" aria-label="Saison précédente">‹</button><b>Saison ${end - 1}-${end}</b><button class="btn" data-saison="1" aria-label="Saison suivante">›</button><span class="grow"></span>${TC() ? `<button class="btn" data-act="tc-new">🎯 Tir compté</button>` : ""}${M().has("carnet") ? `<button class="btn primary" data-act="new">+ Noter une séance</button>` : ""}</div>
       <div class="hub-stats"><div class="hub-stat"><div class="hub-stat-top"><span>Flèches de la saison</span></div><b class="c-gold">${all.toLocaleString("fr-FR")}</b><small>${tot.filter(([, v]) => v).map(([l, v]) => `${l} ${v}`).join(" · ") || "aucune pour l'instant"}</small></div>
       <div class="hub-stat"><div class="hub-stat-top"><span>Séances notées</span></div><b class="c-cyan">${list.length}</b><small>ressenti moyen ${moy} / 10</small></div></div>`;
+    if (archivee(end)) h += `<p class="notice">🔒 Saison archivée par ton entraîneur : tu peux tout relire, mais plus rien modifier.</p>`;
     if (o.processus || o.classement || o.score) h += `<div class="card"><h3 class="hub-h">Mes objectifs de la saison</h3>${[["processus", "Processus"], ["classement", "Classement"], ["score", "Score"]].filter(([k]) => o[k]).map(([k, l]) => `<div class="eq-l"><span>${l}</span><b>${esc(o[k])}</b></div>`).join("")}</div>`;
     if (window.CarnetTcProgress && (M().has("tir") || M().has("impacts"))) h += window.CarnetTcProgress(list, St.tcCombo, "data-artc", St.tcPer || "30", "data-artcp", { courbe: M().has("tir"), carte: M().has("impacts") });
     h += list.length ? `<div class="list">${list.map((e) => `<button class="row" data-entry="${esc(e.id)}"><span class="date"><span class="d">${dObj(e.date).getDate()}</span><span class="mo">${dObj(e.date).toLocaleDateString("fr-FR", { month: "short" }).replace(".", "")}</span></span>
       <span class="main"><span class="t">${esc(e.objectif || (e.concoursId ? "Concours" : "Séance"))}</span><span class="m">${[e.concoursId && num(e.scoreCompet) != null ? e.scoreCompet + " pts" : "", !e.concoursId && num(e.scoreCompte) != null ? `tir compté ${e.scoreCompte} pts${e.tcDistance ? " à " + e.tcDistance + " m" : ""}` : "", vol(e) ? vol(e) + " flèches" : "", e.emotion || "", e.seanceId ? "séance du club" : e.concoursId ? "concours" : "noté par moi", e.commentaireCoach ? "💬 mot de l'entraîneur" : ""].filter(Boolean).map(esc).join(" · ")}</span>${e.commentaire ? `<span class="m">${esc(e.commentaire.slice(0, 100))}</span>` : ""}</span>
       <span class="count">${num(e.note) != null ? `${e.note}<small>/10</small>` : ""}</span></button>`).join("")}</div>` : `<p class="notice">Rien de noté cette saison. « Noter une séance » ajoute une ligne à ton carnet : ton entraîneur la verra.</p>`;
     return h;
+  }
+  // Ligne d'une saison archivée : lecture seule
+  function entryRO(e) {
+    const el = $("#sheet"), d = e || {}, fl = VOL.map(([k, l]) => [l, volOf(d, k)]).filter(([, v]) => v), sc = num(d.scoreCompte ?? d.auto?.scoreCompte), sp = num(d.scoreCompet ?? d.auto?.scoreCompet);
+    const li = (l, v) => (v ? `<div class="eq-l"><b>${l}</b> ${esc(v)}</div>` : "");
+    el.innerHTML = `<div class="sheet-bg" data-close><div class="sheet"><h3>${esc(d.objectif || (d.concoursId ? "Concours" : "Ma séance"))}</h3>
+      <p class="notice">🔒 Saison archivée par ton entraîneur : tu peux relire cette séance mais plus la modifier.</p>
+      ${li("Date", d.date ? dObj(d.date).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : "")}
+      ${li("Flèches", fl.map(([l, v]) => `${l} ${v}`).join(" · "))}${li("Tir compté", sc != null ? `${sc} pts${d.tcDistance ? ` à ${d.tcDistance} m` : ""}` : "")}${li("Score du concours", sp != null && d.concoursId ? `${sp} pts` : "")}
+      ${li("Objectif atteint", d.atteint === "O" ? "Oui" : d.atteint === "N" ? "Non" : "")}${li("Ressenti", num(d.note) != null ? `${d.note} / 10` : "")}${li("Émotion", d.emotion)}${li("Mes commentaires", d.commentaire)}
+      ${d.tcTir && window.CarnetCible?.carte ? (() => { try { return window.CarnetCible.carte(d.tcTir); } catch (err) { return ""; } })() : ""}
+      ${d.commentaireCoach ? `<div class="coach-mot"><b>💬 Le mot de ton entraîneur</b><p style="margin:4px 0 0;color:var(--ink)">${esc(d.commentaireCoach)}</p></div>` : ""}
+      ${fl.length || sc != null || d.note || d.commentaire || d.emotion ? "" : `<p class="tirline">Rien n'a été noté pour cette séance.</p>`}
+      <div class="acts"><button type="button" class="btn primary" data-close>Fermer</button></div></div></div>`;
+    el.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", (ev) => { if (ev.target === b) el.innerHTML = ""; }));
   }
   // Ligne de carnet créée par un concours : on montre le concours (résultat, lieu) plutôt qu'un formulaire vide
   function concoursSheet(e) {
@@ -1207,6 +1230,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     if (t.dataset.seanceAr) {
       const x = (St.data.seances || []).find((y) => y.id === t.dataset.seanceAr); if (!x) return;
       const e = St.data.entrees.find((y) => y.seanceId === x.id);
+      if (archivee(saisonOf(x.date))) { entryRO(e || { date: x.date, objectif: x.theme || "Entraînement" }); return; }
       formEntry(e || { id: `s_${x.id}_${who().archer_id}`, seanceId: x.id, date: x.date, objectif: x.theme || "", __new: true });
       return;
     }
@@ -1224,7 +1248,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     if (t.dataset.arcombo) { St.combo = t.dataset.arcombo; render(); return; }
     if (t.dataset.who) { St.cur = +t.dataset.who; load(); return; }
     if (t.dataset.saison) { St.saison += +t.dataset.saison; render(); return; }
-    if (t.dataset.entry) { const e = St.data.entrees.find((x) => x.id === t.dataset.entry); if (e?.concoursId) concoursSheet(e); else formEntry(e); return; }
+    if (t.dataset.entry) { const e = St.data.entrees.find((x) => x.id === t.dataset.entry); if (e?.concoursId) concoursSheet(e); else if (e?.date && archivee(saisonOf(e.date))) entryRO(e); else formEntry(e); return; }
     if (t.dataset.act === "new") { formEntry(); return; }
     if (t.dataset.act === "reload") { load(); return; }
     if (t.dataset.act === "add-code") {
@@ -1877,6 +1901,13 @@ function monthStats(list) {
   st.moyNote = st.notes.length ? st.notes.reduce((a, b) => a + b, 0) / st.notes.length : null;
   return st;
 }
+// Saisons archivées (Paramètres › Données) : les archers consultent ces carnets sans pouvoir les modifier
+const saisonsArch = () => (Array.isArray(prm().saisonsArchivees) ? prm().saisonsArchivees : []);
+const VOLK = ["paille", "visuel", "blason", "compte", "compet", "autre"];
+// ce qui a été écrit à la main dans une ligne (par l'archer ou l'entraîneur) ; avec auto, compte aussi ce qui vient des feuilles de marque
+const ecritDans = (e, auto = false) => ["objectif", "atteint", "note", "emotion", "commentaire", "commentaireCoach"].some((k) => String(e[k] ?? "").trim())
+  || VOLK.some((k) => Number(e[k]) > 0) || num(e.scoreCompte) != null || num(e.scoreCompet) != null || !!(e.tcTir && (e.tcTir.volees || []).flat().length)
+  || (auto && !!e.auto && (VOLK.some((k) => Number(e.auto[k]) > 0) || num(e.auto.scoreCompte) != null || num(e.auto.scoreCompet) != null));
 const fmt1 = (v) => (v == null ? "—" : v.toFixed(1).replace(".", ","));
 // ---------- Lien séance du club <-> ligne du carnet ----------
 // Une seule ligne de carnet par archer et par séance, à identifiant fixe : les deux écrans lisent et écrivent le même document.
@@ -2348,7 +2379,7 @@ function viewCarnet() {
   const end = S.cSaison, c = getCarnet(a.id, end) || {}, ro = S.canWrite ? "" : "readonly";
   const tabs = [["mois", "Mois"], ["recap", "Récapitulatif"], ["plan", "Objectifs et planning"]];
   let h = `<div class="bar"><button class="btn ghost" data-act="back">← ${esc(fullName(a))}</button><span class="grow"></span>
-      <button class="btn" data-csaison="-1" aria-label="Saison précédente">‹</button><b style="font-family:var(--font-display);font-size:1.15rem">Saison ${end - 1}-${end}</b><button class="btn" data-csaison="1" aria-label="Saison suivante">›</button></div>
+      <button class="btn" data-csaison="-1" aria-label="Saison précédente">‹</button><b style="font-family:var(--font-display);font-size:1.15rem">Saison ${end - 1}-${end}</b><button class="btn" data-csaison="1" aria-label="Saison suivante">›</button>${saisonsArch().includes(saisonKey(end)) ? `<span class="tag" title="Les archers consultent cette saison sans pouvoir la modifier">archivée</span>` : ""}</div>
     <div class="head"><span class="m">Carnet d'entraînement</span><h2>${esc(fullName(a))}</h2></div>
     <div class="chips" role="tablist">${tabs.map(([k, l]) => `<button class="chip" data-ctab="${k}" aria-pressed="${S.cTab === k}">${l}</button>`).join("")}</div>`;
   if (!S.loaded.centrees) return h + `<p class="notice">Chargement du carnet…</p>`;
@@ -3300,7 +3331,7 @@ const AR_MODULES = [["seances", "Mes séances", "Le journal des séances du club
 const AR_PROFILS = { decouverte: ["Découverte", ["seances", "documents", "courte"]], loisir: ["Loisir", ["seances", "carnet", "tir", "impacts", "documents", "chrono"]], competiteur: ["Compétiteur", AR_MODULES.map(([k]) => k).filter((k) => k !== "courte")] };
 const MOD_COURT = { seances: "Séances", carnet: "Carnet", courte: "Fiche courte", tir: "Tir compté", impacts: "Cible", concours: "Concours", documents: "Docs", chrono: "Chrono" };
 // Réglages de l'entraîneur (Paramètres › Espace archers)
-const espaceCfg = () => ({ profils: prm().profils, age: prm().profilAge, defaut: prm().profilDefaut, noms: prm().profilNoms, perso: prm().profilsPerso, regles: prm().reglesAuto, sinon: prm().profilSinon });
+const espaceCfg = () => ({ profils: prm().profils, age: prm().profilAge, defaut: prm().profilDefaut, noms: prm().profilNoms, perso: prm().profilsPerso, regles: prm().reglesAuto, sinon: prm().profilSinon, archives: saisonsArch() });
 const cfgAge = (cfg) => (cfg?.age !== "" && cfg?.age != null && !isNaN(Number(cfg.age)) ? Number(cfg.age) : 12);
 function profilsList(cfg = espaceCfg()) {
   const noms = cfg?.noms || {}, mods = (id, d) => (Array.isArray(cfg?.profils?.[id]) ? cfg.profils[id] : d);
@@ -4385,15 +4416,144 @@ function viewData() {
       <div id="storage"></div>
     </div>
     <h2 class="sec">Carnets d'entraînement</h2>
-    <div class="card">
-      <p style="margin:0;color:var(--muted)">Ajoute aux carnets des archers toutes les séances du club où tu as saisi des tirs ou une note, et recalcule les flèches et scores venant des feuilles de marque. Les lignes déjà présentes ne sont pas dupliquées et ce que tu as écrit dans le carnet est conservé.</p>
-      <div>${S.canWrite ? `<button class="btn" data-act="backfill" id="backfill-btn">Mettre à jour les carnets</button>` : ""}</div>
-      <span class="tirline" id="backfill-msg"></span>
-    </div>`,
+    ${viewCarnetsData()}`,
   };
   return `<div class="head"><span class="m">Réglages du carnet</span><h2>Paramètres</h2></div>
     <div class="seg-mode ptabs" role="tablist" aria-label="Rubriques des paramètres">${PT.map(([k, l]) => `<button role="tab" data-ptab="${k}" aria-pressed="${pt === k}" aria-selected="${pt === k}">${l}</button>`).join("")}</div>
     ${(part[pt] || part.general)()}`;
+}
+// ---------- Paramètres › Données › Carnets d'entraînement : export, saisons, nettoyage, compléter ----------
+let cdCache = null, cdLoading = false, cdClean = null;
+async function loadCarnetsData(force = false) {
+  if (!S.db || cdLoading || (cdCache && !force)) return;
+  cdLoading = true;
+  try { cdCache = (await S.db.collection("carnetEntrees").get()).docs.map((d) => ({ id: d.id, ...d.data() })); } catch (e) { console.error(e); cdCache = []; }
+  cdLoading = false; if (S.tab === "parametres") render();
+}
+const saisonDe = (e) => e.saison || (e.date ? saisonKey(saisonOfDate(e.date)) : "");
+function cdSaisons() {
+  const set = new Set([saisonKey(saisonYear())]);
+  (cdCache || []).forEach((e) => { const k = saisonDe(e); if (k) set.add(k); }); S.carnets.forEach((c) => c.saison && set.add(c.saison));
+  return [...set].sort().reverse();
+}
+function viewCarnetsData() {
+  if (!cdCache) loadCarnetsData();
+  const cur = saisonKey(saisonYear()), arch = saisonsArch(), ss = cdSaisons();
+  const nb = (k) => (cdCache || []).filter((e) => saisonDe(e) === k).length;
+  const cl = cdClean;
+  return `<div class="card"><h3 class="hub-h">Exporter un carnet</h3>
+      <p style="margin:0;color:var(--muted)">Télécharge le carnet d'un archer (ou de tous les archers d'un club) pour une saison : en PDF pour l'imprimer ou le lui donner, ou en tableau pour Excel.</p>
+      <div class="bar"><button class="btn primary" data-act="cd-export">Exporter un carnet…</button></div></div>
+    <div class="card"><h3 class="hub-h">Saisons</h3>
+      <p style="margin:0;color:var(--muted)">La saison change toute seule le 1<sup>er</sup> septembre, comme à la FFTA et à l'UFOLEP. Saison en cours : <b>${cur}</b>. Les saisons passées restent consultables dans chaque carnet avec les flèches ‹ ›.</p>
+      <div class="list">${ss.map((k) => { const a = arch.includes(k), n = cdCache ? nb(k) : null;
+        return `<div class="row"><span class="main"><span class="t">Saison ${k}${k === cur ? ` <span class="tag">en cours</span>` : ""}${a ? ` <span class="tag">archivée</span>` : ""}</span>
+          <span class="m">${n == null ? "…" : n ? `${n} ligne${n > 1 ? "s" : ""} de carnet` : "aucune ligne"}${a ? " · les archers la consultent sans pouvoir la modifier" : ""}</span></span>
+          <button class="btn" data-cd-exp="${k}">Exporter</button>${S.canWrite && k !== cur ? `<button class="btn ${a ? "" : "ghost"}" data-cd-arch="${k}">${a ? "Désarchiver" : "Archiver"}</button>` : ""}</div>`; }).join("")}</div>
+      <span class="tirline">Archiver une saison terminée la met en lecture seule pour les archers : ils gardent tout leur historique mais ne peuvent plus le changer. Toi, tu peux toujours la modifier.</span></div>
+    <div class="card"><h3 class="hub-h">Nettoyer les carnets</h3>
+      <p style="margin:0;color:var(--muted)">Cherche les lignes inutiles : lignes vides, lignes d'une séance ou d'un concours supprimé, lignes d'un archer qui n'existe plus. Une ligne où l'archer ou toi avez écrit quelque chose n'est jamais retirée.</p>
+      ${cl ? `<div class="list">${[["vides", "Lignes vides"], ["seances", "Séances supprimées"], ["concours", "Concours supprimés ou archer retiré"], ["archers", "Archers qui n'existent plus"]].map(([k, l]) => `<div class="row"><span class="main"><span class="t">${l}</span><span class="m">${cl[k].length ? `${cl[k].length} ligne${cl[k].length > 1 ? "s" : ""} à retirer` : "rien à retirer"}</span></span></div>`).join("")}</div>
+        ${cl.gardees ? `<span class="tirline">${cl.gardees} ligne${cl.gardees > 1 ? "s" : ""} d'une séance supprimée ${cl.gardees > 1 ? "sont gardées" : "est gardée"} parce qu'il y a des notes dedans.</span>` : ""}` : ""}
+      <div class="bar">${S.canWrite ? `<button class="btn" data-act="cd-scan">${cl ? "Analyser à nouveau" : "Analyser les carnets"}</button>${cl && cl.total ? `<button class="btn danger" data-act="cd-clean" id="cd-clean">Retirer ${cl.total} ligne${cl.total > 1 ? "s" : ""}</button>` : ""}` : ""}</div></div>
+    <div class="card"><h3 class="hub-h">Compléter les carnets</h3>
+      <p style="margin:0;color:var(--muted)">Normalement, les carnets se remplissent tout seuls quand tu notes une séance. Ce bouton sert à rattraper les oublis : il ajoute aux carnets des archers les séances du club où tu as saisi des tirs ou une note, et recalcule les flèches et les scores venant des feuilles de marque.</p>
+      <p style="margin:0;color:var(--muted)">Rien n'est jamais en double, et ce que l'archer ou toi avez écrit dans le carnet est gardé. Utile après une restauration de sauvegarde ou si une séance manque dans un carnet.</p>
+      <div>${S.canWrite ? `<button class="btn" data-act="backfill" id="backfill-btn">Compléter les carnets</button>` : ""}</div>
+      <span class="tirline" id="backfill-msg"></span></div>`;
+}
+async function cdScan() {
+  await loadCarnetsData(true);
+  const ids = new Set(S.archers.map((a) => a.id)), sids = new Set(S.seances.map((x) => x.id)), r = { vides: [], seances: [], concours: [], archers: [], gardees: 0 };
+  (cdCache || []).forEach((e) => {
+    if (!ids.has(e.archerId)) { r.archers.push(e.id); return; }
+    const id = String(e.id);
+    if (id.startsWith("c_") && e.concoursId) { const c = S.concours.find((x) => x.id === e.concoursId), res = c && (c.resultats || {})[e.archerId];
+      if ((!res || typeof res !== "object") && !e.note && !e.emotion && !String(e.commentaire || "").trim()) r.concours.push(e.id); return; }
+    if (e.seanceId && !sids.has(e.seanceId)) { if (ecritDans(e)) r.gardees++; else r.seances.push(e.id); return; }
+    if (!ecritDans(e, true)) r.vides.push(e.id);
+  });
+  r.total = r.vides.length + r.seances.length + r.concours.length + r.archers.length;
+  cdClean = r; render();
+}
+function cdDoClean() {
+  const r = cdClean; if (!r) return; const all = [...r.vides, ...r.seances, ...r.concours, ...r.archers];
+  all.forEach((id) => remove("carnetEntrees", id));
+  cdCache = (cdCache || []).filter((e) => !all.includes(e.id)); dashCache.at = 0; cdClean = null;
+  toast(`${all.length} ligne${all.length > 1 ? "s" : ""} retirée${all.length > 1 ? "s" : ""} des carnets`); render();
+}
+function formExportCarnet(saison) {
+  const ss = cdSaisons(), arch = S.archers.slice().sort(byName);
+  sheet("Exporter un carnet", `
+    <div class="f">Qui<div class="radio"><label><input type="radio" name="qui" value="un" checked> Un archer</label><label><input type="radio" name="qui" value="club"> Tous les archers d'un club</label></div></div>
+    <div class="grid2"><label class="f" for="ce-a">Archer<select id="ce-a" name="archer">${arch.map((a) => `<option value="${a.id}">${esc(fullName(a))}</option>`).join("")}</select></label>
+      <label class="f" for="ce-c">Club<select id="ce-c" name="club">${S.clubs.map((c) => `<option value="${c.id}">${esc(c.nom)}</option>`).join("")}</select></label></div>
+    <label class="f" for="ce-s">Saison<select id="ce-s" name="saison">${ss.map((k) => `<option value="${k}" ${k === (saison || ss[0]) ? "selected" : ""}>${k}</option>`).join("")}</select></label>
+    <div class="f">Format<div class="radio"><label><input type="radio" name="format" value="pdf" checked> PDF (à imprimer)</label><label><input type="radio" name="format" value="csv"> Tableau pour Excel</label></div></div>
+    <span class="tirline">Pour un club, les archers sont dans l'ordre alphabétique, un par page dans le PDF. Le fichier se télécharge ; ouvre-le ensuite.</span>`, {
+    onSave(fd) {
+      const qui = fd.get("qui"), list = qui === "club" ? arch.filter((a) => (a.clubIds || []).includes(fd.get("club"))) : arch.filter((a) => a.id === fd.get("archer"));
+      if (!list.length) { toast("Aucun archer dans ce club"); return false; }
+      exportCarnets(list, fd.get("saison"), fd.get("format"), qui === "club" ? clubName(fd.get("club")) : "");
+    },
+  });
+  const sb = document.querySelector("#sheet button[type=submit]"); if (sb) sb.textContent = "Télécharger";
+}
+const slugOf = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase();
+async function exportCarnets(archers, saison, format, clubLabel) {
+  toast("Préparation du fichier…");
+  await loadCarnetsData(true);
+  const lines = (aid) => (cdCache || []).filter((e) => e.archerId === aid && saisonDe(e) === saison).sort((x, y) => (x.date || "").localeCompare(y.date || "") || (x.createdAt || 0) - (y.createdAt || 0));
+  const fl = (e) => VOL.map(([k, l]) => [l, volOf(e, k)]).filter(([, v]) => v);
+  const tc = (e) => { const sc = scoreOf(e, "scoreCompte"); return sc == null ? "" : `${sc} pts${e.tcDistance ? ` à ${e.tcDistance} m` : ""}${e.tcBlason ? ` (${e.tcBlason})` : ""}`; };
+  const quoi = (e) => e.objectif || (e.concoursId ? "Concours" : e.seanceId ? "Séance du club" : "Séance");
+  const name = `carnet-${archers.length > 1 ? slugOf(clubLabel || "club") : slugOf(fullName(archers[0]))}-${saison}`;
+  const dl = await claude.use("downloads"); if (!dl) { toast("Téléchargement indisponible sur cet appareil"); return; }
+  let data, filename;
+  if (format === "csv") {
+    const q = (v) => `"${String(v ?? "").replace(/"/g, '""').replace(/\r?\n/g, " ")}"`;
+    const head = ["Archer", "Date", "Objectif", ...VOL.map(([, l]) => `Flèches ${l.toLowerCase()}`), "Total flèches", "Tir compté", "Score compétition", "Objectif atteint", "Ressenti /10", "Émotion", "Commentaire de l'archer", "Mot de l'entraîneur"];
+    const rows = [head]; archers.forEach((a) => lines(a.id).forEach((e) => rows.push([fullName(a), e.date ? dObj(e.date).toLocaleDateString("fr-FR") : "", quoi(e), ...VOL.map(([k]) => volOf(e, k) || ""), entVol(e) || "", scoreOf(e, "scoreCompte") ?? "", scoreOf(e, "scoreCompet") ?? "", e.atteint === "O" ? "Oui" : e.atteint === "N" ? "Non" : "", e.note ?? "", e.emotion || "", e.commentaire || "", e.commentaireCoach || ""])));
+    if (rows.length === 1) { toast("Aucune ligne de carnet pour cette saison"); return; }
+    data = new Blob(["\ufeff" + rows.map((r) => r.map(q).join(";")).join("\r\n")], { type: "text/csv;charset=utf-8" }); filename = name + ".csv";
+  } else {
+    try { await loadPdfLib(); } catch (e) { toast("Impossible de charger l'outil PDF, vérifie la connexion"); return; }
+    const doc = await makePdf(210, 297), W = 210, H = 297, M = 14; let y = 0, any = false;
+    const page = () => { doc.addPage(); y = M; };
+    const need = (h) => { if (y + h > H - M) page(); };
+    archers.forEach((a) => {
+      const L = lines(a.id), end = Number(saison.slice(5)), c = getCarnet(a.id, end) || {}, o = c.objectifs || {}, st = monthStats(L);
+      if (!L.length && !o.processus && !o.classement && !o.score && archers.length > 1) return;
+      any = true; page();
+      doc.setFillColor(...PDF_GREEN); doc.rect(0, 0, W, 4, "F");
+      doc.setTextColor(...PDF_GREY); doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.text(`CARNET D'ENTRAÎNEMENT · SAISON ${saison}`, M, y + 4);
+      doc.setTextColor(...PDF_INK); doc.setFontSize(20); doc.text(fullName(a), M, y + 13); y += 20;
+      doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+      const obj = [["Processus", o.processus], ["Classement", o.classement], ["Score", o.score]].filter(([, v]) => v);
+      if (obj.length) { doc.setFont("helvetica", "bold"); doc.text("Objectifs de la saison", M, y); y += 5; doc.setFont("helvetica", "normal");
+        obj.forEach(([l, v]) => { const t = doc.splitTextToSize(`${l} : ${v}`, W - 2 * M); need(t.length * 4.6); doc.text(t, M, y); y += t.length * 4.6 + 1; }); y += 2; }
+      doc.setFont("helvetica", "bold"); doc.text("Bilan", M, y); y += 5; doc.setFont("helvetica", "normal");
+      const bil = [`${st.total} flèches${st.total ? " (" + VOL.filter(([k]) => st[k]).map(([k, l]) => `${l.toLowerCase()} ${st[k]}`).join(", ") + ")" : ""}`, `${st.n} ligne${st.n > 1 ? "s" : ""} dans le carnet`, st.moyNote != null ? `ressenti moyen ${fmt1(st.moyNote)} / 10` : "", st.bestCompte != null ? `meilleur tir compté ${st.bestCompte} pts` : "", st.bestCompet != null ? `meilleur score en compétition ${st.bestCompet} pts` : ""].filter(Boolean).join(" · ");
+      const bt = doc.splitTextToSize(bil, W - 2 * M); doc.text(bt, M, y); y += bt.length * 4.6 + 4;
+      const cols = [[M, 20, "Date"], [M + 20, 52, "Séance"], [M + 72, 30, "Flèches"], [M + 102, 16, "Ressenti"], [M + 118, W - 2 * M - 118, "Commentaires"]];
+      const headRow = () => { need(9); doc.setFillColor(232, 240, 234); doc.rect(M, y - 4, W - 2 * M, 6.5, "F"); doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); cols.forEach(([x, , l]) => doc.text(l, x + 1, y)); y += 5; doc.setFont("helvetica", "normal"); };
+      if (!L.length) { doc.setTextColor(...PDF_GREY); doc.text("Aucune ligne de carnet pour cette saison.", M, y); doc.setTextColor(...PDF_INK); return; }
+      headRow();
+      L.forEach((e) => {
+        doc.setFontSize(8.5);
+        const cells = [e.date ? dObj(e.date).toLocaleDateString("fr-FR") : "", [quoi(e) === "Tir compté" && tc(e) ? "" : quoi(e), tc(e) ? `Tir compté : ${tc(e)}` : "", scoreOf(e, "scoreCompet") != null ? `Score : ${scoreOf(e, "scoreCompet")} pts` : "", e.atteint === "O" ? "Objectif atteint" : e.atteint === "N" ? "Objectif non atteint" : ""].filter(Boolean).join("\n"),
+          fl(e).map(([l, v]) => `${l} ${v}`).join("\n"), [e.note != null && e.note !== "" ? `${e.note}/10` : "", e.emotion || ""].filter(Boolean).join("\n"),
+          [e.commentaire ? e.commentaire : "", e.commentaireCoach ? `Entraîneur : ${e.commentaireCoach}` : ""].filter(Boolean).join("\n")];
+        const wr = cells.map((t, i) => doc.splitTextToSize(t, cols[i][1] - 2)), h = Math.max(1, ...wr.map((w) => w.length)) * 3.8 + 2.5;
+        if (y + h > H - M) { page(); headRow(); doc.setFontSize(8.5); }
+        wr.forEach((w, i) => doc.text(w, cols[i][0] + 1, y));
+        doc.setDrawColor(210, 218, 212); doc.setLineWidth(0.2); doc.line(M, y + h - 3.6, W - M, y + h - 3.6); y += h;
+      });
+    });
+    if (!any) { toast("Aucun carnet à exporter pour cette saison"); return; }
+    data = await doc.blob(); filename = name + ".pdf";
+  }
+  try { await dl.save({ filename, data }); toast("Carnet exporté : ouvre le fichier téléchargé"); } catch (e) { if (e?.code !== "declined") toast("Téléchargement impossible"); }
 }
 async function backfillCarnets() {
   const btn = $("#backfill-btn"), msg = $("#backfill-msg"); if (btn) btn.disabled = true;
@@ -4412,7 +4572,7 @@ async function backfillCarnets() {
       }
     }
     const txt = added || updated ? `Terminé : ${added} séance${added > 1 ? "s" : ""} ajoutée${added > 1 ? "s" : ""} aux carnets, ${updated} mise${updated > 1 ? "s" : ""} à jour.` : "Les carnets sont déjà à jour.";
-    if ($("#backfill-msg")) $("#backfill-msg").textContent = txt; toast(txt);
+    if ($("#backfill-msg")) $("#backfill-msg").textContent = txt; toast(txt); cdCache = null;
   } catch (e) { console.error(e); toast("La mise à jour a échoué, réessaie"); }
   if ($("#backfill-btn")) $("#backfill-btn").disabled = false;
 }
@@ -4775,7 +4935,7 @@ function formSeance(s = null) {
 
 // ---------- Événements ----------
 document.addEventListener("click", (e) => {
-  const t = e.target.closest("[data-tab],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab],[data-qsort],[data-coptab],[data-com-edit],[data-fmtfed],[data-fmt-del],[data-type-del]");
+  const t = e.target.closest("[data-tab],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab],[data-qsort],[data-coptab],[data-com-edit],[data-fmtfed],[data-fmt-del],[data-type-del],[data-cd-exp],[data-cd-arch]");
   if (!t || t.closest("#sheet")) return;
   if (t.dataset.dashSuivi) { const [sid, aid] = t.dataset.dashSuivi.split("|"); S.seance = sid; S.suivi = aid; S.tirOpen = null; render(); window.scrollTo(0, 0); return; }
   if (t.dataset.tab) { go(t.dataset.tab); try { history.replaceState(null, "", "#" + t.dataset.tab); } catch (_) {} return; }
@@ -4847,6 +5007,11 @@ document.addEventListener("click", (e) => {
   }
   if (t.dataset.attrHere) { const x = S.attributions.find((y) => y.id === t.dataset.attrHere); if (x) { x.seanceId = S.seance; patch("attributions", x.id, { seanceId: S.seance }); render(); toast("Exercice prévu pour cette séance"); } return; }
   if (t.dataset.act === "backfill") { backfillCarnets(); return; }
+  if (t.dataset.act === "cd-export") { formExportCarnet(); return; }
+  if (t.dataset.act === "cd-scan") { cdScan(); return; }
+  if (t.dataset.act === "cd-clean") { if (!t.dataset.ok) { t.dataset.ok = 1; t.textContent = "Confirmer : retirer ces lignes"; return; } cdDoClean(); return; }
+  if (t.dataset.cdExp) { formExportCarnet(t.dataset.cdExp); return; }
+  if (t.dataset.cdArch) { const k = t.dataset.cdArch, a = saisonsArch(), on = !a.includes(k); setParam({ saisonsArchivees: on ? [...a, k].sort() : a.filter((x) => x !== k) }); toast(on ? `Saison ${k} archivée : les archers la consultent sans la modifier` : `Saison ${k} désarchivée`); render(); return; }
   if (t.dataset.combo) { S.combo = t.dataset.combo; render(); return; }
   if (t.dataset.act === "gen-month") { formMonth(); return; }
   if (t.dataset.pf) { S.evalFilter = t.dataset.pf; render(); return; }

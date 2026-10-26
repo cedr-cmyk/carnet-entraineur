@@ -33,7 +33,7 @@ begin
       where owner = p_owner and col = 'evaluations' and data->>'archerId' = p_archer and data->>'partage' = 'true'), '[]'::jsonb),
     -- réglages des profils choisis par l'entraîneur (Paramètres › Espace archers)
     'reglagesEspace', coalesce((select jsonb_build_object('profils', data->'profils', 'age', data->'profilAge', 'defaut', data->'profilDefaut', 'noms', data->'profilNoms',
-        'perso', data->'profilsPerso', 'regles', data->'reglesAuto', 'sinon', data->'profilSinon') from docs
+        'perso', data->'profilsPerso', 'regles', data->'reglesAuto', 'sinon', data->'profilSinon', 'archives', data->'saisonsArchivees') from docs
       where owner = p_owner and col = 'parametres' and id = 'general'), '{}'::jsonb),
     -- séances du club où l'archer a été pointé présent (journal, sans compteur), avec les titres des fiches travaillées
     'seances', coalesce((select jsonb_agg(jsonb_build_object('id', s.id, 'date', s.data->>'date', 'heure', s.data->>'heure', 'groupe', s.data->>'groupe', 'theme', s.data->>'theme',
@@ -86,7 +86,7 @@ end $$;
 
 -- L'archer remplit son carnet ; il peut aussi ouvrir la ligne d'une séance du club où il était présent (identifiant s_<séance>_<archer>)
 create or replace function public.archer_ecrire_entree(p_owner uuid, p_archer text, p_id text, p_data jsonb) returns void language plpgsql security definer set search_path = public as $$
-declare cur jsonb; sd jsonb; sid text; y int; allowed text[] := array['date','saison','objectif','atteint','note','emotion','commentaire','paille','visuel','blason','compte','compet','autre','scoreCompte','scoreCompet','tcDistance','tcBlason','tcTir']; k text; v jsonb := '{}'::jsonb;
+declare cur jsonb; sd jsonb; sid text; y int; sa text; dt text; allowed text[] := array['date','saison','objectif','atteint','note','emotion','commentaire','paille','visuel','blason','compte','compet','autre','scoreCompte','scoreCompet','tcDistance','tcBlason','tcTir']; k text; v jsonb := '{}'::jsonb;
 begin
   if not exists (select 1 from acces where user_id = auth.uid() and owner = p_owner and archer_id = p_archer) then raise exception 'acces refuse'; end if;
   select data into cur from docs where owner = p_owner and col = 'carnetEntrees' and id = p_id;
@@ -105,6 +105,13 @@ begin
     y := left(sd->>'date', 4)::int + case when substr(sd->>'date', 6, 2)::int >= 9 then 1 else 0 end;
     v := v || jsonb_build_object('seanceId', sid, 'date', sd->>'date', 'saison', (y - 1) || '-' || y);
   end if;
+  -- saison archivée par l'entraîneur : consultable, plus modifiable (ni l'ancienne ni la nouvelle saison de la ligne)
+  foreach dt in array array[cur->>'date', v->>'date'] loop
+    if dt ~ '^\d{4}-\d{2}' then
+      y := left(dt, 4)::int + case when substr(dt, 6, 2)::int >= 9 then 1 else 0 end; sa := (y - 1) || '-' || y;
+      if exists (select 1 from docs where owner = p_owner and col = 'parametres' and id = 'general' and jsonb_typeof(data->'saisonsArchivees') = 'array' and data->'saisonsArchivees' ? sa) then raise exception 'saison archivee'; end if;
+    end if;
+  end loop;
   insert into docs (owner, col, id, data, updated_at) values (p_owner, 'carnetEntrees', p_id, coalesce(cur, jsonb_build_object('createdAt', extract(epoch from now()) * 1000)) || v, now())
     on conflict (owner, col, id) do update set data = docs.data || v, updated_at = now();
 end $$;
@@ -116,6 +123,19 @@ create or replace function public.acces_tous() returns jsonb language sql stable
       select archer_id, count(*) n, 0 c from acces where owner = auth.uid() group by archer_id
       union all select archer_id, 0, count(*) from invitations where owner = auth.uid() and used_by is null group by archer_id) z group by archer_id) t), '{}'::jsonb) end
 $$;
+
+-- L'archer supprime une ligne qu'il a créée, sauf dans une saison archivée
+create or replace function public.archer_supprimer_entree(p_owner uuid, p_archer text, p_id text) returns void language plpgsql security definer set search_path = public as $$
+declare dt text; y int;
+begin
+  if not exists (select 1 from acces where user_id = auth.uid() and owner = p_owner and archer_id = p_archer) then raise exception 'acces refuse'; end if;
+  select data->>'date' into dt from docs where owner = p_owner and col = 'carnetEntrees' and id = p_id;
+  if dt ~ '^\d{4}-\d{2}' then
+    y := left(dt, 4)::int + case when substr(dt, 6, 2)::int >= 9 then 1 else 0 end;
+    if exists (select 1 from docs where owner = p_owner and col = 'parametres' and id = 'general' and jsonb_typeof(data->'saisonsArchivees') = 'array' and data->'saisonsArchivees' ? ((y - 1) || '-' || y)) then raise exception 'saison archivee'; end if;
+  end if;
+  delete from docs where owner = p_owner and col = 'carnetEntrees' and id = p_id and id like 'a\_%' and data->>'archerId' = p_archer;
+end $$;
 
 revoke execute on function public.espace_archer(uuid, text), public.archer_avatar(uuid, text, jsonb), public.archer_ecrire_entree(uuid, text, text, jsonb), public.acces_tous() from public, anon;
 grant execute on function public.espace_archer(uuid, text), public.archer_avatar(uuid, text, jsonb), public.archer_ecrire_entree(uuid, text, text, jsonb), public.acces_tous() to authenticated;

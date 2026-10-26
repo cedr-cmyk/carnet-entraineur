@@ -2,6 +2,7 @@
 // telles que les renvoie la base (fonction espace_archer), et remplit son carnet.
 // window.CarnetArcherUI(API, { preview }) : preview = aperçu ouvert par l'entraîneur, en lecture seule.
 window.CarnetArcherUI = (API, opts = {}) => {
+  const API0 = API;
   const PREVIEW = !!opts.preview && !opts.testWrite, TESTW = !!opts.testWrite, BLOB = window.CARNET_BLOB_BASE || "/_blob/";
   const VOL = [["paille", "Paille"], ["visuel", "Visuel"], ["blason", "Blason"], ["compte", "Tir compté"], ["compet", "Compét"], ["autre", "Autre"]];
   const EMOTIONS = ["Fierté", "Satisfaction", "Soulagement", "Espoir", "Tristesse", "Déception", "Honte", "Colère"];
@@ -53,6 +54,12 @@ window.CarnetArcherUI = (API, opts = {}) => {
   const toast = (m) => { const t = $("#toast"); if (!t) return; t.textContent = m; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => (t.hidden = true), 2400); };
 
   const St = { list: API.list, cur: 0, data: null, tab: "accueil", saison: saisonOf(today()), err: "" };
+  // Saisons archivées par l'entraîneur : consultables, plus modifiables (la base refuse aussi)
+  const archivee = (end) => ((St.data?.reglagesEspace || {}).archives || []).includes(`${end - 1}-${end}`);
+  const saisonDeLigne = (id, data = {}) => { const d = data.date || (St.data?.entrees || []).find((x) => x.id === id)?.date || (String(id).startsWith("s_") ? (St.data?.seances || []).find((x) => String(id) === `s_${x.id}_${who().archer_id}`)?.date : ""); return d ? saisonOf(d) : null; };
+  const MSG_ARCH = "cette saison est archivée par ton entraîneur, tu peux la consulter mais plus la modifier";
+  API = { ...API, ecrire: async (w, id, data) => { const end = saisonDeLigne(id, data); if (end && archivee(end)) throw new Error(MSG_ARCH); return API0.ecrire(w, id, data); },
+    supprimer: async (w, id) => { const end = saisonDeLigne(id); if (end && archivee(end)) throw new Error(MSG_ARCH); return API0.supprimer(w, id); } };
   const who = () => St.list[St.cur];
   const name = (a) => `${a.prenom || ""} ${a.nom || ""}`.trim() || "Archer";
 
@@ -189,12 +196,28 @@ window.CarnetArcherUI = (API, opts = {}) => {
     let h = `<div class="bar"><button class="btn" data-saison="-1" aria-label="Saison précédente">‹</button><b>Saison ${end - 1}-${end}</b><button class="btn" data-saison="1" aria-label="Saison suivante">›</button><span class="grow"></span>${TC() ? `<button class="btn" data-act="tc-new">🎯 Tir compté</button>` : ""}${M().has("carnet") ? `<button class="btn primary" data-act="new">+ Noter une séance</button>` : ""}</div>
       <div class="hub-stats"><div class="hub-stat"><div class="hub-stat-top"><span>Flèches de la saison</span></div><b class="c-gold">${all.toLocaleString("fr-FR")}</b><small>${tot.filter(([, v]) => v).map(([l, v]) => `${l} ${v}`).join(" · ") || "aucune pour l'instant"}</small></div>
       <div class="hub-stat"><div class="hub-stat-top"><span>Séances notées</span></div><b class="c-cyan">${list.length}</b><small>ressenti moyen ${moy} / 10</small></div></div>`;
+    if (archivee(end)) h += `<p class="notice">🔒 Saison archivée par ton entraîneur : tu peux tout relire, mais plus rien modifier.</p>`;
     if (o.processus || o.classement || o.score) h += `<div class="card"><h3 class="hub-h">Mes objectifs de la saison</h3>${[["processus", "Processus"], ["classement", "Classement"], ["score", "Score"]].filter(([k]) => o[k]).map(([k, l]) => `<div class="eq-l"><span>${l}</span><b>${esc(o[k])}</b></div>`).join("")}</div>`;
     if (window.CarnetTcProgress && (M().has("tir") || M().has("impacts"))) h += window.CarnetTcProgress(list, St.tcCombo, "data-artc", St.tcPer || "30", "data-artcp", { courbe: M().has("tir"), carte: M().has("impacts") });
     h += list.length ? `<div class="list">${list.map((e) => `<button class="row" data-entry="${esc(e.id)}"><span class="date"><span class="d">${dObj(e.date).getDate()}</span><span class="mo">${dObj(e.date).toLocaleDateString("fr-FR", { month: "short" }).replace(".", "")}</span></span>
       <span class="main"><span class="t">${esc(e.objectif || (e.concoursId ? "Concours" : "Séance"))}</span><span class="m">${[e.concoursId && num(e.scoreCompet) != null ? e.scoreCompet + " pts" : "", !e.concoursId && num(e.scoreCompte) != null ? `tir compté ${e.scoreCompte} pts${e.tcDistance ? " à " + e.tcDistance + " m" : ""}` : "", vol(e) ? vol(e) + " flèches" : "", e.emotion || "", e.seanceId ? "séance du club" : e.concoursId ? "concours" : "noté par moi", e.commentaireCoach ? "💬 mot de l'entraîneur" : ""].filter(Boolean).map(esc).join(" · ")}</span>${e.commentaire ? `<span class="m">${esc(e.commentaire.slice(0, 100))}</span>` : ""}</span>
       <span class="count">${num(e.note) != null ? `${e.note}<small>/10</small>` : ""}</span></button>`).join("")}</div>` : `<p class="notice">Rien de noté cette saison. « Noter une séance » ajoute une ligne à ton carnet : ton entraîneur la verra.</p>`;
     return h;
+  }
+  // Ligne d'une saison archivée : lecture seule
+  function entryRO(e) {
+    const el = $("#sheet"), d = e || {}, fl = VOL.map(([k, l]) => [l, volOf(d, k)]).filter(([, v]) => v), sc = num(d.scoreCompte ?? d.auto?.scoreCompte), sp = num(d.scoreCompet ?? d.auto?.scoreCompet);
+    const li = (l, v) => (v ? `<div class="eq-l"><b>${l}</b> ${esc(v)}</div>` : "");
+    el.innerHTML = `<div class="sheet-bg" data-close><div class="sheet"><h3>${esc(d.objectif || (d.concoursId ? "Concours" : "Ma séance"))}</h3>
+      <p class="notice">🔒 Saison archivée par ton entraîneur : tu peux relire cette séance mais plus la modifier.</p>
+      ${li("Date", d.date ? dObj(d.date).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : "")}
+      ${li("Flèches", fl.map(([l, v]) => `${l} ${v}`).join(" · "))}${li("Tir compté", sc != null ? `${sc} pts${d.tcDistance ? ` à ${d.tcDistance} m` : ""}` : "")}${li("Score du concours", sp != null && d.concoursId ? `${sp} pts` : "")}
+      ${li("Objectif atteint", d.atteint === "O" ? "Oui" : d.atteint === "N" ? "Non" : "")}${li("Ressenti", num(d.note) != null ? `${d.note} / 10` : "")}${li("Émotion", d.emotion)}${li("Mes commentaires", d.commentaire)}
+      ${d.tcTir && window.CarnetCible?.carte ? (() => { try { return window.CarnetCible.carte(d.tcTir); } catch (err) { return ""; } })() : ""}
+      ${d.commentaireCoach ? `<div class="coach-mot"><b>💬 Le mot de ton entraîneur</b><p style="margin:4px 0 0;color:var(--ink)">${esc(d.commentaireCoach)}</p></div>` : ""}
+      ${fl.length || sc != null || d.note || d.commentaire || d.emotion ? "" : `<p class="tirline">Rien n'a été noté pour cette séance.</p>`}
+      <div class="acts"><button type="button" class="btn primary" data-close>Fermer</button></div></div></div>`;
+    el.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", (ev) => { if (ev.target === b) el.innerHTML = ""; }));
   }
   // Ligne de carnet créée par un concours : on montre le concours (résultat, lieu) plutôt qu'un formulaire vide
   function concoursSheet(e) {
@@ -546,6 +569,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     if (t.dataset.seanceAr) {
       const x = (St.data.seances || []).find((y) => y.id === t.dataset.seanceAr); if (!x) return;
       const e = St.data.entrees.find((y) => y.seanceId === x.id);
+      if (archivee(saisonOf(x.date))) { entryRO(e || { date: x.date, objectif: x.theme || "Entraînement" }); return; }
       formEntry(e || { id: `s_${x.id}_${who().archer_id}`, seanceId: x.id, date: x.date, objectif: x.theme || "", __new: true });
       return;
     }
@@ -563,7 +587,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     if (t.dataset.arcombo) { St.combo = t.dataset.arcombo; render(); return; }
     if (t.dataset.who) { St.cur = +t.dataset.who; load(); return; }
     if (t.dataset.saison) { St.saison += +t.dataset.saison; render(); return; }
-    if (t.dataset.entry) { const e = St.data.entrees.find((x) => x.id === t.dataset.entry); if (e?.concoursId) concoursSheet(e); else formEntry(e); return; }
+    if (t.dataset.entry) { const e = St.data.entrees.find((x) => x.id === t.dataset.entry); if (e?.concoursId) concoursSheet(e); else if (e?.date && archivee(saisonOf(e.date))) entryRO(e); else formEntry(e); return; }
     if (t.dataset.act === "new") { formEntry(); return; }
     if (t.dataset.act === "reload") { load(); return; }
     if (t.dataset.act === "add-code") {
