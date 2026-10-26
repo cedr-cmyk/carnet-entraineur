@@ -372,7 +372,8 @@ window.CarnetArcherUI = (API, opts = {}) => {
     draw();
   }
   function formEntry(e = null) {
-    if (e && e.seanceId && !M().has("carnet") && !M().has("tir") && !M().has("impacts")) return formSimple(e);
+    // fiche courte (option des profils) : pour les séances du club et les séances notées par l'archer, pas pour les concours ni les tirs comptés
+    if (M().has("courte") && !e?.concoursId && !(e && e.objectif === "Tir compté" && !e.seanceId)) return formSimple(e || { id: "a_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), date: today(), __new: true });
     const d = e || { date: today() }, el = $("#sheet");
     const lock = e?.concoursId ? "readonly" : "";
     const tcLast = e ? {} : St.data.entrees.filter((x) => x.tcDistance || x.tcBlason).sort((a, b) => (b.date || "").localeCompare(a.date || ""))[0] || {}; // reprend la dernière distance // flèches et score d'un concours : saisis par l'entraîneur

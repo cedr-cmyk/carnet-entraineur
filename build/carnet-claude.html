@@ -1022,7 +1022,8 @@ window.CarnetArcherUI = (API, opts = {}) => {
     draw();
   }
   function formEntry(e = null) {
-    if (e && e.seanceId && !M().has("carnet") && !M().has("tir") && !M().has("impacts")) return formSimple(e);
+    // fiche courte (option des profils) : pour les séances du club et les séances notées par l'archer, pas pour les concours ni les tirs comptés
+    if (M().has("courte") && !e?.concoursId && !(e && e.objectif === "Tir compté" && !e.seanceId)) return formSimple(e || { id: "a_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), date: today(), __new: true });
     const d = e || { date: today() }, el = $("#sheet");
     const lock = e?.concoursId ? "readonly" : "";
     const tcLast = e ? {} : St.data.entrees.filter((x) => x.tcDistance || x.tcBlason).sort((a, b) => (b.date || "").localeCompare(a.date || ""))[0] || {}; // reprend la dernière distance // flèches et score d'un concours : saisis par l'entraîneur
@@ -3219,8 +3220,9 @@ document.addEventListener("click", (e) => {
 // ---------- Ce que l'archer voit dans son espace : profils simples pour ne pas perdre les plus jeunes ----------
 const AR_MODULES = [["seances", "Mes séances", "Le journal des séances du club où il était présent"], ["carnet", "Mon carnet", "Noter ses séances, ses flèches et son ressenti"],
   ["tir", "Tir compté et courbe", "Noter son score de tir compté et suivre sa courbe de progression"], ["impacts", "Cible et « où vont les flèches »", "Placer ses flèches sur la cible volée par volée, et voir sa tendance"],
-  ["concours", "Mes concours", "Résultats, courbe des scores, classements PDF"], ["documents", "Documents", "Documents du club et fiches d'exercices"], ["chrono", "Chrono", "Le chrono d'entraînement"]];
-const AR_PROFILS = { decouverte: ["Découverte", ["seances", "documents"]], loisir: ["Loisir", ["seances", "carnet", "tir", "impacts", "documents", "chrono"]], competiteur: ["Compétiteur", AR_MODULES.map(([k]) => k)] };
+  ["concours", "Mes concours", "Résultats, courbe des scores, classements PDF"], ["documents", "Documents", "Documents du club et fiches d'exercices"], ["chrono", "Chrono", "Le chrono d'entraînement"],
+  ["courte", "Fiche de séance courte", "Smileys et « qu'as-tu appris aujourd'hui ? » à la place de la fiche complète"]];
+const AR_PROFILS = { decouverte: ["Découverte", ["seances", "documents", "courte"]], loisir: ["Loisir", ["seances", "carnet", "tir", "impacts", "documents", "chrono"]], competiteur: ["Compétiteur", AR_MODULES.map(([k]) => k)] };
 // profil « auto » : jeunes jusqu'à 12 ans dans la saison → Découverte ; archer avec un résultat en concours → Compétiteur ; sinon Loisir
 // Réglages de l'entraîneur (Paramètres › Espace archers) : parties de chaque profil, âge limite de Découverte, profil par défaut
 const espaceCfg = () => ({ profils: prm().profils, age: prm().profilAge, defaut: prm().profilDefaut });
