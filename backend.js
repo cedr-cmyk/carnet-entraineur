@@ -13,6 +13,29 @@
   const clone = (o) => JSON.parse(JSON.stringify(o ?? null));
   const merge = (a, b) => { const o = { ...(a || {}) }; Object.entries(b || {}).forEach(([k, v]) => { o[k] = v && typeof v === "object" && !Array.isArray(v) && o[k] && typeof o[k] === "object" && !Array.isArray(o[k]) ? merge(o[k], v) : v; }); return o; };
 
+  // ---------- Hors connexion (V.1.7.1) ----------
+  // Une réponse du serveur qui ne vient pas = pas de réseau : l'appli démarre quand même sur la copie gardée sur l'appareil.
+  const withTimeout = (p, ms = 6000) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(Object.assign(new Error("pas de réseau"), { code: "timeout" })), ms))]);
+  const netErr = (e) => !navigator.onLine || e?.code === "timeout" || /fetch|network|réseau|load failed/i.test(e?.message || "");
+  let bandeau = null;
+  async function horsLigne(on, qui = "coach") {
+    await domReady();
+    if (!on) { if (bandeau) { bandeau.remove(); bandeau = null; } return; }
+    if (!bandeau) {
+      bandeau = document.createElement("div"); bandeau.id = "hors-ligne"; bandeau.setAttribute("role", "status");
+      bandeau.style.cssText = "position:sticky;top:0;z-index:60;display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;padding:8px 14px;background:#78350F;color:#fff;font:600 .9rem/1.3 system-ui,sans-serif;text-align:center";
+      document.body.prepend(bandeau);
+    }
+    bandeau.innerHTML = `<span>📴 Hors connexion : ${qui === "archer" ? "tu vois tes dernières données gardées sur ce téléphone. Pour noter une séance, il faut le réseau." : "tu travailles sur la copie gardée sur cet appareil. Tes modifications partiront dès que le réseau revient."}</span>${qui === "archer" ? `<button type="button" style="font:inherit;padding:4px 12px;border-radius:999px;border:1px solid #fff;background:transparent;color:#fff">Réessayer</button>` : ""}`;
+    bandeau.querySelector("button")?.addEventListener("click", () => location.reload());
+  }
+  async function besoinReseau(msg) {
+    await domReady();
+    document.body.innerHTML = `<div style="max-width:420px;margin:40px auto;padding:20px;font:1rem/1.5 system-ui,sans-serif;color:#E5E7EB;text-align:center"><p style="font-size:2rem;margin:0">📴</p><p>${msg}</p><button type="button" onclick="location.reload()" style="font:inherit;font-weight:700;padding:10px 20px;border-radius:999px;border:0;background:#F59E0B;color:#111">Réessayer</button></div>`;
+    document.body.style.background = "#0B0F19";
+    return new Promise(() => {});
+  }
+
   // ---------- Écran de connexion ----------
   let session = null;
   const domReady = () => new Promise((r) => (document.body ? r() : document.addEventListener("DOMContentLoaded", r, { once: true })));
@@ -42,10 +65,13 @@
     });
   }
   async function ensureSession() {
-    const { data } = await sb.auth.getSession();
-    if (data.session) return data.session;
     const cached = ls.get("uid", null);
-    if (cached && !navigator.onLine) return { user: { id: cached }, offline: true };
+    let r = null;
+    try { r = await withTimeout(sb.auth.getSession(), 4000); } catch (e) { if (cached) return { user: { id: cached }, offline: true }; }
+    if (r?.data?.session) return r.data.session;
+    // session gardée mais impossible à renouveler faute de réseau : on reste sur l'appareil
+    if (cached && (!navigator.onLine || (r?.error && netErr(r.error)))) return { user: { id: cached }, offline: true };
+    if (!navigator.onLine) return besoinReseau("Pas de réseau. La première connexion au carnet a besoin d'internet.");
     return loginScreen();
   }
 
@@ -82,7 +108,8 @@
     cache[col] = cache[col] || {};
     if (op === "del") delete cache[col][id]; else cache[col][id] = data;
     pending[col + "|" + id] = { op, data }; persist(); notify(col);
-    return flush().catch(() => {});
+    flush().catch(() => {}); // enregistré sur l'appareil tout de suite ; l'envoi au serveur suit quand il peut
+    return Promise.resolve();
   }
   async function pull() {
     const all = []; let from = 0;
@@ -103,7 +130,16 @@
       persist(); notify(row.col);
     }).subscribe();
   }
-  window.addEventListener("online", () => { flush().then(pull).catch(console.error); });
+  let rtOn = false;
+  const startRealtime = () => { if (!rtOn) { rtOn = true; realtime(); } };
+  async function reconnect() {
+    if (ls.get("coach", true) === false) return; // espace archer : bouton « Réessayer »
+    try {
+      if (!session || session.offline) { const r = await withTimeout(sb.auth.getSession(), 5000); if (!r?.data?.session) return; session = r.data.session; sb.auth.onAuthStateChange((_e, s) => { if (s) { session = s; tellSW(); } }); tellSW(); }
+      await withTimeout(flush(), 10000); await withTimeout(pull(), 10000); startRealtime(); horsLigne(false);
+    } catch (e) { console.warn("toujours hors connexion", e); }
+  }
+  window.addEventListener("online", () => { reconnect(); });
   window.addEventListener("offline", () => { online = false; });
 
   function collection(col, filters = []) {
@@ -192,9 +228,12 @@
       });
     });
   }
-  async function archerMode() {
-    let list = await rpc("mes_acces");
-    if (!list.length) { await codeScreen(); list = await rpc("mes_acces"); }
+  async function archerMode(net = true) {
+    let list = null;
+    if (net) { try { list = await withTimeout(rpc("mes_acces")); ls.set("ar-acces", list); } catch (e) { if (!netErr(e)) throw e; } }
+    if (!list) list = ls.get("ar-acces", null);
+    if (!list || (!list.length && !net)) return besoinReseau("Pas de réseau. Ton espace archer a besoin d'internet la première fois ; ensuite il reste consultable sans réseau.");
+    if (!list.length) { await codeScreen(); list = await rpc("mes_acces"); ls.set("ar-acces", list); }
     await domReady();
     window.carnetArcherAPI = {
       list,
@@ -206,6 +245,15 @@
       ajouterCode: async (code) => { await rpc("utiliser_invitation", { p_code: code }); return rpc("mes_acces"); },
       deconnexion: () => window.carnetLogout(),
     };
+    // V.1.7.1 : l'espace archer est gardé sur le téléphone pour être consulté sans réseau ; les envois disent clairement quand le réseau manque
+    const API = window.carnetArcherAPI, envoi = (f) => async (...a) => { try { return await withTimeout(f(...a), 12000); } catch (e) { throw netErr(e) ? new Error("pas de réseau, réessaie quand tu auras internet") : e; } };
+    const lire = API.charger;
+    API.charger = async (a) => {
+      const k = `ar-espace:${a.owner}:${a.archer_id}`;
+      try { const d = await withTimeout(lire(a), net ? 8000 : 2500); ls.set(k, d); horsLigne(false); return d; }
+      catch (e) { const d = ls.get(k, null); if (d) { horsLigne(true, "archer"); return d; } throw netErr(e) ? new Error("Pas de réseau. Ouvre ton espace une fois avec internet : il sera ensuite gardé sur ce téléphone.") : e; }
+    };
+    ["ecrire", "supprimer", "repondre", "ajouterCode"].forEach((n) => { if (API[n]) API[n] = envoi(API[n]); });
     window.CarnetArcherUI(window.carnetArcherAPI);
     return new Promise(() => {}); // l'application de l'entraîneur ne démarre pas
   }
@@ -214,16 +262,21 @@
   const ready = (async () => {
     session = await ensureSession();
     ls.set("uid", session.user.id);
-    if (!session.offline) {
-      let coach = ls.get("coach", null);
-      try { coach = await rpc("est_coach"); ls.set("coach", coach); } catch (e) { console.warn(e); }
-      if (coach === false) { sb.auth.onAuthStateChange((_e, s) => { if (s) { session = s; tellSW(); } }); return archerMode(); }
-    } else if (ls.get("coach", true) === false) { await domReady(); document.body.innerHTML = '<p class="notice" style="margin:20px">Ton espace archer a besoin d\'une connexion internet.</p>'; return new Promise(() => {}); }
+    let coach = ls.get("coach", null), net = !session.offline;
+    if (net) {
+      try { coach = await withTimeout(rpc("est_coach"), 4000); ls.set("coach", coach); } catch (e) { console.warn(e); if (netErr(e)) net = false; }
+    }
+    if (coach === null && !net) return besoinReseau("Pas de réseau. La première ouverture du carnet a besoin d'internet.");
+    if (coach === false) { if (!session.offline) sb.auth.onAuthStateChange((_e, s) => { if (s) { session = s; tellSW(); } }); return archerMode(net); }
     if (!session.offline) {
       sb.auth.onAuthStateChange((_e, s) => { if (s) { session = s; tellSW(); } });
       tellSW();
-      try { await flush(); await pull(); realtime(); } catch (e) { console.warn("hors connexion : copie locale", e); online = false; }
     }
+    if (net) {
+      // on attend la mise à jour quelques secondes au plus ; si elle traîne, elle continue en arrière-plan
+      try { await withTimeout(flush(), 8000); await withTimeout(pull(), 8000); startRealtime(); }
+      catch (e) { console.warn("hors connexion : copie locale", e); online = false; horsLigne(true); pull().then(() => { startRealtime(); horsLigne(false); }).catch(() => {}); }
+    } else horsLigne(true);
   })();
   window.carnetLogout = async () => { try { await flush(); } catch (e) {} if (Object.keys(pending).length && !confirm("Des modifications ne sont pas encore envoyées (pas de réseau). Se déconnecter quand même ?")) return; await sb.auth.signOut(); ["cache", "uid", "coach", "pending"].forEach((k) => localStorage.removeItem(LSK(k))); location.reload(); };
   window.claude = {
