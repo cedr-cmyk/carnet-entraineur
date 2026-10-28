@@ -874,15 +874,22 @@ function startHere() {
 }
 
 // ---------- Séances ----------
+// V.1.7.2 : même compte partout. « pointés » = cochés par l'entraîneur pendant la séance (dès qu'il y en a, c'est eux qu'on montre) ;
+// avant, pour une séance proposée : « viennent » = réponses des archers
+function seanceCompte(s, abs = false) {
+  const n = (s.presents || []).length, rs = s.public ? repsOf(s.id) : [], vien = rs.filter((r) => r.reponse === "present").length, ab = rs.filter((r) => r.reponse === "absent").length;
+  if (n) return `${n}<small> pointé${n > 1 ? "s" : ""}</small>`;
+  if (s.public && s.date >= todayISO()) return vien || ab ? `<span class="c-green">${vien}</span><small> ${vien > 1 ? "viennent" : "vient"}${abs && ab ? ` · ${ab} absent${ab > 1 ? "s" : ""}` : ""}</small>` : `<small>aucune réponse</small>`;
+  return s.date < todayISO() ? `0<small> pointé</small>` : `<small>à venir</small>`;
+}
 function seanceRow(s) {
-  const d = dObj(s.date), n = (s.presents || []).length;
-  const inscrits = S.archers.filter((a) => (a.clubIds || []).includes(s.clubId) && a.actif !== false).length;
+  const d = dObj(s.date), compte = seanceCompte(s);
   return `<button class="row club-edge" data-seance="${s.id}" style="--club:${esc(clubColor(s.clubId))}">
     <span class="date"><span class="d">${d.getDate()}</span><span class="mo">${d.toLocaleDateString("fr-FR", { month: "short" }).replace(".", "")}</span></span>
     <span class="main"><span class="t">${esc(s.theme || "Entraînement")} ${s.date === todayISO() ? '<span class="tag today">Aujourd\'hui</span>' : ""}</span>
       <span class="m" style="display:flex;gap:6px;align-items:center"><span class="dot" style="background:${esc(clubColor(s.clubId))}"></span>${esc(clubName(s.clubId))}${s.heure ? " · " + esc(s.heure) : ""}${s.groupe ? " · " + esc(s.groupe) : ""}${s.lieu ? " · " + esc(s.lieu) : ""}</span>
       ${s.periodeId && folderName(s.periodeId) || (s.exercices || []).length ? `<span class="tirline">${esc([folderName(s.periodeId), (s.exercices || []).length ? `${s.exercices.length} fiche${s.exercices.length > 1 ? "s" : ""}` : ""].filter(Boolean).join(" · "))}</span>` : ""}</span>
-    <span class="count">${n}<small> / ${inscrits}</small></span>
+    <span class="count">${compte}</span>
   </button>`;
 }
 function viewSeances() {
@@ -2966,11 +2973,11 @@ function reponsesBlock(s) {
   const nm = (a) => esc(fullName(a)) + (roleOf(a) === "encadrant" ? " <small>(encadrant)</small>" : "");
   const manque = pres.filter((a) => !(s.presents || []).includes(a.id));
   return `<div class="card rep-card"><div class="hub-bar"><h3 class="hub-h">Réponses des archers</h3></div>
-    <div class="rep-cols"><div><b class="c-green">${pres.length} présent${pres.length > 1 ? "s" : ""} annoncé${pres.length > 1 ? "s" : ""}</b><span>${pres.map(nm).join(", ") || "—"}</span></div>
+    <div class="rep-cols"><div><b class="c-green">${pres.length} ${pres.length > 1 ? "viennent" : "vient"}</b><span>${pres.map(nm).join(", ") || "—"}</span></div>
       <div><b class="c-red">${abs.length} absent${abs.length > 1 ? "s" : ""}</b><span>${abs.map(nm).join(", ") || "—"}</span></div></div>
     ${sans.length ? `<details><summary class="tirline">${sans.length} sans réponse</summary><span class="tirline">${sans.map(nm).join(", ")}</span></details>` : ""}
-    ${S.canWrite && manque.length ? `<div><button class="btn" data-act="rep-cocher">${manque.length > 1 ? `Cocher les ${manque.length} présents annoncés` : "Cocher le présent annoncé"}</button></div>` : ""}
-    <span class="tirline">Les archers répondent depuis leur espace. Les encadrants y voient aussi la liste des présents.</span></div>`;
+    ${S.canWrite && manque.length ? `<div><button class="btn" data-act="rep-cocher">${manque.length > 1 ? `Pointer les ${manque.length} qui ont dit « je viens »` : "Pointer celui qui a dit « je viens »"}</button></div>` : ""}
+    <span class="tirline">« Viennent » = les réponses des archers depuis leur espace (les encadrants y voient aussi la liste). « Pointés » = ceux que tu coches pendant la séance.</span></div>`;
 }
 function espaceArchersCard(inC) {
   const today = todayISO();
@@ -2987,10 +2994,10 @@ function espaceArchersCard(inC) {
         ${S.canWrite ? `<button class="btn ghost" data-partage="${d.id}">Modifier</button>` : ""}</div>`).join("")}</div>`
         : `<p class="notice">Calendrier des concours, règlement intérieur, fiche d'inscription… Les documents partagés sont visibles par tous les archers des clubs choisis, dans l'onglet « Documents » de leur espace.</p>`}</div>
     <div class="card"><div class="hub-bar"><h3 class="hub-h">Entraînements proposés</h3><button class="btn ghost" data-tab="seances">Séances</button></div>
-      ${prop.length ? `<div class="list">${prop.map((s) => { const rs = repsOf(s.id), p = rs.filter((r) => r.reponse === "present").length, ab = rs.filter((r) => r.reponse === "absent").length;
+      ${prop.length ? `<div class="list">${prop.map((s) => {
         return `<button class="row club-edge" data-seance="${s.id}" style="--club:${esc(clubColor(s.clubId))}"><span class="date"><span class="d">${dObj(s.date).getDate()}</span><span class="mo">${dObj(s.date).toLocaleDateString("fr-FR", { month: "short" }).replace(".", "")}</span></span>
           <span class="main"><span class="t">${esc(s.theme || s.groupe || "Entraînement")}</span><span class="m">${esc([clubName(s.clubId), s.heure, pubLab(s.public)].filter(Boolean).join(" · "))}</span></span>
-          <span class="count"><span class="c-green">${p}</span><small> présent${p > 1 ? "s" : ""}${ab ? ` · ${ab} abs.` : ""}</small></span></button>`; }).join("")}</div>`
+          <span class="count">${seanceCompte(s, true)}</span></button>`; }).join("")}</div>`
         : `<p class="notice">Aucun entraînement proposé. Dans une séance (ou en créant les séances du mois), choisis « Proposée aux » adultes, jeunes ou les deux : les archers concernés pourront dire s'ils viennent.</p>`}</div>
   </div>`;
 }
