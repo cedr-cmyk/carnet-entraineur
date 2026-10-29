@@ -1001,7 +1001,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
   }
   function cibleSheet(init, onDone) {
     const C = window.CarnetCible;
-    const T = init.prev ? JSON.parse(JSON.stringify(init.prev)) : { distance: init.distance, blason: init.blason || "Trispot 40 cm CL", fpv: 3, nbVolees: 10, volees: [], impacts: [] };
+    const T = init.prev ? JSON.parse(JSON.stringify(init.prev)) : { distance: init.distance, blason: init.blason || "Trispot 40 cm CL", fpv: init.fpv || 3, nbVolees: init.nbVolees || 10, volees: [], impacts: [] };
     T.distance = init.distance || T.distance; if (init.blason) T.blason = init.blason;
     const layer = document.createElement("div"); layer.className = "sheet-bg ar-tgt-layer"; document.body.appendChild(layer);
     const total = () => T.volees.flat().reduce((a, k) => a + kv(k), 0), shot = () => T.volees.flat().length, plan = () => T.fpv * T.nbVolees;
@@ -1062,13 +1062,26 @@ window.CarnetArcherUI = (API, opts = {}) => {
     draw();
   }
   // Accès direct : tir sur la cible → ligne « Tir compté » du jour dans le carnet → bilan
+  // Valeurs d'un nouveau tir compté : réglage de l'archer (Paramètres), puis son dernier tir compté, puis les valeurs proposées par l'entraîneur pour sa fédération
+  function tirDefaut() {
+    const P = prefs(), last = St.data.entrees.filter((x) => x.tcDistance || x.tcBlason).sort((a, b) => (b.date || "").localeCompare(a.date || ""))[0] || {};
+    const lastT = St.data.entrees.filter((x) => x.tcTir && x.tcTir.fpv).sort((a, b) => (b.date || "").localeCompare(a.date || ""))[0]?.tcTir || null;
+    const cfg = (St.data.reglagesEspace || {}).tir || {}, fed = (St.data.archer?.federations || [])[0] || "FFTA";
+    const clean = (o) => Object.fromEntries(Object.entries(o || {}).filter(([, v]) => v !== null && v !== undefined && v !== ""));
+    const q = { distance: 18, blason: "40 cm", fpv: 3, nbVolees: "", ...(fed === "FFTA" ? clean(cfg.base) : {}), ...clean((cfg.fed || {})[fed]) };
+    const dl = String(q.distances || "").split(/[,;\s]+/).map(Number).filter((n) => n > 0 && n <= 200);
+    const fpv = Number(lastT?.fpv || q.fpv) || 3;
+    return { distance: String(P.tcDistance || last.tcDistance || q.distance || 18), blason: P.tcBlason || last.tcBlason || q.blason || "",
+      fpv, nbVolees: Number(lastT?.nbVolees || q.nbVolees) || (fpv >= 6 ? 6 : 10),
+      distances: dl.length ? [...new Set(dl)].sort((a, b) => a - b) : (window.CarnetDistances ? window.CarnetDistances() : [10, 18, 20, 30, 50, 70]) };
+  }
   function tirDirect() { if (!M().has("impacts")) return tirSimple(); return tirCible(); }
   // Tir compté sans cible : distance, blason, flèches et score, puis la moyenne et la comparaison avec le tir précédent
   function tirSimple() {
-    const P = prefs(), last = St.data.entrees.filter((x) => x.tcDistance || x.tcBlason).sort((a, b) => (b.date || "").localeCompare(a.date || ""))[0] || {}, el = $("#sheet");
+    const D = tirDefaut(), el = $("#sheet");
     el.innerHTML = `<div class="sheet-bg" data-close><form class="sheet" id="tc-form"><h3>Nouveau tir compté</h3>
-      <div class="grid2"><label class="f">Date<input type="date" name="date" required value="${today()}"></label><label class="f">Distance (m)<input type="number" inputmode="numeric" min="0" name="tcDistance" value="${esc(P.tcDistance || last.tcDistance || "18")}"></label></div>
-      <label class="f">Blason<select name="tcBlason"><option value="">—</option>${window.CarnetBlasonOpts ? window.CarnetBlasonOpts(P.tcBlason || last.tcBlason || "") : ""}</select></label>
+      <div class="grid2"><label class="f">Date<input type="date" name="date" required value="${today()}"></label><label class="f">Distance (m)<input type="number" inputmode="numeric" min="0" name="tcDistance" list="ts-dl" value="${esc(D.distance)}"><datalist id="ts-dl">${D.distances.map((x) => `<option value="${x}">`).join("")}</datalist></label></div>
+      <label class="f">Blason<select name="tcBlason"><option value="">—</option>${window.CarnetBlasonOpts ? window.CarnetBlasonOpts(D.blason) : ""}</select></label>
       <div class="grid2"><label class="f">Nombre de flèches<input type="number" inputmode="numeric" min="1" name="compte" id="ts-n" required placeholder="ex. 30"></label><label class="f">Score<input type="number" inputmode="numeric" min="0" name="scoreCompte" id="ts-s" required></label></div>
       <span class="tirline" id="ts-m"></span>
       <div class="acts"><button type="button" class="btn" data-close>Annuler</button><button class="btn primary">Enregistrer</button></div></form></div>`;
@@ -1090,9 +1103,8 @@ window.CarnetArcherUI = (API, opts = {}) => {
     });
   }
   function tirCible() {
-    const last = St.data.entrees.filter((x) => x.tcDistance || x.tcBlason).sort((a, b) => (b.date || "").localeCompare(a.date || ""))[0] || {};
-    const P = prefs();
-    cibleSheet({ distance: P.tcDistance || last.tcDistance || "18", blason: P.tcBlason || last.tcBlason || "" }, async (t) => {
+    const D = tirDefaut();
+    cibleSheet({ distance: D.distance, blason: D.blason, fpv: D.fpv, nbVolees: D.nbVolees }, async (t) => {
       const fl = t.volees.flat(); if (!fl.length) return;
       const sc = fl.reduce((a, k) => a + kv(k), 0), date = today();
       const data = { date, saison: `${saisonOf(date) - 1}-${saisonOf(date)}`, objectif: "Tir compté", tcDistance: String(t.distance || ""), tcBlason: t.blason || "", compte: String(fl.length), scoreCompte: String(sc), tcTir: t };
@@ -1138,7 +1150,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     if (courte && !hyb) return formSimple(e || { id: "a_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), date: today(), __new: true });
     const d = e || { date: today() }, el = $("#sheet");
     const lock = e?.concoursId ? "readonly" : "";
-    const tcLast = e ? {} : St.data.entrees.filter((x) => x.tcDistance || x.tcBlason).sort((a, b) => (b.date || "").localeCompare(a.date || ""))[0] || {}; // reprend la dernière distance // flèches et score d'un concours : saisis par l'entraîneur
+    const tcD = tirDefaut(), tcLast = e ? {} : { tcDistance: tcD.distance, tcBlason: tcD.blason }; // reprend la dernière distance // flèches et score d'un concours : saisis par l'entraîneur
     el.innerHTML = `<div class="sheet-bg" data-close><form class="sheet" id="ar-form"><h3>${e?.__new ? "Ma séance du " + esc(dObj(e.date).toLocaleDateString("fr-FR")) : e ? "Ma séance" : "Noter une séance"}</h3>
       <div class="grid2"><label class="f">Date<input type="date" name="date" required value="${esc(d.date)}" ${e?.seanceId || e?.concoursId ? "readonly" : ""}></label><label class="f">Objectif<input type="text" name="objectif" value="${esc(d.objectif)}"></label></div>
       ${hyb ? `<div class="f">Comment ça s'est passé ?<div class="hum" role="group" aria-label="Mon ressenti">${HUMEURS.map(([v, ic, l]) => `<button type="button" class="hum-b" data-humf="${v}" aria-pressed="${num(d.note) != null && HUMEURS.reduce((m, h) => (Math.abs(h[0] - d.note) < Math.abs(m[0] - d.note) ? h : m), HUMEURS[0])[0] === v}"><span aria-hidden="true">${ic}</span><small>${l}</small></button>`).join("")}</div><input type="hidden" name="note" id="ar-note" value="${esc(d.note ?? "")}"></div>
@@ -1148,7 +1160,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
       ${e?.concoursId ? `<input type="hidden" name="scoreCompte" value="${esc(d.scoreCompte)}"><label class="f">Score du concours<input type="number" name="scoreCompet" value="${esc(d.scoreCompet)}" readonly></label>`
       : !TC() ? `<input type="hidden" name="scoreCompte" value="${esc(d.scoreCompte)}"><input type="hidden" name="tcDistance" value="${esc(d.tcDistance ?? "")}"><input type="hidden" name="tcBlason" value="${esc(d.tcBlason ?? "")}"><input type="hidden" name="compte" value="${esc(d.compte ?? "")}"><input type="hidden" name="scoreCompet" value="${esc(d.scoreCompet)}"><input type="hidden" name="tcTir" value="${esc(d.tcTir ? JSON.stringify(d.tcTir) : "")}">`
       : `<div class="f ar-tc"><b>Mon tir compté</b><span class="tirline">Note ton score pour suivre ta progression (courbe dans « Mon carnet »).</span>
-        <div class="grid4"><label class="f" style="font-weight:500">Distance (m)<input type="number" inputmode="numeric" min="0" name="tcDistance" list="ar-dl" value="${esc(d.tcDistance ?? tcLast.tcDistance ?? "")}" placeholder="${esc(d.auto?.tcDistance ?? "")}"><datalist id="ar-dl">${(window.CarnetDistances ? window.CarnetDistances() : [10, 18, 20, 30, 50, 70]).map((x) => `<option value="${x}">`).join("")}</datalist></label>
+        <div class="grid4"><label class="f" style="font-weight:500">Distance (m)<input type="number" inputmode="numeric" min="0" name="tcDistance" list="ar-dl" value="${esc(d.tcDistance ?? tcLast.tcDistance ?? "")}" placeholder="${esc(d.auto?.tcDistance ?? "")}"><datalist id="ar-dl">${tcD.distances.map((x) => `<option value="${x}">`).join("")}</datalist></label>
           <label class="f" style="font-weight:500">Blason<select name="tcBlason"><option value="">—</option>${window.CarnetBlasonOpts ? window.CarnetBlasonOpts(d.tcBlason ?? tcLast.tcBlason ?? "") : ""}</select></label>
           <label class="f" style="font-weight:500">Flèches<input type="number" inputmode="numeric" min="0" name="compte" id="ar-tcn" value="${esc(d.compte)}" placeholder="${d.auto?.compte ? "+" + d.auto.compte : "ex. 30"}"></label>
           <label class="f" style="font-weight:500">Score<input type="number" inputmode="numeric" min="0" name="scoreCompte" id="ar-tcs" value="${esc(d.scoreCompte)}" placeholder="${esc(d.auto?.scoreCompte ?? "")}"></label></div>
@@ -1169,7 +1181,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     $("#ar-tcn")?.addEventListener("input", tcm); $("#ar-tcs")?.addEventListener("input", tcm); tcm();
     $("#ar-cible")?.addEventListener("click", () => {
       const f = $("#ar-form"); let prev = null; try { prev = f.tcTir.value ? JSON.parse(f.tcTir.value) : null; } catch (err) { prev = null; }
-      cibleSheet({ id: e?.id, distance: f.tcDistance.value || prev?.distance || "18", blason: f.tcBlason.value || prev?.blason || "", prev }, (t) => {
+      cibleSheet({ id: e?.id, distance: f.tcDistance.value || prev?.distance || tcD.distance, blason: f.tcBlason.value || prev?.blason || "", fpv: tcD.fpv, nbVolees: tcD.nbVolees, prev }, (t) => {
         const sc = t.volees.flat().reduce((a, k) => a + kv(k), 0), n = t.volees.flat().length;
         f.tcDistance.value = t.distance; f.tcBlason.value = t.blason; f.compte.value = n || ""; f.scoreCompte.value = n ? sc : ""; f.tcTir.value = n ? JSON.stringify(t) : "";
         $("#ar-cible").textContent = n ? "🎯 Voir / modifier mon tir sur la cible" : "🎯 Saisir mon tir sur la cible"; tcm();
@@ -3429,7 +3441,9 @@ const AR_MODULES = [["seances", "Mes séances", "Le journal des séances du club
 const AR_PROFILS = { decouverte: ["Découverte", ["seances", "documents", "courte"]], loisir: ["Loisir", ["seances", "carnet", "tir", "impacts", "documents", "chrono"]], competiteur: ["Compétiteur", AR_MODULES.map(([k]) => k).filter((k) => k !== "courte")] };
 const MOD_COURT = { seances: "Séances", carnet: "Carnet", courte: "Fiche courte", tir: "Tir compté", impacts: "Cible", concours: "Concours", documents: "Docs", chrono: "Chrono" };
 // Réglages de l'entraîneur (Paramètres › Espace archers)
-const espaceCfg = () => ({ profils: prm().profils, age: prm().profilAge, defaut: prm().profilDefaut, noms: prm().profilNoms, perso: prm().profilsPerso, regles: prm().reglesAuto, sinon: prm().profilSinon, archives: saisonsArch(), fetes: prm().fetesArchers === false ? null : prm().fetes || null, fetesMessage: prm().fetesMessage !== false });
+const espaceCfg = () => ({ profils: prm().profils, age: prm().profilAge, defaut: prm().profilDefaut, noms: prm().profilNoms, perso: prm().profilsPerso, regles: prm().reglesAuto, sinon: prm().profilSinon, archives: saisonsArch(), fetes: prm().fetesArchers === false ? null : prm().fetes || null, fetesMessage: prm().fetesMessage !== false,
+  // valeurs proposées pour un nouveau tir (Paramètres › Séances), reprises par l'espace archer
+  tir: { base: { distance: prm().distance, blason: prm().blason, fpv: prm().fpv, nbVolees: prm().nbVolees }, fed: prm().fed || null } });
 const cfgAge = (cfg) => (cfg?.age !== "" && cfg?.age != null && !isNaN(Number(cfg.age)) ? Number(cfg.age) : 12);
 function profilsList(cfg = espaceCfg()) {
   const noms = cfg?.noms || {}, mods = (id, d) => (Array.isArray(cfg?.profils?.[id]) ? cfg.profils[id] : d);

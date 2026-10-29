@@ -2803,7 +2803,9 @@ const AR_MODULES = [["seances", "Mes séances", "Le journal des séances du club
 const AR_PROFILS = { decouverte: ["Découverte", ["seances", "documents", "courte"]], loisir: ["Loisir", ["seances", "carnet", "tir", "impacts", "documents", "chrono"]], competiteur: ["Compétiteur", AR_MODULES.map(([k]) => k).filter((k) => k !== "courte")] };
 const MOD_COURT = { seances: "Séances", carnet: "Carnet", courte: "Fiche courte", tir: "Tir compté", impacts: "Cible", concours: "Concours", documents: "Docs", chrono: "Chrono" };
 // Réglages de l'entraîneur (Paramètres › Espace archers)
-const espaceCfg = () => ({ profils: prm().profils, age: prm().profilAge, defaut: prm().profilDefaut, noms: prm().profilNoms, perso: prm().profilsPerso, regles: prm().reglesAuto, sinon: prm().profilSinon, archives: saisonsArch(), fetes: prm().fetesArchers === false ? null : prm().fetes || null, fetesMessage: prm().fetesMessage !== false });
+const espaceCfg = () => ({ profils: prm().profils, age: prm().profilAge, defaut: prm().profilDefaut, noms: prm().profilNoms, perso: prm().profilsPerso, regles: prm().reglesAuto, sinon: prm().profilSinon, archives: saisonsArch(), fetes: prm().fetesArchers === false ? null : prm().fetes || null, fetesMessage: prm().fetesMessage !== false,
+  // valeurs proposées pour un nouveau tir (Paramètres › Séances), reprises par l'espace archer
+  tir: { base: { distance: prm().distance, blason: prm().blason, fpv: prm().fpv, nbVolees: prm().nbVolees }, fed: prm().fed || null } });
 const cfgAge = (cfg) => (cfg?.age !== "" && cfg?.age != null && !isNaN(Number(cfg.age)) ? Number(cfg.age) : 12);
 function profilsList(cfg = espaceCfg()) {
   const noms = cfg?.noms || {}, mods = (id, d) => (Array.isArray(cfg?.profils?.[id]) ? cfg.profils[id] : d);
