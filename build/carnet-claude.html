@@ -1395,7 +1395,8 @@ function banniereSvg(k) {
 function banniereFete(k, cfg, base, avecMsg = true) {
   const f = feteCfg(cfg)[k]; if (!f) return "";
   const msg = avecMsg ? feteMessage(k) : "";
-  if (f.image?.assetId) return `<div class="fete-ban img"><img src="${esc((base || "/_blob/") + f.image.assetId)}" alt="${esc(msg || FETES.find(([x]) => x === k)[1])}" loading="lazy">${msg ? `<span class="fete-ban-cap">${esc(msg)}</span>` : ""}</div>`;
+  // une image perso porte déjà son texte (bannière Canva) : pas de message en plus
+  if (f.image?.assetId) return `<div class="fete-ban img"><img src="${esc((base || "/_blob/") + f.image.assetId)}" alt="${esc(feteMessage(k) || FETES.find(([x]) => x === k)[1])}" loading="lazy"></div>`;
   return `<div class="fete-ban">${msg ? `<span class="fete-ban-msg">${esc(msg)}</span>` : ""}${banniereSvg(k)}</div>`;
 }
 const mdToday = (d = new Date()) => String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
@@ -4528,7 +4529,7 @@ function feteCard(ro) {
       <label class="fete-on"><input type="checkbox" data-fete-opt="fetesArchers" ${arch ? "checked" : ""} ${ro}> Aussi dans l'espace des archers <span class="tirline">(chacun garde son avatar)</span></label>
       <label class="fete-on"><input type="checkbox" data-fete-opt="fetesMessage" ${msg ? "checked" : ""} ${ro}> Message de fête sur la bannière de l'accueil <span class="tirline">(« Joyeux Noël ! », « Bonne année ! »)</span></label>
       <label class="fete-on"><input type="checkbox" data-fete-opt="fetesAnim" ${p.fetesAnim !== false ? "checked" : ""} ${ro}> Animation : neige qui tombe et guirlande qui scintille <span class="tirline">(coupée d'office sur les appareils réglés pour limiter les animations)</span></label>
-      <span class="tirline">Ta propre image : une bannière large (par exemple 1600 × 400 pixels), faite avec Canva ou une autre appli, enregistrée en PNG ou JPG. Elle remplace le dessin du thème sur l'accueil, pour toi et les archers.</span>
+      <span class="tirline">Ta propre image : une bannière large (par exemple 1600 × 400 pixels), faite avec Canva ou une autre appli, enregistrée en PNG ou JPG. Elle remplace le dessin du thème sur l'accueil, pour toi et les archers ; le message de fête n'est alors pas ajouté, ton image porte son propre texte.</span>
       <span class="tirline">Le réglage clair ou sombre de chaque appareil reste valable. L'icône de l'appli sur l'écran d'accueil du téléphone ne change pas.</span>
     </div>`;
 }
