@@ -75,7 +75,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     St.err = ""; St.data = null; render();
     try { API.fichiers(who()); St.data = await API.charger(who());
       // thème de fête choisi par l'entraîneur (dans l'aperçu côté entraîneur, la page garde le sien)
-      if (!PREVIEW && !TESTW && window.CarnetFete) window.CarnetFete.appliquer(window.CarnetFete.jour((St.data.reglagesEspace || {}).fetes));
+      if (!PREVIEW && !TESTW && window.CarnetFete) window.CarnetFete.appliquer(window.CarnetFete.jour((St.data.reglagesEspace || {}).fetes), (St.data.reglagesEspace || {}).fetesAnim !== false);
     }
     catch (e) { console.error(e); St.err = "Impossible de charger ton espace. Vérifie ta connexion."; }
     render();
@@ -137,8 +137,8 @@ window.CarnetArcherUI = (API, opts = {}) => {
     const mots = St.data.entrees.filter((e) => e.commentaireCoach).sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, 2);
     const nouv = nouveautes();
     const m = M(), q = [TC() ? `<button class="btn primary ar-big" data-act="tc-new">🎯 Nouveau tir compté</button>` : "", window.CarnetChrono && m.has("chrono") ? `<button class="btn ar-big" data-act="chrono">⏱ Chrono</button>` : ""].filter(Boolean);
-    const fk = window.CarnetFete && (St.data.reglagesEspace || {}).fetesMessage !== false ? window.CarnetFete.jour((St.data.reglagesEspace || {}).fetes) : "";
-    let h = fk ? `<div class="fete-msg ar-fete">${esc(window.CarnetFete.message(fk))}</div>` : "";
+    const RE = St.data.reglagesEspace || {}, fk = window.CarnetFete ? window.CarnetFete.jour(RE.fetes) : "";
+    let h = fk ? `<div class="ar-fete">${window.CarnetFete.banniere(fk, RE.fetes, BLOB, RE.fetesMessage !== false)}</div>` : "";
     h += q.length ? `<div class="ar-quick${q.length === 1 ? " one" : ""}">${q.join("")}</div>` : "";
     if (nouv.length) h += `<div class="card ar-new"><div class="bar"><b>✨ Du nouveau depuis ta dernière visite</b><span class="grow"></span><button class="btn" data-act="vu">Vu ✓</button></div>
       <ul class="ar-new-l">${nouv.map((n) => `<li><button class="lnk" ${n.go}>${esc(n.txt)}</button></li>`).join("")}</ul></div>`;

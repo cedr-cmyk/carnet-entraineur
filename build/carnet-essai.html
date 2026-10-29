@@ -603,6 +603,40 @@ table.qvq td, table.qvq th { white-space: nowrap; } .qvq-f { display: flex; gap:
 :root[data-fete] .brand h1 em { background: linear-gradient(90deg, var(--accent), var(--cyan)); -webkit-background-clip: text; background-clip: text; }
 :root[data-fete] .btn.primary, :root[data-fete] .fab, :root[data-fete] .seg-mode button[aria-pressed="true"] { background: linear-gradient(135deg, var(--fete-a), var(--fete-b)); color: var(--accent-ink); box-shadow: 0 8px 22px -8px color-mix(in srgb, var(--fete-a) 70%, transparent); }
 :root[data-fete="noel"] .btn.primary, :root[data-fete="noel"] .fab, :root[data-fete="noel"] .seg-mode button[aria-pressed="true"] { color: #fff; }
+/* guirlande lumineuse sous le menu */
+:root[data-fete] .top::after { height: 12px; background:
+  radial-gradient(circle at 9px 7px, var(--fete-a) 0 3.2px, transparent 3.8px) 0 0 / 72px 12px repeat-x,
+  radial-gradient(circle at 27px 7px, var(--fete-d) 0 3.2px, transparent 3.8px) 0 0 / 72px 12px repeat-x,
+  radial-gradient(circle at 45px 7px, var(--fete-c) 0 3.2px, transparent 3.8px) 0 0 / 72px 12px repeat-x,
+  radial-gradient(circle at 63px 7px, #60A5FA 0 3.2px, transparent 3.8px) 0 0 / 72px 12px repeat-x,
+  linear-gradient(transparent 3px, color-mix(in srgb, var(--muted) 55%, transparent) 3px 4px, transparent 4px); }
+:root[data-fete][data-fete-anim] .top::after { animation: fete-guirlande 2.4s steps(4) infinite; }
+@keyframes fete-guirlande { to { background-position: 72px 0, 72px 0, 72px 0, 72px 0, 0 0; } }
+/* neige qui tombe (très légère, ne gêne pas la lecture) */
+:root[data-fete][data-fete-anim] body::after { content: ""; position: fixed; inset: 0; z-index: 40; pointer-events: none;
+  background-image: radial-gradient(circle, rgba(255,255,255,.75) 1.4px, transparent 2px), radial-gradient(circle, rgba(255,255,255,.5) 1px, transparent 1.6px), radial-gradient(circle, rgba(255,255,255,.6) 2px, transparent 2.6px);
+  background-size: 140px 160px, 90px 110px, 230px 260px; animation: fete-neige 18s linear infinite; opacity: .55; }
+:root[data-fete="fetes"][data-fete-anim] body::after { background-image: radial-gradient(circle, rgba(253,230,138,.8) 1.4px, transparent 2px), radial-gradient(circle, rgba(248,113,113,.55) 1px, transparent 1.6px), radial-gradient(circle, rgba(74,222,128,.55) 1.6px, transparent 2.2px); }
+:root[data-fete][data-theme="light"][data-fete-anim] body::after { opacity: .9; background-image: radial-gradient(circle, rgba(185,28,28,.35) 1.4px, transparent 2px), radial-gradient(circle, rgba(21,128,61,.3) 1px, transparent 1.6px), radial-gradient(circle, rgba(161,98,7,.3) 2px, transparent 2.6px); }
+@keyframes fete-neige { from { background-position: 0 0, 30px 0, 60px 0; } to { background-position: 40px 160px, 10px 330px, 100px 260px; } }
+@media (prefers-reduced-motion: reduce) { :root[data-fete] .top::after, :root[data-fete] body::after { animation: none !important; } :root[data-fete] body::after { display: none; } }
+/* cartes habillées */
+:root[data-fete] .card { border-top: 2px solid color-mix(in srgb, var(--fete-d) 55%, var(--line)); }
+:root[data-fete="noel"] .hub-h::before { content: "❄ "; color: color-mix(in srgb, var(--fete-c) 70%, #fff); }
+:root[data-fete="fetes"] .hub-h::before { content: "✦ "; color: var(--fete-a); }
+/* bannière d'accueil */
+.fete-ban { position: relative; border-radius: 18px; overflow: hidden; min-height: 112px; display: flex; align-items: stretch; margin: 8px 0 2px; border: 1px solid color-mix(in srgb, var(--fete-d, #FACC15) 45%, transparent); box-shadow: 0 10px 30px -18px rgba(0,0,0,.6);
+  background: radial-gradient(circle, rgba(255,255,255,.5) 1px, transparent 1.6px) 0 0 / 37px 29px, radial-gradient(500px 160px at 80% 0, rgba(127,29,29,.6), transparent 70%), linear-gradient(#0B2117, #0B2117);
+  background-color: #0B2117; }
+.fete-ban::after { content: ""; position: absolute; z-index: 1; left: 0; right: 0; bottom: 0; height: 20px; background: linear-gradient(transparent, #F8FAFC 7px, #E2E8F0); border-radius: 50% 50% 0 0 / 14px 14px 0 0; }
+:root[data-fete="fetes"] .fete-ban { background: radial-gradient(circle, rgba(253,230,138,.6) 1px, transparent 1.6px) 0 0 / 37px 29px, radial-gradient(500px 160px at 70% 0, rgba(113,63,18,.7), transparent 70%), linear-gradient(#0A0E1F, #0A0E1F); }
+.fete-ban-svg { position: relative; z-index: 0; flex: none; height: 112px; width: auto; aspect-ratio: 3 / 1; align-self: flex-end; margin-left: auto; max-width: 62%; }
+.fete-ban-msg { position: relative; z-index: 2; align-self: center; flex: 1; min-width: 0; padding: 10px 6px 22px 16px; font-weight: 800; font-size: clamp(1.02rem, 3.4vw, 1.5rem); line-height: 1.2; color: #fff; text-shadow: 0 2px 8px rgba(0,0,0,.6); }
+@media (max-width: 520px) { .fete-ban { flex-direction: column; } .fete-ban-msg { padding: 12px 14px 0; } .fete-ban-svg { height: 92px; max-width: none; align-self: flex-end; } }
+.fete-ban.img { display: block; min-height: 0; background: var(--sunk); } .fete-ban.img img { display: block; width: 100%; height: auto; max-height: 260px; object-fit: cover; }
+.fete-ban-cap { display: block; padding: 8px 14px; font-weight: 700; }
+.fete-img { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; } .fete-img img { width: 120px; height: 40px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
+.fete-up { cursor: pointer; }
 .fete-msg { display: inline-block; margin-top: 6px; padding: 6px 14px; border-radius: 999px; font-weight: 700; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--ink); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); }
 .fete-card { display: grid; gap: 12px; } .fete-list { display: grid; gap: 8px; }
 .fete-it { display: flex; gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: 14px; }
@@ -790,7 +824,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     St.err = ""; St.data = null; render();
     try { API.fichiers(who()); St.data = await API.charger(who());
       // thème de fête choisi par l'entraîneur (dans l'aperçu côté entraîneur, la page garde le sien)
-      if (!PREVIEW && !TESTW && window.CarnetFete) window.CarnetFete.appliquer(window.CarnetFete.jour((St.data.reglagesEspace || {}).fetes));
+      if (!PREVIEW && !TESTW && window.CarnetFete) window.CarnetFete.appliquer(window.CarnetFete.jour((St.data.reglagesEspace || {}).fetes), (St.data.reglagesEspace || {}).fetesAnim !== false);
     }
     catch (e) { console.error(e); St.err = "Impossible de charger ton espace. Vérifie ta connexion."; }
     render();
@@ -852,8 +886,8 @@ window.CarnetArcherUI = (API, opts = {}) => {
     const mots = St.data.entrees.filter((e) => e.commentaireCoach).sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, 2);
     const nouv = nouveautes();
     const m = M(), q = [TC() ? `<button class="btn primary ar-big" data-act="tc-new">🎯 Nouveau tir compté</button>` : "", window.CarnetChrono && m.has("chrono") ? `<button class="btn ar-big" data-act="chrono">⏱ Chrono</button>` : ""].filter(Boolean);
-    const fk = window.CarnetFete && (St.data.reglagesEspace || {}).fetesMessage !== false ? window.CarnetFete.jour((St.data.reglagesEspace || {}).fetes) : "";
-    let h = fk ? `<div class="fete-msg ar-fete">${esc(window.CarnetFete.message(fk))}</div>` : "";
+    const RE = St.data.reglagesEspace || {}, fk = window.CarnetFete ? window.CarnetFete.jour(RE.fetes) : "";
+    let h = fk ? `<div class="ar-fete">${window.CarnetFete.banniere(fk, RE.fetes, BLOB, RE.fetesMessage !== false)}</div>` : "";
     h += q.length ? `<div class="ar-quick${q.length === 1 ? " one" : ""}">${q.join("")}</div>` : "";
     if (nouv.length) h += `<div class="card ar-new"><div class="bar"><b>✨ Du nouveau depuis ta dernière visite</b><span class="grow"></span><button class="btn" data-act="vu">Vu ✓</button></div>
       <ul class="ar-new-l">${nouv.map((n) => `<li><button class="lnk" ${n.go}>${esc(n.txt)}</button></li>`).join("")}</ul></div>`;
@@ -1345,7 +1379,29 @@ window.CarnetModules = (a, n, cfg, ne) => arModules(a, n, cfg || espaceCfg(), ne
 window.CarnetAvatar = { svg: (a, n) => avatarSvg(a, n), choisir: (a, f) => avatarPicker(a, f) };
 // ---------- Thèmes de fête (V.1.8) : Noël, Noël et fêtes de fin d'année, diffusés entre deux dates chaque année ----------
 const FETES = [["noel", "Noël", "🎄", "12-01", "12-26"], ["fetes", "Noël et fêtes de fin d'année", "✨", "12-01", "01-03"]];
-const feteCfg = (c) => { const o = c || {}; return Object.fromEntries(FETES.map(([k, , , du, au]) => [k, { on: !!(o[k] || {}).on, du: (o[k] || {}).du || du, au: (o[k] || {}).au || au }])); };
+const feteCfg = (c) => { const o = c || {}; return Object.fromEntries(FETES.map(([k, , , du, au]) => [k, { on: !!(o[k] || {}).on, du: (o[k] || {}).du || du, au: (o[k] || {}).au || au, image: (o[k] || {}).image || null }])); };
+// Bannières dessinées (dessins originaux) : sapins, cible enneigée et flèche pour Noël ; feux d'artifice en plus pour les fêtes
+const BAN_SAPIN = (x, y, h, c) => `<path d="M${x} ${y - h}l${h * .32} ${h * .42}h-${h * .14}l${h * .26} ${h * .34}h-${h * .16}l${h * .24} ${h * .24}h-${h * 1.24}l${h * .24}-${h * .24}h-${h * .16}l${h * .26}-${h * .34}h-${h * .14}z" fill="${c}"/><rect x="${x - h * .05}" y="${y}" width="${h * .1}" height="${h * .1}" fill="#5B3A1E"/>`;
+const BAN_CIBLE = (x, y, r) => `<g><circle cx="${x}" cy="${y}" r="${r}" fill="#F8FAFC"/><circle cx="${x}" cy="${y}" r="${r * .8}" fill="#1E293B"/><circle cx="${x}" cy="${y}" r="${r * .6}" fill="#06B6D4"/><circle cx="${x}" cy="${y}" r="${r * .4}" fill="#EF4444"/><circle cx="${x}" cy="${y}" r="${r * .2}" fill="#FFD700"/>
+  <path d="M${x - r * 1.05} ${y - r * .55}q${r * 1.05}-${r * .75} ${r * 2.1} 0q-${r * .2}-${r * .12}-${r * .42}-${r * .05}q-${r * .5}-${r * .3}-${r * .85}-${r * .05}q-${r * .4}-${r * .2}-${r * .83} 0z" fill="#FFFFFF"/>
+  <line x1="${x + r * .08}" y1="${y - r * .06}" x2="${x + r * 1.9}" y2="${y - r * .9}" stroke="#E2E8F0" stroke-width="${r * .07}" stroke-linecap="round"/><path d="M${x + r * 1.75} ${y - r * .98}l${r * .38}-${r * .12}-${r * .1} ${r * .3}zM${x + r * 1.62} ${y - r * .74}l${r * .38}-${r * .1}-${r * .14} ${r * .28}z" fill="#DC2626"/></g>`;
+const BAN_FLOCONS = (n, seed) => Array.from({ length: n }, (_, i) => { const a = (i * 97 + seed * 31) % 800, b = (i * 53 + seed * 17) % 120, r = 1 + ((i * 7) % 3); return `<circle cx="${a}" cy="${b}" r="${r}" fill="#fff" opacity="${.35 + ((i * 13) % 5) / 10}"/>`; }).join("");
+const BAN_FEU = (x, y, r, c) => Array.from({ length: 12 }, (_, i) => { const t = (i / 12) * Math.PI * 2; return `<line x1="${x + Math.cos(t) * r * .3}" y1="${y + Math.sin(t) * r * .3}" x2="${x + Math.cos(t) * r}" y2="${y + Math.sin(t) * r}" stroke="${c}" stroke-width="2.4" stroke-linecap="round"/><circle cx="${x + Math.cos(t) * r * 1.14}" cy="${y + Math.sin(t) * r * 1.14}" r="1.8" fill="${c}"/>`; }).join("");
+function banniereSvg(k) {
+  // scène dessinée à droite de la bannière ; le ciel et la neige du sol sont en fond (CSS), le message à gauche
+  const sapins = BAN_SAPIN(220, 110, 72, "#166534") + BAN_SAPIN(298, 114, 56, "#15803D") + BAN_SAPIN(360, 112, 64, "#14532D") + BAN_SAPIN(408, 116, 42, "#166534");
+  const boules = [[220, 62, "#DC2626"], [207, 86, "#FACC15"], [234, 96, "#DC2626"], [360, 74, "#FACC15"], [345, 94, "#DC2626"], [298, 86, "#FACC15"]].map(([x, y, c]) => `<circle cx="${x}" cy="${y}" r="4" fill="${c}"/>`).join("");
+  const etoile = (x, y, r, c) => `<path d="M${x} ${y - r}l${r * .29} ${r * .6} ${r * .66} ${r * .1}-${r * .48} ${r * .46} ${r * .12} ${r * .66}-${r * .59}-${r * .31}-${r * .59} ${r * .31} ${r * .12}-${r * .66}-${r * .48}-${r * .46} ${r * .66}-${r * .1}z" fill="${c}"/>`;
+  const feux = k === "fetes" ? BAN_FEU(70, 36, 24, "#FBBF24") + BAN_FEU(140, 22, 15, "#F87171") + BAN_FEU(30, 70, 13, "#4ADE80") : "";
+  return `<svg class="fete-ban-svg" viewBox="0 0 420 140" aria-hidden="true">${BAN_FLOCONS(16, k === "fetes" ? 3 : 1).replace(/cx="(\d+)"/g, (m, x) => `cx="${Number(x) % 420}"`)}${feux}${sapins}${boules}${etoile(220, 34, 8, "#FACC15")}${BAN_CIBLE(118, 94, 22)}</svg>`;
+}
+// bannière d'accueil : l'image choisie par l'entraîneur (faite avec Canva par exemple) ou le dessin du thème
+function banniereFete(k, cfg, base, avecMsg = true) {
+  const f = feteCfg(cfg)[k]; if (!f) return "";
+  const msg = avecMsg ? feteMessage(k) : "";
+  if (f.image?.assetId) return `<div class="fete-ban img"><img src="${esc((base || "/_blob/") + f.image.assetId)}" alt="${esc(msg || FETES.find(([x]) => x === k)[1])}" loading="lazy">${msg ? `<span class="fete-ban-cap">${esc(msg)}</span>` : ""}</div>`;
+  return `<div class="fete-ban">${msg ? `<span class="fete-ban-msg">${esc(msg)}</span>` : ""}${banniereSvg(k)}</div>`;
+}
 const mdToday = (d = new Date()) => String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 const dansPeriode = (md, du, au) => (du <= au ? md >= du && md <= au : md >= du || md <= au);
 // thème du jour ; si les deux périodes se chevauchent, « Noël et fêtes » l'emporte (il contient Noël)
@@ -1356,7 +1412,8 @@ function feteMessage(k, d = new Date()) {
   return "";
 }
 function appliquerFete(k) { const r = document.documentElement; if (k) r.setAttribute("data-fete", k); else r.removeAttribute("data-fete"); }
-window.CarnetFete = { jour: (c) => feteDuJour(c), appliquer: (k) => appliquerFete(k), message: (k) => feteMessage(k), liste: FETES };
+function appliquerAnim(on) { document.documentElement.toggleAttribute("data-fete-anim", !!on); }
+window.CarnetFete = { jour: (c) => feteDuJour(c), appliquer: (k, anim = true) => { appliquerFete(k); appliquerAnim(k && anim); }, message: (k) => feteMessage(k), banniere: (k, c, b, m) => banniereFete(k, c, b, m), liste: FETES };
 window.CarnetCible = { svg: (t) => targetSvg(t), face: (t) => faceOf(t), scoreAt: (f, r) => scoreAt(f, r), groupe: (t) => groupStats(t), carte: (t, a, s) => tirCarte(t, a, s), viewer: (t, s, a, o) => tirViewer(t, s, a, o), bilan: (t, o) => tirBilan(t, o) };
 const ARCS = ["Classique", "Poulies", "Barebow", "Arc droit", "Arc chasse"];
 const CATS = ["U11", "U13", "U15", "U18", "U21", "Senior 1", "Senior 2", "Senior 3"];
@@ -1561,7 +1618,7 @@ const inClub = (clubId) => S.club === "all" || S.club === clubId;
 
 function render() {
   if (S.club !== "all" && !club(S.club) && S.loaded.clubs) S.club = "all";
-  appliquerFete(feteActive());
+  appliquerFete(feteActive()); appliquerAnim(feteActive() && prm().fetesAnim !== false);
   renderTabs();
   const v = $("#view"), fab = $("#fab");
   fab.hidden = true;
@@ -3425,7 +3482,7 @@ const AR_MODULES = [["seances", "Mes séances", "Le journal des séances du club
 const AR_PROFILS = { decouverte: ["Découverte", ["seances", "documents", "courte"]], loisir: ["Loisir", ["seances", "carnet", "tir", "impacts", "documents", "chrono"]], competiteur: ["Compétiteur", AR_MODULES.map(([k]) => k).filter((k) => k !== "courte")] };
 const MOD_COURT = { seances: "Séances", carnet: "Carnet", courte: "Fiche courte", tir: "Tir compté", impacts: "Cible", concours: "Concours", documents: "Docs", chrono: "Chrono" };
 // Réglages de l'entraîneur (Paramètres › Espace archers)
-const espaceCfg = () => ({ profils: prm().profils, age: prm().profilAge, defaut: prm().profilDefaut, noms: prm().profilNoms, perso: prm().profilsPerso, regles: prm().reglesAuto, sinon: prm().profilSinon, archives: saisonsArch(), fetes: prm().fetesArchers === false ? null : prm().fetes || null, fetesMessage: prm().fetesMessage !== false,
+const espaceCfg = () => ({ profils: prm().profils, age: prm().profilAge, defaut: prm().profilDefaut, noms: prm().profilNoms, perso: prm().profilsPerso, regles: prm().reglesAuto, sinon: prm().profilSinon, archives: saisonsArch(), fetes: prm().fetesArchers === false ? null : prm().fetes || null, fetesMessage: prm().fetesMessage !== false, fetesAnim: prm().fetesAnim !== false,
   // valeurs proposées pour un nouveau tir (Paramètres › Séances), reprises par l'espace archer
   tir: { base: { distance: prm().distance, blason: prm().blason, fpv: prm().fpv, nbVolees: prm().nbVolees }, fed: prm().fed || null } });
 const cfgAge = (cfg) => (cfg?.age !== "" && cfg?.age != null && !isNaN(Number(cfg.age)) ? Number(cfg.age) : 12);
@@ -3755,7 +3812,7 @@ function viewAccueil() {
     return { a: S.archers.find((x) => x.id === aid), r, score: num(r.score), moy, n: prev.length };
   }).sort((p, q) => fullName(p.a).localeCompare(fullName(q.a), "fr")) : [];
   const card = (icon, cls, label, val, sub) => `<div class="hub-stat"><div class="hub-stat-top"><span>${label}</span><i class="hub-ico ${cls}">${ICON[icon]}</i></div><b class="${cls}">${val}</b><small>${sub}</small></div>`;
-  let h = clubChips() + `<button class="btn primary dash-chrono" data-act="chrono">⏱ Lancer le chrono d'entraînement</button><div class="head"><span class="pill">Tableau de bord</span><h2>${prm().nom ? "Bonjour " + esc(prm().nom) : "Bonjour"}</h2><span class="m">${esc(fmtLong(today))}</span></div>${(() => { const k = feteActive(); return k && prm().fetesMessage !== false ? `<div class="fete-msg">${esc(feteMessage(k))}</div>` : ""; })()}
+  let h = clubChips() + `<button class="btn primary dash-chrono" data-act="chrono">⏱ Lancer le chrono d'entraînement</button><div class="head"><span class="pill">Tableau de bord</span><h2>${prm().nom ? "Bonjour " + esc(prm().nom) : "Bonjour"}</h2><span class="m">${esc(fmtLong(today))}</span></div>${(() => { const k = feteActive(); return k ? banniereFete(k, prm().fetes, BLOB_BASE, prm().fetesMessage !== false) : ""; })()}
     <div class="hub-stats">
       ${card("cal", "c-cyan", "Séances du mois", sessM.length, `${upcoming.length ? "prochaine : " + dObj(upcoming[0].date).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" }) : "aucune prévue"}`)}
       ${card("wrench", aRep ? "c-red" : "c-green", "Matériel à réparer", aRep, `${mat.filter((m) => m.archerId).length} prêté${mat.filter((m) => m.archerId).length > 1 ? "s" : ""} sur ${mat.length}`)}
@@ -4443,7 +4500,7 @@ function applyDisplay() {
   if (th === "auto") root.removeAttribute("data-theme"); else root.setAttribute("data-theme", th);
   document.body.style.fontSize = sz === "grand" ? "18.5px" : sz === "tres-grand" ? "20.5px" : "";
   document.body.classList.toggle("no-hand", LS.get("manuscrit", "oui") === "non");
-  appliquerFete(feteActive());
+  appliquerFete(feteActive()); appliquerAnim(feteActive() && prm().fetesAnim !== false);
 }
 // thème affiché : l'aperçu en cours sur cet appareil, sinon celui des dates de diffusion
 const feteActive = () => (S.feteApercu != null ? S.feteApercu : feteDuJour(prm().fetes));
@@ -4465,13 +4522,17 @@ function feteCard(ro) {
         ${FETES.map(([k, l, ic]) => `<div class="fete-it${f[k].on ? " on" : ""}"><span class="fete-sw" data-sw="${k}" aria-hidden="true">${ic}</span>
           <div class="main"><label class="fete-on"><input type="checkbox" data-fete-on="${k}" ${f[k].on ? "checked" : ""} ${ro}> <b>${esc(l)}</b></label>
             <span class="fete-dates">du ${mdSel(k, "du", f[k].du, ro)} au ${mdSel(k, "au", f[k].au, ro)}</span>
-            <span class="tirline">${f[k].on ? `Diffusé chaque année du ${mdLab(f[k].du)} au ${mdLab(f[k].au)}${jour === k ? " · en ce moment" : ""}` : "Pas diffusé : coche pour le programmer."}</span></div>
+            <span class="tirline">${f[k].on ? `Diffusé chaque année du ${mdLab(f[k].du)} au ${mdLab(f[k].au)}${jour === k ? " · en ce moment" : ""}` : "Pas diffusé : coche pour le programmer."}</span>
+            <span class="fete-img">${f[k].image?.assetId ? `<img src="${esc(BLOB_BASE + f[k].image.assetId)}" alt="">` : ""}<span class="tirline">${f[k].image?.assetId ? "Ta bannière" : "Bannière dessinée du thème"}</span>
+              ${ro ? "" : `<label class="btn ghost fete-up">${f[k].image?.assetId ? "Changer l'image" : "Mettre ma propre image"}<input type="file" accept="image/png,image/jpeg,image/webp" data-fete-img="${k}" hidden></label>${f[k].image?.assetId ? `<button class="btn ghost" data-fete-imgdel="${k}">Reprendre le dessin</button>` : ""}`}</span></div>
           <button class="btn ghost" data-fete-ap="${k}" aria-pressed="${ap === k}">Aperçu</button></div>`).join("")}
       </div>
       ${chev ? `<p class="notice" style="margin:0">Les deux périodes se chevauchent : pendant les jours communs, c'est « Noël et fêtes de fin d'année » qui s'affiche.</p>` : ""}
       ${ap != null ? `<p class="notice fete-ap" style="margin:0">Aperçu sur cet appareil seulement : ${ap ? esc(FETES.find(([k]) => k === ap)[1]) : "thème habituel"}. Les archers ne voient rien. <button class="btn" data-fete-ap="stop">Arrêter l'aperçu</button></p>` : ""}
       <label class="fete-on"><input type="checkbox" data-fete-opt="fetesArchers" ${arch ? "checked" : ""} ${ro}> Aussi dans l'espace des archers <span class="tirline">(chacun garde son avatar)</span></label>
-      <label class="fete-on"><input type="checkbox" data-fete-opt="fetesMessage" ${msg ? "checked" : ""} ${ro}> Petit message de fête sur l'accueil <span class="tirline">(« Joyeux Noël ! », « Bonne année ! »)</span></label>
+      <label class="fete-on"><input type="checkbox" data-fete-opt="fetesMessage" ${msg ? "checked" : ""} ${ro}> Message de fête sur la bannière de l'accueil <span class="tirline">(« Joyeux Noël ! », « Bonne année ! »)</span></label>
+      <label class="fete-on"><input type="checkbox" data-fete-opt="fetesAnim" ${p.fetesAnim !== false ? "checked" : ""} ${ro}> Animation : neige qui tombe et guirlande qui scintille <span class="tirline">(coupée d'office sur les appareils réglés pour limiter les animations)</span></label>
+      <span class="tirline">Ta propre image : une bannière large (par exemple 1600 × 400 pixels), faite avec Canva ou une autre appli, enregistrée en PNG ou JPG. Elle remplace le dessin du thème sur l'accueil, pour toi et les archers.</span>
       <span class="tirline">Le réglage clair ou sombre de chaque appareil reste valable. L'icône de l'appli sur l'écran d'accueil du téléphone ne change pas.</span>
     </div>`;
 }
@@ -5092,7 +5153,7 @@ function formSeance(s = null) {
 
 // ---------- Événements ----------
 document.addEventListener("click", (e) => {
-  const t = e.target.closest("[data-tab],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab],[data-qsort],[data-coptab],[data-com-edit],[data-fmtfed],[data-fmt-del],[data-type-del],[data-fete-ap],[data-cd-exp],[data-cd-arch]");
+  const t = e.target.closest("[data-tab],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab],[data-qsort],[data-coptab],[data-com-edit],[data-fmtfed],[data-fmt-del],[data-type-del],[data-fete-ap],[data-fete-imgdel],[data-cd-exp],[data-cd-arch]");
   if (!t || t.closest("#sheet")) return;
   if (t.dataset.dashSuivi) { const [sid, aid] = t.dataset.dashSuivi.split("|"); S.seance = sid; S.suivi = aid; S.tirOpen = null; render(); window.scrollTo(0, 0); return; }
   if (t.dataset.tab) { go(t.dataset.tab); try { history.replaceState(null, "", "#" + t.dataset.tab); } catch (_) {} return; }
@@ -5103,6 +5164,7 @@ document.addEventListener("click", (e) => {
   }
   if (t.dataset.folder !== undefined) { S.folder = t.dataset.folder || null; render(); window.scrollTo(0, 0); return; }
   if (t.dataset.qsort) { const k = t.dataset.qsort, so = S.qvqSort || { k: "nom", d: 1 }; S.qvqSort = { k, d: so.k === k ? -so.d : k === "nom" || k === "profil" ? 1 : -1 }; render(); return; }
+  if (t.dataset.feteImgdel) { const f = feteCfg(prm().fetes); f[t.dataset.feteImgdel].image = null; setParam({ fetes: f }); toast("Retour à la bannière dessinée"); render(); return; }
   if (t.dataset.feteAp != null) { const v = t.dataset.feteAp; S.feteApercu = v === "stop" ? null : v; applyDisplay(); render(); return; }
   if (t.dataset.fmtfed) { S.fmtFed = t.dataset.fmtfed; render(); return; }
   if (t.dataset.fmtDel) { const [fd, ty] = t.dataset.fmtDel.split("|"); setParam({ co: { fmtRows: { [fd]: fmtRows(fd).filter((k) => k !== ty) } } }); toast(`${typeLab(ty)} retiré du format de secours ${fd}`); render(); return; }
@@ -5377,6 +5439,17 @@ document.addEventListener("change", (e) => {
   }
   const dp = e.target.dataset?.disp;
   if (dp) { LS.set(dp, e.target.value); applyDisplay(); return; }
+  const fim = e.target.dataset?.feteImg;
+  if (fim && S.canWrite) {
+    const file = e.target.files?.[0]; if (!file) return;
+    if (!S.assets) { toast("Dépôt indisponible dans cette vue"); return; }
+    if (!/^image\/(png|jpeg|webp)$/.test(file.type)) { toast("Choisis une image PNG ou JPG"); return; }
+    if (file.size > 5 * 1048576) { toast("Image trop lourde (5 Mo au plus)"); return; }
+    toast("Envoi de l'image…");
+    (async () => { try { const r = await S.assets.upload(file, { type: file.type }); const f = feteCfg(prm().fetes); f[fim].image = { assetId: r.id, type: file.type, nom: file.name }; setParam({ fetes: f }); toast("Image du thème enregistrée"); render(); }
+      catch (err) { console.error(err); toast("Envoi impossible : " + ({ too_large: "image trop lourde", quota_or_state: "espace de stockage plein" }[err?.code] || "réessaie")); } })();
+    return;
+  }
   const fo = e.target.dataset?.feteOn, fm = e.target.dataset?.feteMd, fop = e.target.dataset?.feteOpt;
   if ((fo || fm || fop) && S.canWrite) {
     if (fop) setParam({ [fop]: e.target.checked });
