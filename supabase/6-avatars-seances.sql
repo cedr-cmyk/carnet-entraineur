@@ -33,7 +33,8 @@ begin
       where owner = p_owner and col = 'evaluations' and data->>'archerId' = p_archer and data->>'partage' = 'true'), '[]'::jsonb),
     -- réglages des profils choisis par l'entraîneur (Paramètres › Espace archers)
     'reglagesEspace', coalesce((select jsonb_build_object('profils', data->'profils', 'age', data->'profilAge', 'defaut', data->'profilDefaut', 'noms', data->'profilNoms',
-        'perso', data->'profilsPerso', 'regles', data->'reglesAuto', 'sinon', data->'profilSinon', 'archives', data->'saisonsArchivees') from docs
+        'perso', data->'profilsPerso', 'regles', data->'reglesAuto', 'sinon', data->'profilSinon', 'archives', data->'saisonsArchivees',
+        'fetes', case when data->'fetesArchers' = 'false'::jsonb then null else data->'fetes' end, 'fetesMessage', coalesce(data->'fetesMessage', 'true'::jsonb) <> 'false'::jsonb) from docs
       where owner = p_owner and col = 'parametres' and id = 'general'), '{}'::jsonb),
     -- séances du club où l'archer a été pointé présent (journal, sans compteur), avec les titres des fiches travaillées
     'seances', coalesce((select jsonb_agg(jsonb_build_object('id', s.id, 'date', s.data->>'date', 'heure', s.data->>'heure', 'groupe', s.data->>'groupe', 'theme', s.data->>'theme',

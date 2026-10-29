@@ -73,7 +73,10 @@ window.CarnetArcherUI = (API, opts = {}) => {
 
   async function load() {
     St.err = ""; St.data = null; render();
-    try { API.fichiers(who()); St.data = await API.charger(who()); }
+    try { API.fichiers(who()); St.data = await API.charger(who());
+      // thème de fête choisi par l'entraîneur (dans l'aperçu côté entraîneur, la page garde le sien)
+      if (!PREVIEW && !TESTW && window.CarnetFete) window.CarnetFete.appliquer(window.CarnetFete.jour((St.data.reglagesEspace || {}).fetes));
+    }
     catch (e) { console.error(e); St.err = "Impossible de charger ton espace. Vérifie ta connexion."; }
     render();
   }
@@ -134,7 +137,9 @@ window.CarnetArcherUI = (API, opts = {}) => {
     const mots = St.data.entrees.filter((e) => e.commentaireCoach).sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, 2);
     const nouv = nouveautes();
     const m = M(), q = [TC() ? `<button class="btn primary ar-big" data-act="tc-new">🎯 Nouveau tir compté</button>` : "", window.CarnetChrono && m.has("chrono") ? `<button class="btn ar-big" data-act="chrono">⏱ Chrono</button>` : ""].filter(Boolean);
-    let h = q.length ? `<div class="ar-quick${q.length === 1 ? " one" : ""}">${q.join("")}</div>` : "";
+    const fk = window.CarnetFete && (St.data.reglagesEspace || {}).fetesMessage !== false ? window.CarnetFete.jour((St.data.reglagesEspace || {}).fetes) : "";
+    let h = fk ? `<div class="fete-msg ar-fete">${esc(window.CarnetFete.message(fk))}</div>` : "";
+    h += q.length ? `<div class="ar-quick${q.length === 1 ? " one" : ""}">${q.join("")}</div>` : "";
     if (nouv.length) h += `<div class="card ar-new"><div class="bar"><b>✨ Du nouveau depuis ta dernière visite</b><span class="grow"></span><button class="btn" data-act="vu">Vu ✓</button></div>
       <ul class="ar-new-l">${nouv.map((n) => `<li><button class="lnk" ${n.go}>${esc(n.txt)}</button></li>`).join("")}</ul></div>`;
     h += mots.map((e) => `<button class="card coach-mot ar-mot" data-entry="${esc(e.id)}"><b>💬 Le mot de ton entraîneur · ${esc(dObj(e.date).toLocaleDateString("fr-FR"))}</b><span>${esc(e.commentaireCoach)}</span></button>`).join("");

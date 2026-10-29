@@ -567,6 +567,52 @@ svg.chart .szl { stroke: var(--line-2, var(--line)); stroke-dasharray: 3 3; }
 table.qvq td, table.qvq th { white-space: nowrap; } .qvq-f { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; } .qvq-f input, .qvq-f select { min-height: 40px; } .qvq-f input { flex: 1; min-width: 180px; }
 .qvq-sort { font-weight: 800; text-decoration: none; text-transform: inherit; letter-spacing: inherit; color: inherit; } .qvq-auto { display: block; color: var(--muted); font-size: .78rem; margin-top: 2px; } .qvq-c { text-align: center; font-weight: 800; } .qvq-a { display: flex; align-items: center; gap: 8px; } table.qvq select { min-width: 150px; }
 [hidden] { display: none !important; }
+
+/* ===== Thèmes de fête (V.1.8) ===== */
+:root[data-fete="noel"] {
+  --bg: #09140F; --surface: #0E1D16; --sunk: #12261C; --line: #1D3B2D; --line-2: #2C5643; --field: rgba(9,20,15,.86); --field-2: #7F1D1D;
+  --accent: #F87171; --accent-2: #DC2626; --accent-ink: #fff; --cyan: #4ADE80; --gold: #FACC15; --muted: #9DB5A8;
+  --fete-a: #DC2626; --fete-b: #991B1B; --fete-c: #16A34A; --fete-d: #FACC15; --fete-flake: rgba(255,255,255,.22);
+}
+:root[data-fete="noel"][data-theme="light"] {
+  --bg: #FBF5EF; --surface: #FFFFFF; --sunk: #F4E9E0; --ink: #1C1917; --muted: #57534E; --line: #EFDFD2; --line-2: #E2CBB9; --field: rgba(255,255,255,.88); --field-ink: #1C1917; --field-muted: #57534E;
+  --accent: #B91C1C; --accent-2: #991B1B; --accent-ink: #fff; --cyan: #15803D; --gold: #A16207; --fete-flake: rgba(185,28,28,.10);
+}
+:root[data-fete="fetes"] {
+  --bg: #0A0E1F; --surface: #101631; --sunk: #141B3A; --line: #222B52; --line-2: #34407A; --field: rgba(10,14,31,.86); --field-2: #713F12;
+  --accent: #FBBF24; --accent-2: #D97706; --accent-ink: #1A1205; --cyan: #F87171; --gold: #FDE68A; --muted: #A3ACCB;
+  --fete-a: #FBBF24; --fete-b: #B45309; --fete-c: #DC2626; --fete-d: #16A34A; --fete-flake: rgba(253,230,138,.30);
+}
+:root[data-fete="fetes"][data-theme="light"] {
+  --bg: #FBF8EE; --surface: #FFFFFF; --sunk: #F3ECD9; --ink: #1C1917; --muted: #57534E; --line: #EDE3C8; --line-2: #DCCDA4; --field: rgba(255,255,255,.88); --field-ink: #1C1917; --field-muted: #57534E;
+  --accent: #A16207; --accent-2: #854D0E; --accent-ink: #fff; --cyan: #B91C1C; --gold: #A16207; --fete-flake: rgba(161,98,7,.14);
+}
+:root[data-fete] body { background-image: radial-gradient(circle, var(--fete-flake) 1.2px, transparent 1.8px), radial-gradient(circle, var(--fete-flake) 1px, transparent 1.6px),
+  radial-gradient(1100px 480px at 85% -10%, color-mix(in srgb, var(--fete-a) 16%, transparent), transparent 60%), radial-gradient(900px 480px at -10% 10%, color-mix(in srgb, var(--fete-c) 14%, transparent), transparent 60%);
+  background-size: 53px 61px, 37px 43px, auto, auto; background-position: 0 0, 19px 27px, 0 0, 0 0; }
+:root[data-fete="fetes"] body { background-image: radial-gradient(circle, var(--fete-flake) 1.4px, transparent 2px), radial-gradient(circle, color-mix(in srgb, var(--fete-c) 30%, transparent) 1px, transparent 1.6px),
+  radial-gradient(1100px 480px at 85% -10%, color-mix(in srgb, var(--fete-a) 16%, transparent), transparent 60%), radial-gradient(900px 480px at -10% 10%, color-mix(in srgb, var(--fete-c) 12%, transparent), transparent 60%); }
+:root[data-fete] .top { border-bottom: 0; box-shadow: none; }
+:root[data-fete] .top::after { content: ""; display: block; height: 4px; margin: 0 calc(-1 * max(16px, env(safe-area-inset-left, 0px))); background: repeating-linear-gradient(90deg, var(--fete-a) 0 18px, var(--fete-d) 18px 24px, var(--fete-c) 24px 42px, var(--fete-d) 42px 48px); }
+:root[data-fete] .brand .logo { background: linear-gradient(135deg, var(--fete-a), var(--fete-b)); box-shadow: 0 6px 20px color-mix(in srgb, var(--fete-a) 40%, transparent); position: relative; }
+:root[data-fete] .brand .logo svg { color: #fff; }
+:root[data-fete="fetes"] .brand .logo svg { color: #1A1205; }
+:root[data-fete] .brand .logo::after { content: "★"; position: absolute; top: -7px; right: -6px; font-size: 15px; line-height: 1; color: var(--fete-d); text-shadow: 0 1px 2px rgba(0,0,0,.5); }
+:root[data-fete="fetes"] .brand .logo::after { color: #FDE68A; }
+:root[data-fete] .brand h1 em { background: linear-gradient(90deg, var(--accent), var(--cyan)); -webkit-background-clip: text; background-clip: text; }
+:root[data-fete] .btn.primary, :root[data-fete] .fab, :root[data-fete] .seg-mode button[aria-pressed="true"] { background: linear-gradient(135deg, var(--fete-a), var(--fete-b)); color: var(--accent-ink); box-shadow: 0 8px 22px -8px color-mix(in srgb, var(--fete-a) 70%, transparent); }
+:root[data-fete="noel"] .btn.primary, :root[data-fete="noel"] .fab, :root[data-fete="noel"] .seg-mode button[aria-pressed="true"] { color: #fff; }
+.fete-msg { display: inline-block; margin-top: 6px; padding: 6px 14px; border-radius: 999px; font-weight: 700; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--ink); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); }
+.fete-card { display: grid; gap: 12px; } .fete-list { display: grid; gap: 8px; }
+.fete-it { display: flex; gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: 14px; }
+.fete-it.on { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
+.fete-it .main { flex: 1; display: grid; gap: 4px; min-width: 0; }
+.fete-sw { flex: none; width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; font-size: 1.3rem; background: linear-gradient(135deg, #F59E0B, #06B6D4); }
+.fete-sw[data-sw="noel"] { background: linear-gradient(135deg, #DC2626 0 45%, #16A34A 55%); } .fete-sw[data-sw="fetes"] { background: linear-gradient(135deg, #0A0E1F, #FBBF24); }
+.fete-on { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; } .fete-on input { width: 20px; height: 20px; accent-color: var(--accent); }
+.fete-dates { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; color: var(--muted); } .fete-md { display: inline-flex; gap: 4px; } .fete-md select { min-height: 36px; padding: 4px 8px; }
+.fete-it .btn[aria-pressed="true"] { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); }
+.fete-ap { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .ver-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; } .ver-b { display: flex; flex-direction: column; gap: 2px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; }
 .ver-l { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); } .ver-n { font-family: var(--font-display); font-size: 1.8rem; line-height: 1.1; } .ver-d { font-size: .85rem; color: var(--muted); }
 .cd-cat { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-top: 8px; } .cd-cat summary { cursor: pointer; }
@@ -576,6 +622,7 @@ table.qvq td, table.qvq th { white-space: nowrap; } .qvq-f { display: flex; gap:
 .ar-params { display: grid; gap: 14px; max-width: 720px; } .ar-params .card { gap: 10px; }
 .ar-quick.one { grid-template-columns: 1fr; }
 .ar-quick { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
+.ar-fete { margin: 0 0 10px; }
 .ar-big { width: 100%; min-height: 56px; font-size: 1.1rem; }
 .ar-mot { display: grid; gap: 4px; text-align: left; width: 100%; color: var(--ink); cursor: pointer; }
 .coach-mot { border-left: 3px solid var(--accent); padding: 8px 12px; background: var(--sunk); border-radius: 0 12px 12px 0; } .tv-chips .chip { min-width: 44px; justify-content: center; }
@@ -660,7 +707,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
 <div id="toast" class="toast" hidden></div>
 <input type="file" id="file-in" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.mp4,.webm,.txt,.md,.csv,application/pdf,image/*,video/mp4,video/webm,text/plain,text/markdown,text/csv">
 
-<script>window.CARNET_VERSION = { v: "1.8", date: "2026-10-28", site: "1.8", test: false };</script>
+<script>window.CARNET_VERSION = { v: "1.8", date: "2026-10-29", site: "1.8", test: false };</script>
 <script>
 // Espace archer : l'archer (ou son parent) voit uniquement ses propres informations,
 // telles que les renvoie la base (fonction espace_archer), et remplit son carnet.
@@ -737,7 +784,10 @@ window.CarnetArcherUI = (API, opts = {}) => {
 
   async function load() {
     St.err = ""; St.data = null; render();
-    try { API.fichiers(who()); St.data = await API.charger(who()); }
+    try { API.fichiers(who()); St.data = await API.charger(who());
+      // thème de fête choisi par l'entraîneur (dans l'aperçu côté entraîneur, la page garde le sien)
+      if (!PREVIEW && !TESTW && window.CarnetFete) window.CarnetFete.appliquer(window.CarnetFete.jour((St.data.reglagesEspace || {}).fetes));
+    }
     catch (e) { console.error(e); St.err = "Impossible de charger ton espace. Vérifie ta connexion."; }
     render();
   }
@@ -798,7 +848,9 @@ window.CarnetArcherUI = (API, opts = {}) => {
     const mots = St.data.entrees.filter((e) => e.commentaireCoach).sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, 2);
     const nouv = nouveautes();
     const m = M(), q = [TC() ? `<button class="btn primary ar-big" data-act="tc-new">🎯 Nouveau tir compté</button>` : "", window.CarnetChrono && m.has("chrono") ? `<button class="btn ar-big" data-act="chrono">⏱ Chrono</button>` : ""].filter(Boolean);
-    let h = q.length ? `<div class="ar-quick${q.length === 1 ? " one" : ""}">${q.join("")}</div>` : "";
+    const fk = window.CarnetFete && (St.data.reglagesEspace || {}).fetesMessage !== false ? window.CarnetFete.jour((St.data.reglagesEspace || {}).fetes) : "";
+    let h = fk ? `<div class="fete-msg ar-fete">${esc(window.CarnetFete.message(fk))}</div>` : "";
+    h += q.length ? `<div class="ar-quick${q.length === 1 ? " one" : ""}">${q.join("")}</div>` : "";
     if (nouv.length) h += `<div class="card ar-new"><div class="bar"><b>✨ Du nouveau depuis ta dernière visite</b><span class="grow"></span><button class="btn" data-act="vu">Vu ✓</button></div>
       <ul class="ar-new-l">${nouv.map((n) => `<li><button class="lnk" ${n.go}>${esc(n.txt)}</button></li>`).join("")}</ul></div>`;
     h += mots.map((e) => `<button class="card coach-mot ar-mot" data-entry="${esc(e.id)}"><b>💬 Le mot de ton entraîneur · ${esc(dObj(e.date).toLocaleDateString("fr-FR"))}</b><span>${esc(e.commentaireCoach)}</span></button>`).join("");
@@ -1275,6 +1327,20 @@ window.CarnetChrono = (store) => openChrono(store);
 window.CarnetChronoNoms = () => CHRONO_DEF.map((c) => c.nom);
 window.CarnetModules = (a, n, cfg, ne) => arModules(a, n, cfg || espaceCfg(), ne || 0);
 window.CarnetAvatar = { svg: (a, n) => avatarSvg(a, n), choisir: (a, f) => avatarPicker(a, f) };
+// ---------- Thèmes de fête (V.1.8) : Noël, Noël et fêtes de fin d'année, diffusés entre deux dates chaque année ----------
+const FETES = [["noel", "Noël", "🎄", "12-01", "12-26"], ["fetes", "Noël et fêtes de fin d'année", "✨", "12-01", "01-03"]];
+const feteCfg = (c) => { const o = c || {}; return Object.fromEntries(FETES.map(([k, , , du, au]) => [k, { on: !!(o[k] || {}).on, du: (o[k] || {}).du || du, au: (o[k] || {}).au || au }])); };
+const mdToday = (d = new Date()) => String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+const dansPeriode = (md, du, au) => (du <= au ? md >= du && md <= au : md >= du || md <= au);
+// thème du jour ; si les deux périodes se chevauchent, « Noël et fêtes » l'emporte (il contient Noël)
+function feteDuJour(c, d = new Date()) { const f = feteCfg(c), md = mdToday(d); return ["fetes", "noel"].find((k) => f[k].on && dansPeriode(md, f[k].du, f[k].au)) || ""; }
+function feteMessage(k, d = new Date()) {
+  if (k === "noel") return "🎄 Joyeux Noël !";
+  if (k === "fetes") return d.getMonth() === 0 ? `✨ Bonne année ${d.getFullYear()} !` : d.getDate() >= 27 && d.getMonth() === 11 ? `✨ Bonnes fêtes de fin d'année et bonne année ${d.getFullYear() + 1} !` : "🎄 Joyeux Noël et bonnes fêtes de fin d'année !";
+  return "";
+}
+function appliquerFete(k) { const r = document.documentElement; if (k) r.setAttribute("data-fete", k); else r.removeAttribute("data-fete"); }
+window.CarnetFete = { jour: (c) => feteDuJour(c), appliquer: (k) => appliquerFete(k), message: (k) => feteMessage(k), liste: FETES };
 window.CarnetCible = { svg: (t) => targetSvg(t), face: (t) => faceOf(t), scoreAt: (f, r) => scoreAt(f, r), groupe: (t) => groupStats(t), carte: (t, a, s) => tirCarte(t, a, s), viewer: (t, s, a, o) => tirViewer(t, s, a, o), bilan: (t, o) => tirBilan(t, o) };
 const ARCS = ["Classique", "Poulies", "Barebow", "Arc droit", "Arc chasse"];
 const CATS = ["U11", "U13", "U15", "U18", "U21", "Senior 1", "Senior 2", "Senior 3"];
@@ -1479,6 +1545,7 @@ const inClub = (clubId) => S.club === "all" || S.club === clubId;
 
 function render() {
   if (S.club !== "all" && !club(S.club) && S.loaded.clubs) S.club = "all";
+  appliquerFete(feteActive());
   renderTabs();
   const v = $("#view"), fab = $("#fab");
   fab.hidden = true;
@@ -3342,7 +3409,7 @@ const AR_MODULES = [["seances", "Mes séances", "Le journal des séances du club
 const AR_PROFILS = { decouverte: ["Découverte", ["seances", "documents", "courte"]], loisir: ["Loisir", ["seances", "carnet", "tir", "impacts", "documents", "chrono"]], competiteur: ["Compétiteur", AR_MODULES.map(([k]) => k).filter((k) => k !== "courte")] };
 const MOD_COURT = { seances: "Séances", carnet: "Carnet", courte: "Fiche courte", tir: "Tir compté", impacts: "Cible", concours: "Concours", documents: "Docs", chrono: "Chrono" };
 // Réglages de l'entraîneur (Paramètres › Espace archers)
-const espaceCfg = () => ({ profils: prm().profils, age: prm().profilAge, defaut: prm().profilDefaut, noms: prm().profilNoms, perso: prm().profilsPerso, regles: prm().reglesAuto, sinon: prm().profilSinon, archives: saisonsArch() });
+const espaceCfg = () => ({ profils: prm().profils, age: prm().profilAge, defaut: prm().profilDefaut, noms: prm().profilNoms, perso: prm().profilsPerso, regles: prm().reglesAuto, sinon: prm().profilSinon, archives: saisonsArch(), fetes: prm().fetesArchers === false ? null : prm().fetes || null, fetesMessage: prm().fetesMessage !== false });
 const cfgAge = (cfg) => (cfg?.age !== "" && cfg?.age != null && !isNaN(Number(cfg.age)) ? Number(cfg.age) : 12);
 function profilsList(cfg = espaceCfg()) {
   const noms = cfg?.noms || {}, mods = (id, d) => (Array.isArray(cfg?.profils?.[id]) ? cfg.profils[id] : d);
@@ -3670,7 +3737,7 @@ function viewAccueil() {
     return { a: S.archers.find((x) => x.id === aid), r, score: num(r.score), moy, n: prev.length };
   }).sort((p, q) => fullName(p.a).localeCompare(fullName(q.a), "fr")) : [];
   const card = (icon, cls, label, val, sub) => `<div class="hub-stat"><div class="hub-stat-top"><span>${label}</span><i class="hub-ico ${cls}">${ICON[icon]}</i></div><b class="${cls}">${val}</b><small>${sub}</small></div>`;
-  let h = clubChips() + `<button class="btn primary dash-chrono" data-act="chrono">⏱ Lancer le chrono d'entraînement</button><div class="head"><span class="pill">Tableau de bord</span><h2>${prm().nom ? "Bonjour " + esc(prm().nom) : "Bonjour"}</h2><span class="m">${esc(fmtLong(today))}</span></div>
+  let h = clubChips() + `<button class="btn primary dash-chrono" data-act="chrono">⏱ Lancer le chrono d'entraînement</button><div class="head"><span class="pill">Tableau de bord</span><h2>${prm().nom ? "Bonjour " + esc(prm().nom) : "Bonjour"}</h2><span class="m">${esc(fmtLong(today))}</span></div>${(() => { const k = feteActive(); return k && prm().fetesMessage !== false ? `<div class="fete-msg">${esc(feteMessage(k))}</div>` : ""; })()}
     <div class="hub-stats">
       ${card("cal", "c-cyan", "Séances du mois", sessM.length, `${upcoming.length ? "prochaine : " + dObj(upcoming[0].date).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" }) : "aucune prévue"}`)}
       ${card("wrench", aRep ? "c-red" : "c-green", "Matériel à réparer", aRep, `${mat.filter((m) => m.archerId).length} prêté${mat.filter((m) => m.archerId).length > 1 ? "s" : ""} sur ${mat.length}`)}
@@ -4358,9 +4425,38 @@ function applyDisplay() {
   if (th === "auto") root.removeAttribute("data-theme"); else root.setAttribute("data-theme", th);
   document.body.style.fontSize = sz === "grand" ? "18.5px" : sz === "tres-grand" ? "20.5px" : "";
   document.body.classList.toggle("no-hand", LS.get("manuscrit", "oui") === "non");
+  appliquerFete(feteActive());
 }
+// thème affiché : l'aperçu en cours sur cet appareil, sinon celui des dates de diffusion
+const feteActive = () => (S.feteApercu != null ? S.feteApercu : feteDuJour(prm().fetes));
 function applyParams() { const n = prm().nom; const h = document.querySelector(".brand h1"); if (h) h.innerHTML = n ? `Carnet <em>de ${esc(n)}</em>` : `Carnet <em>de l'entraîneur</em>`; }
 const radioRow = (name, cur, opts, attr = "data-disp") => `<div class="radio">${opts.map(([v, l]) => `<label><input type="radio" name="${name}" ${attr}="${name}" value="${v}" ${String(cur) === String(v) ? "checked" : ""}> ${l}</label>`).join("")}</div>`;
+const MOIS_C = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
+const mdLab = (md) => `${Number(md.slice(3))}${md.slice(3) === "01" ? "er" : ""} ${MOIS_C[Number(md.slice(0, 2)) - 1]}`;
+const mdSel = (k, w, md, ro) => `<span class="fete-md"><select data-fete-md="${k}|${w}|d" aria-label="Jour" ${ro}>${Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, "0")).map((d) => `<option value="${d}" ${md.slice(3) === d ? "selected" : ""}>${Number(d)}</option>`).join("")}</select>
+  <select data-fete-md="${k}|${w}|m" aria-label="Mois" ${ro}>${MOIS_C.map((m, i) => { const v = String(i + 1).padStart(2, "0"); return `<option value="${v}" ${md.slice(0, 2) === v ? "selected" : ""}>${m}</option>`; }).join("")}</select></span>`;
+function feteCard(ro) {
+  const p = prm(), f = feteCfg(p.fetes), jour = feteDuJour(p.fetes), ap = S.feteApercu, arch = p.fetesArchers !== false, msg = p.fetesMessage !== false;
+  const chev = f.noel.on && f.fetes.on && FETES.some(([k]) => { const o = k === "noel" ? f.fetes : f.noel; return dansPeriode(f[k].du, o.du, o.au) || dansPeriode(f[k].au, o.du, o.au); });
+  return `<h2 class="sec">Thèmes de fête</h2>
+    <div class="card fete-card">
+      <p style="margin:0;color:var(--muted)">L'appli change de couleurs et de décor entre les dates choisies, chaque année, puis revient toute seule au thème habituel. ${jour ? `<b>En ce moment : ${esc(FETES.find(([k]) => k === jour)[1])}.</b>` : "En ce moment : thème habituel."}</p>
+      <div class="fete-list">
+        <div class="fete-it"><span class="fete-sw" data-sw=""></span><div class="main"><b>Thème habituel</b><span class="tirline">Le reste de l'année.</span></div>
+          <button class="btn ghost" data-fete-ap="" aria-pressed="${ap === ""}">Aperçu</button></div>
+        ${FETES.map(([k, l, ic]) => `<div class="fete-it${f[k].on ? " on" : ""}"><span class="fete-sw" data-sw="${k}" aria-hidden="true">${ic}</span>
+          <div class="main"><label class="fete-on"><input type="checkbox" data-fete-on="${k}" ${f[k].on ? "checked" : ""} ${ro}> <b>${esc(l)}</b></label>
+            <span class="fete-dates">du ${mdSel(k, "du", f[k].du, ro)} au ${mdSel(k, "au", f[k].au, ro)}</span>
+            <span class="tirline">${f[k].on ? `Diffusé chaque année du ${mdLab(f[k].du)} au ${mdLab(f[k].au)}${jour === k ? " · en ce moment" : ""}` : "Pas diffusé : coche pour le programmer."}</span></div>
+          <button class="btn ghost" data-fete-ap="${k}" aria-pressed="${ap === k}">Aperçu</button></div>`).join("")}
+      </div>
+      ${chev ? `<p class="notice" style="margin:0">Les deux périodes se chevauchent : pendant les jours communs, c'est « Noël et fêtes de fin d'année » qui s'affiche.</p>` : ""}
+      ${ap != null ? `<p class="notice fete-ap" style="margin:0">Aperçu sur cet appareil seulement : ${ap ? esc(FETES.find(([k]) => k === ap)[1]) : "thème habituel"}. Les archers ne voient rien. <button class="btn" data-fete-ap="stop">Arrêter l'aperçu</button></p>` : ""}
+      <label class="fete-on"><input type="checkbox" data-fete-opt="fetesArchers" ${arch ? "checked" : ""} ${ro}> Aussi dans l'espace des archers <span class="tirline">(chacun garde son avatar)</span></label>
+      <label class="fete-on"><input type="checkbox" data-fete-opt="fetesMessage" ${msg ? "checked" : ""} ${ro}> Petit message de fête sur l'accueil <span class="tirline">(« Joyeux Noël ! », « Bonne année ! »)</span></label>
+      <span class="tirline">Le réglage clair ou sombre de chaque appareil reste valable. L'icône de l'appli sur l'écran d'accueil du téléphone ne change pas.</span>
+    </div>`;
+}
 function viewData() {
   const p = prm(), ro = S.canWrite ? "" : "disabled";
   const nEnt = S.carnets.length;
@@ -4375,6 +4471,7 @@ function viewData() {
       <div class="f">Taille du texte${radioRow("taille", LS.get("taille", "normal"), [["normal", "Normale"], ["grand", "Grande"], ["tres-grand", "Très grande"]])}</div>
       <span class="tirline">Ces réglages ne s'appliquent qu'à cet appareil : tu peux avoir un texte plus grand sur la tablette et normal sur l'ordinateur.</span>
     </div>
+    ${feteCard(ro)}
 `,
     seances: () => `    <h2 class="sec">Nouveau tir : valeurs proposées</h2>
     ${FEDS.map((f) => { const q = prmFed(f), k = `fed.${f}.`; return `<div class="card"><h3 style="margin:0;font-family:var(--font-display);text-transform:uppercase;font-weight:800"><span class="tag fed" style="font-size:.9rem">${f}</span></h3>
@@ -4977,7 +5074,7 @@ function formSeance(s = null) {
 
 // ---------- Événements ----------
 document.addEventListener("click", (e) => {
-  const t = e.target.closest("[data-tab],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab],[data-qsort],[data-coptab],[data-com-edit],[data-fmtfed],[data-fmt-del],[data-type-del],[data-cd-exp],[data-cd-arch]");
+  const t = e.target.closest("[data-tab],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab],[data-qsort],[data-coptab],[data-com-edit],[data-fmtfed],[data-fmt-del],[data-type-del],[data-fete-ap],[data-cd-exp],[data-cd-arch]");
   if (!t || t.closest("#sheet")) return;
   if (t.dataset.dashSuivi) { const [sid, aid] = t.dataset.dashSuivi.split("|"); S.seance = sid; S.suivi = aid; S.tirOpen = null; render(); window.scrollTo(0, 0); return; }
   if (t.dataset.tab) { go(t.dataset.tab); try { history.replaceState(null, "", "#" + t.dataset.tab); } catch (_) {} return; }
@@ -4988,6 +5085,7 @@ document.addEventListener("click", (e) => {
   }
   if (t.dataset.folder !== undefined) { S.folder = t.dataset.folder || null; render(); window.scrollTo(0, 0); return; }
   if (t.dataset.qsort) { const k = t.dataset.qsort, so = S.qvqSort || { k: "nom", d: 1 }; S.qvqSort = { k, d: so.k === k ? -so.d : k === "nom" || k === "profil" ? 1 : -1 }; render(); return; }
+  if (t.dataset.feteAp != null) { const v = t.dataset.feteAp; S.feteApercu = v === "stop" ? null : v; applyDisplay(); render(); return; }
   if (t.dataset.fmtfed) { S.fmtFed = t.dataset.fmtfed; render(); return; }
   if (t.dataset.fmtDel) { const [fd, ty] = t.dataset.fmtDel.split("|"); setParam({ co: { fmtRows: { [fd]: fmtRows(fd).filter((k) => k !== ty) } } }); toast(`${typeLab(ty)} retiré du format de secours ${fd}`); render(); return; }
   if (t.dataset.typeDel) { const id = t.dataset.typeDel; setParam({ coTypesPerso: typesPerso().filter((x) => x.id !== id) }); toast("Type supprimé"); render(); return; }
@@ -5261,6 +5359,15 @@ document.addEventListener("change", (e) => {
   }
   const dp = e.target.dataset?.disp;
   if (dp) { LS.set(dp, e.target.value); applyDisplay(); return; }
+  const fo = e.target.dataset?.feteOn, fm = e.target.dataset?.feteMd, fop = e.target.dataset?.feteOpt;
+  if ((fo || fm || fop) && S.canWrite) {
+    if (fop) setParam({ [fop]: e.target.checked });
+    else { const f = feteCfg(prm().fetes);
+      if (fo) f[fo].on = e.target.checked;
+      else { const [k, w, part] = fm.split("|"), cur = f[k][w]; f[k][w] = part === "m" ? e.target.value + cur.slice(2) : cur.slice(0, 3) + e.target.value; }
+      setParam({ fetes: f }); }
+    applyDisplay(); toast("Thème de fête enregistré"); render(); return;
+  }
   if (e.target.dataset && "prmType" in e.target.dataset && S.canWrite) {
     setParam({ co: { types: [...document.querySelectorAll("[data-prm-type]:checked")].map((x) => x.value) } }); $("#sync").textContent = "Paramètre enregistré"; return;
   }
