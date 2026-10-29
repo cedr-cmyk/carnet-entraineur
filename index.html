@@ -607,10 +607,10 @@ table.qvq td, table.qvq th { white-space: nowrap; } .qvq-f { display: flex; gap:
   --bg: #FBF8EE; --surface: #FFFFFF; --sunk: #F3ECD9; --ink: #1C1917; --muted: #57534E; --line: #EDE3C8; --line-2: #DCCDA4; --field: rgba(255,255,255,.88); --field-ink: #1C1917; --field-muted: #57534E;
   --accent: #A16207; --accent-2: #854D0E; --accent-ink: #fff; --cyan: #B91C1C; --gold: #A16207; --fete-flake: rgba(161,98,7,.14);
 }
-:root[data-fete] body { background-image: radial-gradient(circle, var(--fete-flake) 1.2px, transparent 1.8px), radial-gradient(circle, var(--fete-flake) 1px, transparent 1.6px),
+:root[data-fete] body, :root[data-fete] .ar-preview { background-image: radial-gradient(circle, var(--fete-flake) 1.2px, transparent 1.8px), radial-gradient(circle, var(--fete-flake) 1px, transparent 1.6px),
   radial-gradient(1100px 480px at 85% -10%, color-mix(in srgb, var(--fete-a) 16%, transparent), transparent 60%), radial-gradient(900px 480px at -10% 10%, color-mix(in srgb, var(--fete-c) 14%, transparent), transparent 60%);
   background-size: 53px 61px, 37px 43px, auto, auto; background-position: 0 0, 19px 27px, 0 0, 0 0; }
-:root[data-fete="fetes"] body { background-image: radial-gradient(circle, var(--fete-flake) 1.4px, transparent 2px), radial-gradient(circle, color-mix(in srgb, var(--fete-c) 30%, transparent) 1px, transparent 1.6px),
+:root[data-fete="fetes"] body, :root[data-fete="fetes"] .ar-preview { background-image: radial-gradient(circle, var(--fete-flake) 1.4px, transparent 2px), radial-gradient(circle, color-mix(in srgb, var(--fete-c) 30%, transparent) 1px, transparent 1.6px),
   radial-gradient(1100px 480px at 85% -10%, color-mix(in srgb, var(--fete-a) 16%, transparent), transparent 60%), radial-gradient(900px 480px at -10% 10%, color-mix(in srgb, var(--fete-c) 12%, transparent), transparent 60%); }
 :root[data-fete] .top { border-bottom: 0; box-shadow: none; }
 :root[data-fete] .top::after { content: ""; display: block; height: 4px; margin: 0 calc(-1 * max(16px, env(safe-area-inset-left, 0px))); background: repeating-linear-gradient(90deg, var(--fete-a) 0 18px, var(--fete-d) 18px 24px, var(--fete-c) 24px 42px, var(--fete-d) 42px 48px); }
