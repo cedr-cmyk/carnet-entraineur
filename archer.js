@@ -111,10 +111,42 @@ window.CarnetArcherUI = (API, opts = {}) => {
   const setPref = (k, v) => { const p = prefs(); if (v === "" || v == null) delete p[k]; else p[k] = v; lsSet(prefKey(), p); };
   // Nouveautés depuis la dernière visite : évaluations partagées, mots de l'entraîneur, documents, infos du club
   const vuKey = () => "carnet-ar-vu-" + (who()?.archer_id || "");
+  // Messages de l'entraîneur : mots libres (collection mots) et mots laissés sur une séance ou un tir du carnet
+  function motsListe() {
+    const libres = (St.data.mots || []).map((x) => ({ kind: "libre", id: x.id, date: x.date, texte: x.texte, reponse: x.reponse, archive: !!x.archive }));
+    const seances = St.data.entrees.filter((e) => String(e.commentaireCoach || "").trim() && !(e.date && archivee(saisonOf(e.date))))
+      .map((e) => ({ kind: "seance", id: e.id, date: e.date, texte: e.commentaireCoach, reponse: e.reponseMot, archive: !!e.motArchive, e }));
+    return [...libres, ...seances].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  }
+  function motHtml(x) {
+    const d = x.date ? dObj(x.date).toLocaleDateString("fr-FR", { day: "numeric", month: "long" }) : "";
+    return `<div class="ar-mot-it${x.archive ? " arch" : ""}"><span class="tirline">${esc(d)}${x.kind === "seance" ? ` · sur <button class="lnk" data-entry="${esc(x.id)}">${esc(x.e.objectif || (x.e.concoursId ? "ton concours" : "ta séance"))}</button>` : ""}</span>
+      <p>${esc(x.texte).replace(/\n/g, "<br>")}</p>
+      ${x.reponse ? `<span class="ar-mot-rep">↩︎ Ta réponse : ${esc(x.reponse)}</span>` : ""}
+      <span class="bar">${x.reponse ? "" : `<button class="btn" data-mot-rep="${x.kind}|${esc(x.id)}">↩︎ Répondre</button>`}<button class="btn ghost" data-mot-arch="${x.kind}|${esc(x.id)}|${x.archive ? "0" : "1"}">${x.archive ? "Remettre sur l'accueil" : "Archiver ✓"}</button></span></div>`;
+  }
+  async function motAction(kind, id, action, texte = "") {
+    if (PREVIEW) { toast("Aperçu : l'archer pourra répondre ou archiver ici"); return; }
+    try {
+      if (kind === "libre") { await API.mot(who(), id, action, texte); const x = (St.data.mots || []).find((y) => y.id === id); if (x) Object.assign(x, action === "repondre" ? { reponse: texte, archive: true } : { archive: action === "archiver" }); }
+      else { const v = action === "repondre" ? { reponseMot: texte, reponseMotLe: Date.now(), motArchive: true } : { motArchive: action === "archiver" }; await API.ecrire(who(), id, v); const e = St.data.entrees.find((y) => y.id === id); if (e) Object.assign(e, v); }
+      toast(action === "repondre" ? "Réponse envoyée à ton entraîneur" : action === "archiver" ? "Message archivé" : "Message remis sur l'accueil"); render();
+    } catch (err) { toast("Impossible : " + err.message); }
+  }
+  function motRepondre(kind, id) {
+    const el = $("#sheet");
+    el.innerHTML = `<div class="sheet-bg" data-close><form class="sheet" id="mot-form"><h3>Répondre à ton entraîneur</h3>
+      <label class="f">Ta réponse<textarea name="t" required maxlength="1000" placeholder="Ex. Merci ! Je vais y penser samedi."></textarea></label>
+      <span class="tirline">Ton entraîneur la verra sur ta fiche. Le message passera dans tes messages archivés.</span>
+      <div class="acts"><button type="button" class="btn" data-close>Annuler</button><button class="btn primary">Envoyer</button></div></form></div>`;
+    el.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", (ev) => { if (ev.target === b) el.innerHTML = ""; }));
+    $("#mot-form").addEventListener("submit", async (ev) => { ev.preventDefault(); const t = new FormData(ev.target).get("t").trim(); if (!t) return; el.innerHTML = ""; await motAction(kind, id, "repondre", t); });
+  }
   function nouvItems() {
     const m = M(), it = [];
     (St.data.evaluations || []).forEach((x) => it.push({ k: "e:" + x.id, txt: `Une évaluation partagée (${dObj(x.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })})`, go: `data-eval="${esc(x.id)}" data-asub-go="evaluations"` }));
-    St.data.entrees.filter((x) => x.commentaireCoach).forEach((x) => it.push({ k: "m:" + x.id + ":" + x.commentaireCoach.length, txt: `Un mot de ton entraîneur (${dObj(x.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })})`, go: `data-entry="${esc(x.id)}"` }));
+    (St.data.mots || []).filter((x) => !x.archive).forEach((x) => it.push({ k: "w:" + x.id + ":" + String(x.texte || "").length, txt: `Un message de ton entraîneur (${dObj(x.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })})`, go: `data-atab="accueil"` }));
+    St.data.entrees.filter((x) => x.commentaireCoach && !x.motArchive).forEach((x) => it.push({ k: "m:" + x.id + ":" + x.commentaireCoach.length, txt: `Un mot de ton entraîneur (${dObj(x.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })})`, go: `data-entry="${esc(x.id)}"` }));
     if (m.has("documents")) (St.data.documents || []).forEach((x) => it.push({ k: "d:" + x.id, txt: `Document : ${x.titre || x.nomFichier || "nouveau document"}`, go: `data-atab="documents"` }));
     (St.data.annonces || []).forEach((x) => it.push({ k: "a:" + x.id, txt: `Info du club : ${x.titre || ""}`, go: `data-act="vu-info"` }));
     return it;
@@ -134,7 +166,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
   function vAccueil() {
     const ann = (St.data.annonces || []).slice().sort((a, b) => (b.important ? 1 : 0) - (a.important ? 1 : 0) || (b.date || "").localeCompare(a.date || ""));
     const ent = St.data.entrainements, prenom = St.data.archer?.prenom || "";
-    const mots = St.data.entrees.filter((e) => e.commentaireCoach).sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, 2);
+    const tousMots = motsListe(), mots = tousMots.filter((x) => !x.archive), motsArch = tousMots.filter((x) => x.archive);
     const nouv = nouveautes();
     const m = M(), q = [TC() ? `<button class="btn primary ar-big" data-act="tc-new">🎯 Nouveau tir compté</button>` : "", window.CarnetChrono && m.has("chrono") ? `<button class="btn ar-big" data-act="chrono">⏱ Chrono</button>` : ""].filter(Boolean);
     const RE = St.data.reglagesEspace || {}, fk = window.CarnetFete ? window.CarnetFete.jour(RE.fetes) : "";
@@ -142,7 +174,9 @@ window.CarnetArcherUI = (API, opts = {}) => {
     h += q.length ? `<div class="ar-quick${q.length === 1 ? " one" : ""}">${q.join("")}</div>` : "";
     if (nouv.length) h += `<div class="card ar-new"><div class="bar"><b>✨ Du nouveau depuis ta dernière visite</b><span class="grow"></span><button class="btn" data-act="vu">Vu ✓</button></div>
       <ul class="ar-new-l">${nouv.map((n) => `<li><button class="lnk" ${n.go}>${esc(n.txt)}</button></li>`).join("")}</ul></div>`;
-    h += mots.map((e) => `<button class="card coach-mot ar-mot" data-entry="${esc(e.id)}"><b>💬 Le mot de ton entraîneur · ${esc(dObj(e.date).toLocaleDateString("fr-FR"))}</b><span>${esc(e.commentaireCoach)}</span></button>`).join("");
+    if (mots.length || motsArch.length) h += `<div class="card ar-mots"><h3 class="hub-h">💬 Messages de ton entraîneur</h3>
+      ${mots.length ? mots.map(motHtml).join("") : `<p class="tirline" style="margin:0">Tu as tout lu ✓</p>`}
+      ${motsArch.length ? `<details class="ar-mots-arch" ${St.motsArchOpen ? "open" : ""}><summary class="tirline">Messages archivés (${motsArch.length})</summary>${motsArch.map(motHtml).join("")}</details>` : ""}</div>`;
     h += `<div class="card ar-infos"><h3 class="hub-h">Infos du club</h3>${ann.length ? ann.map((n) => `<div class="ar-info${n.important ? " imp" : ""}">
       <b>${n.important ? '<span class="tag imp">Important</span> ' : ""}${esc(n.titre || "Info")}</b>${n.texte ? `<p>${esc(n.texte).replace(/\n/g, "<br>")}</p>` : ""}
       <span class="tirline">${[n.date ? "Publiée le " + dObj(n.date).toLocaleDateString("fr-FR") : "", (n.clubIds || []).length ? n.clubIds.map(clubNom).filter(Boolean).join(", ") : ""].filter(Boolean).map(esc).join(" · ")}</span></div>`).join("")
@@ -565,7 +599,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     if (t.hasAttribute("data-pref-chrono")) { chronoStore.setLast(t.value); toast("Réglage du chrono enregistré"); }
   });
   root.addEventListener("click", async (ev) => {
-    const t = ev.target.closest("[data-atab],[data-who],[data-act],[data-saison],[data-entry],[data-eval],[data-arcombo],[data-rep],[data-artc],[data-artcp],[data-asub],[data-seance-ar],#ar-out"); if (!t) return;
+    const t = ev.target.closest("[data-atab],[data-who],[data-act],[data-saison],[data-entry],[data-eval],[data-arcombo],[data-rep],[data-artc],[data-artcp],[data-asub],[data-seance-ar],[data-mot-rep],[data-mot-arch],#ar-out"); if (!t) return;
     ev.stopPropagation();
     if (t.dataset.act === "close-preview") { root.remove(); return; }
     if (t.id === "ar-out") return API.deconnexion();
@@ -592,6 +626,8 @@ window.CarnetArcherUI = (API, opts = {}) => {
       return;
     }
     if (t.dataset.act === "vu" || t.dataset.act === "vu-info") { const seen = new Set(lsGet(vuKey(), [])); nouvItems().forEach((x) => seen.add(x.k)); lsSet(vuKey(), [...seen]); render(); return; }
+    if (t.dataset.motRep) { const [k, id] = t.dataset.motRep.split("|"); motRepondre(k, id); return; }
+    if (t.dataset.motArch) { const [k, id, on] = t.dataset.motArch.split("|"); motAction(k, id, on === "1" ? "archiver" : "desarchiver"); return; }
     if (t.dataset.act === "all-ent") { St.allEnt = !St.allEnt; render(); return; }
     if (t.dataset.act === "avatar" && window.CarnetAvatar) {
       window.CarnetAvatar.choisir(St.data.archer, async (v) => {

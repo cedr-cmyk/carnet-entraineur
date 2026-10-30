@@ -29,6 +29,10 @@ begin
       left join docs d on d.owner = t.owner and d.col = 'documents' and d.id = t.data->>'documentId'
       left join docs s on s.owner = t.owner and s.col = 'seances' and s.id = t.data->>'seanceId'
       where t.owner = p_owner and t.col = 'attributions' and t.data->>'archerId' = p_archer and t.data->>'visible' = 'true'), '[]'::jsonb),
+    -- mots libres de l'entraîneur (V.1.8) : l'archer répond ou archive
+    'mots', coalesce((select jsonb_agg(jsonb_build_object('id', id, 'date', data->>'date', 'texte', data->>'texte', 'reponse', coalesce(data->>'reponse', ''), 'reponseLe', data->'reponseLe',
+        'archive', coalesce(data->>'archive', 'false') = 'true') order by data->>'date' desc) from docs
+      where owner = p_owner and col = 'mots' and data->>'archerId' = p_archer), '[]'::jsonb),
     'evaluations', coalesce((select jsonb_agg(jsonb_build_object('id', id, 'date', data->>'date', 'notes', data->'notes', 'observation', data->>'observation')) from docs
       where owner = p_owner and col = 'evaluations' and data->>'archerId' = p_archer and data->>'partage' = 'true'), '[]'::jsonb),
     -- réglages des profils choisis par l'entraîneur (Paramètres › Espace archers)
@@ -89,7 +93,7 @@ end $$;
 
 -- L'archer remplit son carnet ; il peut aussi ouvrir la ligne d'une séance du club où il était présent (identifiant s_<séance>_<archer>)
 create or replace function public.archer_ecrire_entree(p_owner uuid, p_archer text, p_id text, p_data jsonb) returns void language plpgsql security definer set search_path = public as $$
-declare cur jsonb; sd jsonb; sid text; y int; sa text; dt text; allowed text[] := array['date','saison','objectif','atteint','note','emotion','commentaire','paille','visuel','blason','compte','compet','autre','scoreCompte','scoreCompet','tcDistance','tcBlason','tcTir']; k text; v jsonb := '{}'::jsonb;
+declare cur jsonb; sd jsonb; sid text; y int; sa text; dt text; allowed text[] := array['date','saison','objectif','atteint','note','emotion','commentaire','paille','visuel','blason','compte','compet','autre','scoreCompte','scoreCompet','tcDistance','tcBlason','tcTir','reponseMot','reponseMotLe','motArchive']; k text; v jsonb := '{}'::jsonb;
 begin
   if not exists (select 1 from acces where user_id = auth.uid() and owner = p_owner and archer_id = p_archer) then raise exception 'acces refuse'; end if;
   select data into cur from docs where owner = p_owner and col = 'carnetEntrees' and id = p_id;
@@ -101,7 +105,7 @@ begin
     if sd is null or jsonb_typeof(sd->'presents') is distinct from 'array' or not (sd->'presents' ? p_archer) then raise exception 'identifiant invalide'; end if;
   end if;
   -- les lignes de concours gardent le score et les flèches saisis par l'entraîneur
-  if cur is not null and coalesce(cur->>'concoursId', '') <> '' then allowed := array['atteint','note','emotion','commentaire']; end if;
+  if cur is not null and coalesce(cur->>'concoursId', '') <> '' then allowed := array['atteint','note','emotion','commentaire','reponseMot','reponseMotLe','motArchive']; end if;
   foreach k in array allowed loop if p_data ? k then v := v || jsonb_build_object(k, p_data->k); end if; end loop;
   v := v || jsonb_build_object('archerId', p_archer, 'saisiParArcher', true, 'majArcher', extract(epoch from now()) * 1000);
   if sd is not null then
@@ -118,6 +122,22 @@ begin
   insert into docs (owner, col, id, data, updated_at) values (p_owner, 'carnetEntrees', p_id, coalesce(cur, jsonb_build_object('createdAt', extract(epoch from now()) * 1000)) || v, now())
     on conflict (owner, col, id) do update set data = docs.data || v, updated_at = now();
 end $$;
+
+-- L'archer répond à un mot de l'entraîneur, ou l'archive (V.1.8)
+create or replace function public.archer_mot(p_owner uuid, p_archer text, p_id text, p_action text, p_texte text) returns void language plpgsql security definer set search_path = public as $$
+declare v jsonb;
+begin
+  if not exists (select 1 from acces where user_id = auth.uid() and owner = p_owner and archer_id = p_archer) then raise exception 'acces refuse'; end if;
+  if not exists (select 1 from docs where owner = p_owner and col = 'mots' and id = p_id and data->>'archerId' = p_archer) then raise exception 'mot introuvable'; end if;
+  if p_action = 'repondre' then
+    if coalesce(btrim(p_texte), '') = '' then raise exception 'reponse vide'; end if;
+    v := jsonb_build_object('reponse', left(btrim(p_texte), 1000), 'reponseLe', extract(epoch from now()) * 1000, 'archive', true);
+  elsif p_action in ('archiver', 'desarchiver') then v := jsonb_build_object('archive', p_action = 'archiver');
+  else raise exception 'action invalide'; end if;
+  update docs set data = data || v, updated_at = now() where owner = p_owner and col = 'mots' and id = p_id;
+end $$;
+revoke execute on function public.archer_mot(uuid, text, text, text, text) from public, anon;
+grant execute on function public.archer_mot(uuid, text, text, text, text) to authenticated;
 
 -- Pour l'entraîneur : qui a un compte (ou un code en attente) pour chaque archer, en une seule fois
 create or replace function public.acces_tous() returns jsonb language sql stable security definer set search_path = public as $$

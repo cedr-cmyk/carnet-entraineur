@@ -262,6 +262,7 @@
       ecrire: (a, id, data) => rpc("archer_ecrire_entree", { p_owner: a.owner, p_archer: a.archer_id, p_id: id, p_data: data }),
       supprimer: (a, id) => rpc("archer_supprimer_entree", { p_owner: a.owner, p_archer: a.archer_id, p_id: id }),
       repondre: (a, seance, reponse) => rpc("archer_repondre", { p_owner: a.owner, p_archer: a.archer_id, p_seance: seance, p_reponse: reponse }),
+      mot: (a, id, action, texte) => rpc("archer_mot", { p_owner: a.owner, p_archer: a.archer_id, p_id: id, p_action: action, p_texte: texte || "" }),
       avatar: (a, v) => rpc("archer_avatar", { p_owner: a.owner, p_archer: a.archer_id, p_avatar: v }),
       fichiers: (a) => { filesOwner = a.owner; tellSW(); },
       ajouterCode: async (code) => { await rpc("utiliser_invitation", { p_code: code }); return rpc("mes_acces"); },
@@ -275,7 +276,7 @@
       try { const d = await withTimeout(lire(a), net ? 8000 : 2500); ls.set(k, d); horsLigne(false); return d; }
       catch (e) { const d = ls.get(k, null); if (d) { horsLigne(true, "archer"); return d; } throw netErr(e) ? new Error("Pas de réseau. Ouvre ton espace une fois avec internet : il sera ensuite gardé sur ce téléphone.") : e; }
     };
-    ["ecrire", "supprimer", "repondre", "avatar", "ajouterCode"].forEach((n) => { if (API[n]) API[n] = envoi(API[n]); });
+    ["ecrire", "supprimer", "repondre", "avatar", "mot", "ajouterCode"].forEach((n) => { if (API[n]) API[n] = envoi(API[n]); });
     window.CarnetArcherUI(window.carnetArcherAPI);
     return new Promise(() => {}); // l'application de l'entraîneur ne démarre pas
   }
