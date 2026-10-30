@@ -39,6 +39,26 @@
   // ---------- Écran de connexion ----------
   let session = null;
   const domReady = () => new Promise((r) => (document.body ? r() : document.addEventListener("DOMContentLoaded", r, { once: true })));
+
+  // ---------- V.1.7.3 : Samsung Internet ----------
+  // Installer l'appli depuis Samsung Internet déclenche souvent une fausse alerte de Google Play Protect et l'installation échoue :
+  // on propose d'ouvrir la même page dans Chrome. Rien ne s'affiche une fois l'appli installée.
+  (async () => {
+    const samsung = /SamsungBrowser/i.test(navigator.userAgent), installee = window.matchMedia?.("(display-mode: standalone)").matches || navigator.standalone;
+    let vu = null; try { vu = localStorage.getItem("carnet:samsung-vu"); } catch (e) {}
+    if (!samsung || installee || vu) return;
+    await domReady();
+    const url = location.host + location.pathname + location.search;
+    const chrome = `intent://${url}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent("https://play.google.com/store/apps/details?id=com.android.chrome")};end`;
+    const el = document.createElement("div"); el.id = "samsung-chrome"; el.setAttribute("role", "note");
+    el.style.cssText = "position:fixed;left:12px;right:12px;bottom:12px;z-index:70;max-width:520px;margin:0 auto;padding:14px 16px;border-radius:18px;background:#0F172A;color:#F3F4F6;border:1px solid #F59E0B;box-shadow:0 12px 40px rgba(0,0,0,.5);font:15px/1.45 system-ui,sans-serif";
+    el.innerHTML = `<b style="display:block;margin-bottom:4px">Pour installer l'appli, utilise Chrome</b>
+      <span>Depuis Samsung Internet, l'installation est souvent bloquée par une fausse alerte de sécurité. Ouvre cette page dans Chrome, puis menu ⋮ › « Installer l'appli ». Tu peux aussi continuer ici sans installer.</span>
+      <span style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><a href="${chrome}" style="flex:1;text-align:center;padding:10px 14px;border-radius:999px;background:#F59E0B;color:#0B0F19;font-weight:700;text-decoration:none">Ouvrir dans Chrome</a>
+      <button type="button" style="padding:10px 14px;border-radius:999px;border:1px solid #475569;background:transparent;color:#F3F4F6;font:inherit">Plus tard</button></span>`;
+    el.querySelector("button").onclick = () => { try { localStorage.setItem("carnet:samsung-vu", String(Date.now())); } catch (e) {} el.remove(); };
+    document.body.appendChild(el);
+  })();
   async function loginScreen(msg = "") {
     await domReady();
     return new Promise((resolve) => {
