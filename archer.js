@@ -554,6 +554,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
       ${PREVIEW ? "" : `<section class="card"><h3 class="hub-h">Mon compte</h3>
         <div class="bar"><button class="btn" data-act="add-code">Ajouter un autre archer (frère, sœur…)</button>${TESTW ? "" : `<button class="btn danger" id="ar-out">Se déconnecter</button>`}</div></section>`}
       <span class="tirline">Ces préférences sont gardées sur cet appareil.</span>
+      ${(() => { const a = window.CARNET_AUTEUR; return a?.logo ? `<div class="auteur"><span>${esc(a.titre || "Réalisé par")}</span><img src="${a.logo}" alt="${esc(a.alt || "")}" width="72" height="72" loading="lazy"></div>` : ""; })()}
       ${window.CARNET_VERSION ? `<p class="ar-ver">Appli ${esc("V." + window.CARNET_VERSION.v)}${PREVIEW && window.CARNET_VERSION.test && window.CARNET_VERSION.site !== window.CARNET_VERSION.v ? ` (test · les archers ont la ${esc("V." + window.CARNET_VERSION.site)})` : ""}</p>` : ""}</div>`;
   }
   // ---------- Documents : partagés avec le club + fiches d'exercices de l'archer ----------
