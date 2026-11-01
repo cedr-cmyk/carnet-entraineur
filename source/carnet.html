@@ -85,6 +85,16 @@ textarea { min-height: 90px; resize: vertical; }
 
 h2.sec { font-family: var(--font-display); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; font-size: .95rem; color: var(--muted); margin: 8px 0 -4px; }
 .list { display: grid; gap: 8px; }
+.fi-grp { margin: 18px 0 8px; font-size: 1rem; display: flex; gap: 8px; align-items: baseline; }
+.sheet.fiche .fi-fam { margin: 0; font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.fi-sec { margin-top: 14px; } .fi-sec h4 { margin: 0 0 6px; font-size: .95rem; }
+.fi-cache { font-weight: 500; font-size: .75rem; color: var(--muted); border: 1px dashed var(--line); border-radius: 999px; padding: 1px 8px; margin-left: 6px; }
+.fi-ul { margin: 0; padding-left: 20px; display: grid; gap: 3px; } .fi-sub { padding-left: 18px; list-style: "→ "; margin-top: 3px; }
+.fi-tab { width: 100%; border-collapse: collapse; font-size: .92rem; } .fi-tab th, .fi-tab td { text-align: left; vertical-align: top; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.fi-tab td:first-child, .fi-tab th:first-child { white-space: nowrap; width: 1%; } .fi-tab tfoot td { border-bottom: 0; }
+.fi-warn { color: #b45309; font-weight: 600; } .fi-dl dt { font-weight: 700; margin-top: 4px; } .fi-dl dd { margin: 0 0 4px; }
+.fi-et { display: grid; grid-template-columns: 70px 1fr auto; gap: 6px; align-items: start; margin-bottom: 6px; }
+.fi-opt { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; } .fi-opt summary { cursor: pointer; font-weight: 600; font-size: .9rem; }
 .row { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; display: flex; gap: 14px; align-items: center; text-align: left; width: 100%; }
 .row:hover { border-color: var(--muted); }
 .row .main { flex: 1; min-width: 0; }
@@ -884,7 +894,7 @@ const PALETTE = [
   ["#6aa84f", "Vert pomme"], ["#8a9a3b", "Olive"], ["#8b5a2b", "Marron"], ["#a8896c", "Sable"], ["#7d8a96", "Gris"], ["#3a4652", "Ardoise"],
 ];
 const COLORS = PALETTE.map(([c]) => c);
-const S = { clubs: [], archers: [], seances: [], mots: [], tab: "accueil", club: "all", q: "", seance: null, archer: null, loaded: {}, db: null, canWrite: true, past: false, suivi: null, tirOpen: null, overlay: {}, tt: {}, stale: false, evaluations: [], evaluation: null, evalFrom: null, evalOv: {}, evalT: {}, dossiers: [], documents: [], folder: null, assets: null, uploading: 0, parametres: [], attributions: [], concours: [], materiel: [], matEtat: "all", concoursId: null, coSaison: null, carnets: [], centrees: [], annonces: [], reponses: [], carnet: null, cSaison: null, cTab: null, cMonth: 9 };
+const S = { clubs: [], archers: [], seances: [], mots: [], tab: "accueil", club: "all", q: "", seance: null, archer: null, loaded: {}, db: null, canWrite: true, past: false, suivi: null, tirOpen: null, overlay: {}, tt: {}, stale: false, evaluations: [], evaluation: null, evalFrom: null, evalOv: {}, evalT: {}, dossiers: [], documents: [], fiches: [], exMode: null, fTheme: "all", folder: null, assets: null, uploading: 0, parametres: [], attributions: [], concours: [], materiel: [], matEtat: "all", concoursId: null, coSaison: null, carnets: [], centrees: [], annonces: [], reponses: [], carnet: null, cSaison: null, cTab: null, cMonth: 9 };
 const $ = (s) => document.querySelector(s);
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const todayISO = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
@@ -1086,7 +1096,7 @@ function render() {
   if (S.tab === "accueil") v.innerHTML = viewAccueil();
   if (S.tab === "materiel") { v.innerHTML = viewMateriel(); if (S.canWrite && S.clubs.length) { fab.hidden = false; fab.textContent = "+ Nouveau matériel"; fab.onclick = () => formMat(); } }
   if (S.tab === "concours") { v.innerHTML = S.concoursId ? viewConcours() : viewConcoursList(); if (S.canWrite && !S.concoursId) { fab.hidden = false; fab.textContent = "+ Nouveau concours"; fab.onclick = () => formConcours(); } }
-  if (S.tab === "exos") { v.innerHTML = viewExos(); if (S.assets && S.canWrite) { fab.hidden = false; fab.textContent = "+ Déposer des fichiers"; fab.onclick = () => $("#file-in").click(); } }
+  if (S.tab === "exos") { v.innerHTML = viewExos(); if (S.exMode === "fiches" && S.canWrite) { fab.hidden = false; fab.textContent = "+ Nouvelle fiche"; fab.onclick = () => formFiche(); } else if (S.assets && S.canWrite) { fab.hidden = false; fab.textContent = "+ Déposer des fichiers"; fab.onclick = () => $("#file-in").click(); } }
   if (S.tab === "parametres") { v.innerHTML = viewData(); showStorage(); }
   if (!S.canWrite) fab.hidden = true;
 }
@@ -3768,6 +3778,121 @@ function docRow(d, withFolder = false) {
     <span class="main"><span class="t">${esc(d.titre || d.nomFichier)}</span><span class="m">${esc(meta || d.nomFichier)}</span></span>
     <span class="tirline">${fmtSize(d.taille || 0)}</span></button>`;
 }
+// ---------- Fiches d'exercices structurées (V.1.9) ----------
+// Le contenu des fiches (objectifs, consignes, déroulé…) se lit et se modifie directement dans le carnet, sans ouvrir de PDF.
+const FI_THEMES = ["Technique", "Physique", "Mental", "Tactique"];
+const FI_SECTIONS = [["objectifs", "Objectifs"], ["consignes", "Consignes"], ["etapes", "Déroulé de la séance"], ["quand", "Quand utiliser"], ["vigilance", "Points de vigilance"], ["adaptations", "Adaptations"], ["evaluation", "Méthode d'évaluation"]];
+const FI_VIS = { objectifs: true, consignes: true, etapes: true, quand: true, vigilance: true, adaptations: true, evaluation: false };
+const FI_ADAPT = [["debutant", "Débutant"], ["intermediaire", "Intermédiaire"], ["competiteur", "Compétiteur"]];
+const FI_OT = [{"code": "F-OT-1", "version": 1, "titre": "Ressenti des contacts", "famille": "Outils transversaux", "themes": ["Technique"], "sousTheme": "Ressenti des contacts", "duree": 120, "objectifs": ["Développer les sensations du geste", "Améliorer la proprioception", "Renforcer la qualité des contacts (corde, poignée, ancrage)", "Automatiser le geste sans dépendre du visuel"], "consignes": ["Tir à courte distance (environ 10 m)", "Se placer face à la cible (sécurité prioritaire)", "Fermer les yeux une fois en position", "Se concentrer sur les sensations :", "→ appuis", "→ placement", "→ traction", "→ ancrage", "Garder une exécution fluide", "Ouvrir les yeux uniquement après la décoche"], "etapes": [{"duree": 20, "texte": "Échauffement général : mobilité, élastique, activation spécifique"}, {"duree": 20, "texte": "Tir sur paille yeux ouverts : mise en place du geste"}, {"duree": 45, "texte": "Exercice principal : tir yeux fermés à 10 m (par séries courtes, 3 à 6 flèches)"}, {"duree": 25, "texte": "Tir yeux ouverts : transfert des sensations"}, {"duree": 10, "texte": "Étirements + débrief : analyse des sensations et du geste"}], "quand": ["Perte de sensations", "Archer trop visuel", "Crispation", "Travail technique de base"], "vigilance": ["Sécurité (distance, orientation)", "Qualité du geste prioritaire", "Arrêter si dégradation"], "adaptations": {"debutant": "Tir sur paille", "intermediaire": "Alternance yeux ouverts / fermés", "competiteur": "Intégration dans la routine"}, "evaluation": "L'évaluation de la séance se fait par l'observation de la qualité du geste et des sensations exprimées par l'archer.\nLes critères observés portent sur la stabilité, la fluidité du mouvement, la qualité des placements ainsi que la régularité de l'exécution sans repère visuel.\nUne attention particulière est portée à la capacité de l'archer à ressentir son geste et à identifier les différences entre tir avec et sans vision. Le retour verbal de l'archer est essentiel pour évaluer la prise de conscience des sensations.\nUn bilan est réalisé en fin de séance afin d'identifier les améliorations en termes de ressenti et de contrôle du geste. Cette évaluation permet de renforcer l'automatisation et la qualité technique."}, {"code": "F-OT-2", "version": 1, "titre": "Élastique", "famille": "Outils transversaux", "themes": ["Technique"], "sousTheme": "Répétition et placement", "duree": 120, "objectifs": ["Améliorer les placements", "Développer les sensations", "Augmenter le volume de répétitions", "Automatiser le geste"], "consignes": ["Utiliser un élastique adapté", "Reproduire le geste complet", "Se concentrer sur un point technique précis", "Maintenir une exécution lente et contrôlée", "Faire des séries de 8 à 12 répétitions"], "etapes": [{"duree": 20, "texte": "Échauffement général : mobilité, activation spécifique, élastique léger"}, {"duree": 60, "texte": "Travail à l'élastique : répétitions ciblées sur un point technique précis (placement, traction, ancrage)"}, {"duree": 25, "texte": "Tir appliqué : transfert des sensations sur cible"}, {"duree": 10, "texte": "Étirements + débrief : ressenti et qualité du geste"}], "quand": [], "vigilance": [], "adaptations": {}, "evaluation": "L'évaluation de la séance se fait par l'observation de la qualité des répétitions réalisées à l'élastique et de leur transfert sur le tir réel.\nLes critères observés portent sur la précision des placements, la fluidité du geste ainsi que la capacité à maintenir une exécution technique constante.\nUne attention particulière est portée à l'absence de compensations et à la qualité du geste plutôt qu'à la quantité de répétitions.\nUn bilan est réalisé en fin de séance afin d'identifier les progrès techniques et d'ajuster le travail."}, {"code": "F-OT-3", "version": 1, "titre": "Miroir / vidéo", "famille": "Outils transversaux", "themes": ["Technique"], "sousTheme": "Prise de conscience", "duree": 120, "objectifs": ["Améliorer la perception du geste", "Corriger les défauts techniques", "Développer l'autonomie"], "consignes": ["Se focaliser sur un seul point technique", "Observer sans modifier immédiatement", "Comparer avec le geste attendu", "Alterner observation et tir"], "etapes": [{"duree": 20, "texte": "Échauffement : mobilité et activation spécifique"}, {"duree": 20, "texte": "Tir technique : mise en place du geste"}, {"duree": 45, "texte": "Travail miroir / vidéo : observation + correction sur un point précis"}, {"duree": 25, "texte": "Tir appliqué : intégration des corrections sans outil"}, {"duree": 10, "texte": "Débrief : analyse des écarts et ressentis"}], "quand": [], "vigilance": [], "adaptations": {}, "evaluation": "L'évaluation de la séance se fait par la capacité de l'archer à identifier ses erreurs et à les corriger.\nLes critères observés portent sur la pertinence de l'analyse, la compréhension du geste ainsi que l'évolution de la qualité technique.\nUne attention particulière est portée à la capacité de l'archer à reproduire un geste corrigé sans l'aide du miroir ou de la vidéo.\nUn bilan est réalisé en fin de séance afin d'évaluer les progrès et renforcer l'autonomie."}, {"code": "F-OT-4", "version": 1, "titre": "Travail en binôme", "famille": "Outils transversaux", "themes": ["Technique"], "sousTheme": "Observation", "duree": 120, "objectifs": ["Développer l'analyse", "Améliorer la compréhension du geste", "Favoriser l'échange"], "consignes": ["Travail en duo", "Un tire, un observe", "Donner un retour précis", "Inverser les rôles"], "etapes": [{"duree": 20, "texte": "Échauffement : mobilité et activation spécifique"}, {"duree": 20, "texte": "Tir technique : mise en place des fondamentaux"}, {"duree": 45, "texte": "Travail en binôme : observation ciblée sur un point technique"}, {"duree": 25, "texte": "Tir appliqué : intégration des corrections"}, {"duree": 10, "texte": "Débrief : échanges et analyse des observations"}], "quand": [], "vigilance": [], "adaptations": {}, "evaluation": "L'évaluation de la séance se fait par la qualité des observations réalisées et la capacité à les intégrer dans le geste.\nLes critères observés portent sur la précision des retours, la compréhension technique ainsi que l'évolution du tir.\nUne attention particulière est portée à la justesse des analyses et à la capacité à corriger efficacement.\nUn bilan est réalisé en fin de séance afin d'évaluer la progression et renforcer l'autonomie."}, {"code": "F-OT-5", "version": 1, "titre": "Échauffement spécifique compétition", "famille": "Outils transversaux", "themes": ["Physique", "Technique", "Mental"], "sousTheme": "Mise en condition avant la compétition", "duree": 120, "objectifs": ["Préparer le corps à l'effort spécifique du tir à l'arc", "Activer les muscles sollicités pendant le tir", "Retrouver les repères techniques habituels", "Mettre l'archer en confiance avant le début du concours", "Installer une routine de préparation et un rythme de tir"], "consignes": ["Commencer progressivement, sans rechercher la performance dès les premières flèches", "Mobiliser les épaules, les bras, le dos et le tronc", "Réaliser quelques mouvements à l'élastique pour retrouver les sensations", "Effectuer des tirs d'échauffement en augmentant progressivement le volume et l'intensité", "Se concentrer sur les sensations et les repères habituels plutôt que sur le score", "Respecter le temps d'échauffement prévu par l'organisation de la compétition"], "etapes": [{"duree": 5, "texte": "Mobilité générale : mobilisation des épaules, des bras, du dos et du tronc, accompagnée de mouvements dynamiques contrôlés"}, {"duree": 5, "texte": "Activation spécifique : travail à l'élastique, répétitions du geste et recherche des placements habituels"}, {"duree": 5, "texte": "Mise en place technique : premières mises en tension et répétitions du geste, avec une attention particulière portée à la posture, à l'alignement et à l'ancrage"}, {"duree": 10, "texte": "Tirs d'échauffement : tirs progressifs à la distance de compétition, en privilégiant la qualité du geste, le rythme et les sensations"}, {"duree": 5, "texte": "Préparation mentale : mise en place de la routine personnelle, respiration calme et définition d'un objectif simple pour le début du concours"}], "quand": [], "vigilance": [], "adaptations": {}, "evaluation": "L'évaluation de l'échauffement se fait par l'observation de la préparation physique, technique et mentale de l'archer avant le début de la compétition.\nLes critères observés portent sur la qualité des mouvements, la stabilité des placements, la régularité du geste ainsi que la capacité à retrouver ses sensations habituelles.\nUne attention particulière est portée à la gestion du rythme, à la concentration et à la capacité de l'archer à appliquer sa routine sans se focaliser excessivement sur le résultat en cible.\nL'échauffement est considéré comme satisfaisant lorsque l'archer est physiquement prêt, retrouve ses repères techniques et se sent en confiance pour commencer le concours."}, {"code": "F-OT-6", "version": 1, "titre": "Maîtrise du cliquer", "famille": "Outils transversaux", "themes": ["Technique"], "sousTheme": "Régularité de traction, passage du cliquer et continuité du geste", "duree": 60, "objectifs": ["Comprendre le rôle du cliquer et son fonctionnement", "Trouver une traction régulière jusqu'au passage de la flèche", "Éviter l'anticipation du clic et le relâchement prématuré", "Maintenir la posture, l'alignement et la continuité du mouvement", "Améliorer la régularité du départ de flèche et la qualité de la décoche"], "consignes": ["Vérifier que la longueur de flèche et le réglage du cliquer sont adaptés à l'archer, avec l'encadrement du responsable technique", "Conserver une posture stable et un alignement cohérent pendant toute la traction", "Amener progressivement la pointe de flèche sous le cliquer, sans coup d'épaule ni accélération brutale", "Ne pas chercher à provoquer le clic en avançant artificiellement le bras d'arc ou en modifiant la posture", "Au passage du cliquer, poursuivre le mouvement de traction et laisser la décoche se produire sans geste volontaire brusque", "Si le cliquer ne passe pas après plusieurs secondes, ne pas forcer indéfiniment : revenir en sécurité, se replacer et recommencer", "Privilégier la qualité du geste plutôt que le score"], "etapes": [{"duree": 5, "texte": "Présentation et observation. Expliquer le rôle du cliquer et observer quelques flèches pour repérer les éventuelles anticipations, les variations de traction ou les ruptures de continuité."}, {"duree": 10, "texte": "Travail sans lâcher. Avec l'arc et une flèche, dans des conditions de sécurité adaptées, répéter la mise en place, la montée, l'ancrage et la traction progressive jusqu'au passage du cliquer. Revenir ensuite en position de repos sans chercher systématiquement à décocher."}, {"duree": 10, "texte": "Travail à courte distance. Tirer à distance réduite, sur une cible adaptée, en se concentrant sur la progression de la traction et le maintien de la posture. L'archer identifie le passage du cliquer sans chercher à anticiper le bruit."}, {"duree": 15, "texte": "Séries techniques à distance habituelle. Réaliser plusieurs petites volées en conservant les mêmes repères. Entre les volées, identifier si le passage du cliquer est fluide, précipité ou bloqué, puis choisir un seul point technique à corriger."}, {"duree": 10, "texte": "Travail sur la continuité. Reprendre des volées en portant l'attention sur la poursuite de la traction après le clic, la stabilité du bras d'arc et la qualité de la décoche. L'entraîneur observe notamment les réactions au bruit du cliquer."}, {"duree": 10, "texte": "Bilan et validation. Réaliser une dernière série en autonomie, puis échanger sur les sensations, les difficultés rencontrées et les repères qui ont aidé l'archer à conserver un geste régulier."}], "quand": [], "vigilance": [], "adaptations": {}, "evaluation": "L'évaluation repose d'abord sur l'observation du geste. L'entraîneur vérifie que l'archer conserve une posture stable, un ancrage reproductible et un alignement cohérent pendant la traction. Il observe si la pointe de flèche progresse de manière régulière jusqu'au passage du cliquer, sans mouvement brusque de l'épaule, poussée excessive du bras d'arc ou modification de la tête.\nUne attention particulière est portée au comportement de l'archer au moment du clic. Celui-ci ne doit pas déclencher une réaction de surprise, un relâchement précipité ou un arrêt complet de la traction. La décoche doit s'inscrire dans la continuité du mouvement, sans être provoquée volontairement par une crispation des doigts ou une action brusque.\nL'archer est également invité à décrire ses sensations : ressent-il une traction progressive, le passage du cliquer lui paraît-il prévisible, parvient-il à poursuivre son mouvement sans se focaliser uniquement sur le bruit ? Ces retours permettent de distinguer une difficulté technique d'une appréhension du clic ou d'une anticipation du départ de flèche.\nLa séance est considérée comme satisfaisante lorsque l'archer parvient à reproduire plusieurs tirs avec une traction régulière, un passage du cliquer maîtrisé et une continuité de geste préservée. La précision en cible constitue un indicateur complémentaire, mais elle ne doit pas être le seul critère de réussite."}];
+const fiTotal = (f) => (f.etapes || []).reduce((a, e) => a + (Number(e.duree) || 0), 0);
+const fiEcart = (f) => { const t = fiTotal(f); return f.duree && t && t !== Number(f.duree) ? t : 0; };
+const fiVis = (f) => ({ ...FI_VIS, ...(f.visibles || {}) });
+const fiCode = (f) => [f.code, f.version ? "V" + f.version : ""].filter(Boolean).join(" · ");
+const fiTri = (a, b) => (a.code || "~").localeCompare(b.code || "~", "fr", { numeric: true }) || (a.titre || "").localeCompare(b.titre || "", "fr");
+const fiThemesUtilises = () => [...new Set([...FI_THEMES, ...S.fiches.flatMap((f) => f.themes || [])])];
+const fiRemplie = (f, k) => k === "adaptations" ? FI_ADAPT.some(([a]) => (f.adaptations || {})[a]) : k === "evaluation" ? !!(f.evaluation || "").trim() : (f[k] || []).length > 0;
+function fiRow(f) {
+  const ec = fiEcart(f), meta = [fiCode(f), f.sousTheme, f.duree ? f.duree + " min" : ""].filter(Boolean).join(" · ");
+  return `<button class="row" data-fiche="${f.id}"><span class="thumb">FICHE</span><span class="main"><span class="t">${esc(f.titre || "Fiche sans titre")}</span><span class="m">${esc(meta)}</span></span>
+    ${ec ? `<span class="tirline" title="Le déroulé fait ${ec} min">⚠ ${ec} min</span>` : ""}</button>`;
+}
+function viewFiches() {
+  const th = S.fTheme || "all", list = S.fiches.slice().sort(fiTri);
+  const themes = fiThemesUtilises().filter((t) => list.some((f) => (f.themes || []).includes(t)));
+  if (th !== "all" && !themes.includes(th)) S.fTheme = "all";
+  const manquent = FI_OT.filter((m) => !S.fiches.some((f) => f.code === m.code)).length;
+  let h = S.canWrite ? `<div class="bar"><button class="btn primary" data-act="fiche-new">+ Nouvelle fiche</button><span class="grow"></span>
+    ${manquent ? `<button class="btn" data-act="fiche-ot">Ajouter mes outils transversaux (${manquent})</button>` : ""}</div>` : "";
+  if (!list.length) return h + `<div class="empty"><h3>Tes fiches d'exercices</h3><p>Écris tes fiches directement dans le carnet : objectifs, consignes, déroulé minuté, évaluation. Tu choisis ce que les archers pourront voir. Commence par ajouter tes outils transversaux ou crée une nouvelle fiche.</p></div>`;
+  h += `<div class="chips" role="tablist" aria-label="Thèmes"><button class="chip" data-ftheme="all" aria-pressed="${S.fTheme === "all" || !S.fTheme}">Tous les thèmes</button>${themes.map((t) => `<button class="chip" data-ftheme="${esc(t)}" aria-pressed="${S.fTheme === t}">${esc(t)}</button>`).join("")}</div>`;
+  const groupes = (S.fTheme && S.fTheme !== "all" ? [S.fTheme] : themes).map((t) => [t, list.filter((f) => (f.themes || []).includes(t))]);
+  const sans = list.filter((f) => !(f.themes || []).length);
+  if (sans.length && (!S.fTheme || S.fTheme === "all")) groupes.push(["Sans thème", sans]);
+  h += groupes.filter(([, l]) => l.length).map(([t, l]) => `<h3 class="fi-grp">${esc(t)} <span class="tirline">${l.length} fiche${l.length > 1 ? "s" : ""}</span></h3><div class="list">${l.map(fiRow).join("")}</div>`).join("");
+  return h;
+}
+function fiListe(items) {
+  let h = "", sub = [];
+  const flush = () => { if (sub.length) { h = h.replace(/<\/li>$/, `<ul class="fi-sub">${sub.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></li>`); sub = []; } };
+  items.forEach((x) => { const m = /^\s*(→|->|-)\s*(.*)$/.exec(x); if (m && h) sub.push(m[2]); else { flush(); h += `<li>${esc(x)}</li>`; } });
+  flush(); return `<ul class="fi-ul">${h}</ul>`;
+}
+function fiSection(f, k) {
+  if (k === "etapes") {
+    const ec = fiEcart(f);
+    return `<table class="fi-tab"><thead><tr><th>Temps</th><th>Travail</th></tr></thead><tbody>${(f.etapes || []).map((e) => `<tr><td>${e.duree ? esc(e.duree) + " min" : ""}</td><td>${esc(e.texte)}</td></tr>`).join("")}</tbody>
+      <tfoot><tr><td><b>${fiTotal(f)} min</b></td><td>${ec ? `<span class="fi-warn">⚠ La fiche annonce ${esc(f.duree)} min, le déroulé en fait ${ec}.</span>` : "Total"}</td></tr></tfoot></table>`;
+  }
+  if (k === "adaptations") return `<dl class="fi-dl">${FI_ADAPT.filter(([a]) => (f.adaptations || {})[a]).map(([a, l]) => `<dt>${l}</dt><dd>${esc(f.adaptations[a])}</dd>`).join("")}</dl>`;
+  if (k === "evaluation") return (f.evaluation || "").split(/\n+/).filter(Boolean).map((x) => `<p>${esc(x)}</p>`).join("");
+  return fiListe(f[k] || []);
+}
+function openFiche(f) {
+  const vis = fiVis(f), el = $("#sheet");
+  const secs = FI_SECTIONS.filter(([k]) => fiRemplie(f, k)).map(([k, l]) => `<section class="fi-sec"><h4>${l}${vis[k] ? "" : ` <span class="fi-cache">non visible par les archers</span>`}</h4>${fiSection(f, k)}</section>`).join("");
+  el.innerHTML = `<div class="sheet-bg" data-close><div class="sheet doc fiche" role="dialog" aria-label="${esc(f.titre)}">
+    <p class="fi-fam">${esc([f.famille, fiCode(f)].filter(Boolean).join(" · "))}</p><h3>${esc(f.titre || "Fiche sans titre")}</h3>
+    <p class="tirline">${esc([(f.themes || []).join(", "), f.sousTheme, f.duree ? f.duree + " min" : ""].filter(Boolean).join(" · "))}</p>
+    ${secs || `<p class="notice">Cette fiche est encore vide.</p>`}
+    <div class="acts">${S.canWrite ? `<button type="button" class="btn" id="fi-dup">Dupliquer</button><button type="button" class="btn" id="fi-edit">Modifier</button>` : ""}<button type="button" class="btn primary" data-close>Fermer</button></div></div></div>`;
+  el.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", (e) => { if (e.target === b) { el.innerHTML = ""; if (S.stale) { S.stale = false; render(); } } }));
+  const ed = $("#fi-edit"); if (ed) ed.addEventListener("click", () => formFiche(f));
+  const du = $("#fi-dup"); if (du) du.addEventListener("click", () => { const { id, ...rest } = f; const nid = newId("fiches"); const c = { ...JSON.parse(JSON.stringify(rest)), titre: (f.titre || "Fiche") + " (copie)", createdAt: Date.now(), updatedAt: Date.now() }; save("fiches", nid, c); toast("Fiche dupliquée"); formFiche({ id: nid, ...c }); });
+}
+const fiLignes = (v) => String(v || "").split("\n").map((x) => x.trim()).filter(Boolean);
+function formFiche(f = null) {
+  const v = fiVis(f || {}), th = f?.themes || [], autres = th.filter((t) => !FI_THEMES.includes(t));
+  const etRow = (e = {}) => `<div class="fi-et"><input type="number" inputmode="numeric" min="0" class="d" value="${esc(e.duree ?? "")}" placeholder="min" aria-label="Durée en minutes"><textarea class="x" rows="2" placeholder="Travail : ce que font les archers" aria-label="Travail">${esc(e.texte || "")}</textarea><button type="button" class="btn fi-et-del" aria-label="Retirer cette étape">✕</button></div>`;
+  const ta = (n, l, val, ph, rows = 4) => `<label class="f" for="fi-${n}">${l}<textarea id="fi-${n}" name="${n}" rows="${rows}" placeholder="${esc(ph)}">${esc(val)}</textarea></label>`;
+  sheet(f ? "Modifier la fiche" : "Nouvelle fiche", `
+    <label class="f" for="fi-titre">Titre<input type="text" id="fi-titre" name="titre" value="${esc(f?.titre)}" placeholder="Ex. Ressenti des contacts"></label>
+    <div class="grid2"><label class="f" for="fi-code">Code<input type="text" id="fi-code" name="code" value="${esc(f?.code)}" placeholder="Ex. F-OT-7"></label>
+      <label class="f" for="fi-ver">Version<input type="number" inputmode="numeric" min="1" id="fi-ver" name="version" value="${esc(f?.version ?? 1)}"></label></div>
+    <div class="grid2"><label class="f" for="fi-fam">Famille<input type="text" id="fi-fam" name="famille" value="${esc(f?.famille ?? "Outils transversaux")}" list="fi-fams"></label>
+      <label class="f" for="fi-dur">Durée annoncée (min)<input type="number" inputmode="numeric" min="0" id="fi-dur" name="duree" value="${esc(f?.duree ?? "")}"></label></div>
+    <datalist id="fi-fams">${[...new Set(S.fiches.map((x) => x.famille).filter(Boolean))].map((x) => `<option value="${esc(x)}">`).join("")}</datalist>
+    <div class="f">Thèmes<div class="checks">${FI_THEMES.map((t) => `<label><input type="checkbox" name="theme" value="${t}" ${th.includes(t) ? "checked" : ""}>${t}</label>`).join("")}</div>
+      <input type="text" name="themesAutres" value="${esc(autres.join(", "))}" placeholder="Autres thèmes, séparés par des virgules" aria-label="Autres thèmes"></div>
+    <label class="f" for="fi-st">Sous-thème<input type="text" id="fi-st" name="sousTheme" value="${esc(f?.sousTheme)}"></label>
+    ${ta("objectifs", "Objectifs (un par ligne)", (f?.objectifs || []).join("\n"), "Développer les sensations du geste")}
+    ${ta("consignes", "Consignes (une par ligne ; commence une ligne par → pour un sous-point)", (f?.consignes || []).join("\n"), "Se concentrer sur les sensations :\n→ appuis\n→ ancrage", 6)}
+    <div class="f">Déroulé de la séance<div id="fi-ets">${(f?.etapes?.length ? f.etapes : [{}]).map(etRow).join("")}</div>
+      <div class="bar"><button type="button" class="btn" id="fi-et-add">+ Ajouter une étape</button><span class="grow"></span><span class="tirline" id="fi-tot"></span></div></div>
+    <details class="fi-opt" ${f && ["quand", "vigilance", "adaptations"].some((k) => fiRemplie(f, k)) ? "open" : ""}><summary>Quand utiliser, points de vigilance, adaptations (facultatif)</summary>
+      ${ta("quand", "Quand utiliser (un par ligne)", (f?.quand || []).join("\n"), "Perte de sensations", 3)}
+      ${ta("vigilance", "Points de vigilance (un par ligne)", (f?.vigilance || []).join("\n"), "Sécurité (distance, orientation)", 3)}
+      ${FI_ADAPT.map(([a, l]) => `<label class="f" for="fi-ad-${a}">Adaptation ${l.toLowerCase()}<input type="text" id="fi-ad-${a}" name="ad-${a}" value="${esc(f?.adaptations?.[a])}"></label>`).join("")}</details>
+    ${ta("evaluation", "Méthode d'évaluation", f?.evaluation || "", "Ce que tu observes pour savoir si la séance a porté ses fruits", 5)}
+    <div class="f">Ce que voient les archers<div class="checks">${FI_SECTIONS.map(([k, l]) => `<label><input type="checkbox" name="vis" value="${k}" ${v[k] ? "checked" : ""}>${l}</label>`).join("")}</div>
+      <span class="tirline">Les parties décochées restent visibles pour toi seulement.</span></div>`, {
+    onSave(fd) {
+      const titre = fd.get("titre").trim(); if (!titre) { toast("Donne un titre à la fiche"); return false; }
+      const etapes = [...document.querySelectorAll("#fi-ets .fi-et")].map((r) => ({ duree: Number(r.querySelector(".d").value) || 0, texte: r.querySelector(".x").value.trim() })).filter((e) => e.duree || e.texte);
+      const themes = [...fd.getAll("theme"), ...String(fd.get("themesAutres") || "").split(",").map((x) => x.trim()).filter(Boolean)];
+      const visSet = new Set(fd.getAll("vis"));
+      const data = { titre, code: fd.get("code").trim(), version: Number(fd.get("version")) || 1, famille: fd.get("famille").trim(), themes: [...new Set(themes)], sousTheme: fd.get("sousTheme").trim(),
+        duree: Number(fd.get("duree")) || null, objectifs: fiLignes(fd.get("objectifs")), consignes: fiLignes(fd.get("consignes")), etapes,
+        quand: fiLignes(fd.get("quand")), vigilance: fiLignes(fd.get("vigilance")), adaptations: Object.fromEntries(FI_ADAPT.map(([a]) => [a, String(fd.get("ad-" + a) || "").trim()]).filter(([, x]) => x)),
+        evaluation: String(fd.get("evaluation") || "").trim(), visibles: Object.fromEntries(FI_SECTIONS.map(([k]) => [k, visSet.has(k)])),
+        createdAt: f?.createdAt || Date.now(), updatedAt: Date.now() };
+      const id = f?.id || newId("fiches"); save("fiches", id, data); toast(f ? "Fiche enregistrée" : "Fiche créée");
+      setTimeout(() => { const n = S.fiches.find((x) => x.id === id); if (n && !$("#sheet").innerHTML) openFiche(n); }, 60);
+    },
+    onDelete: f ? () => { remove("fiches", f.id); toast("Fiche supprimée"); } : null, deleteLabel: "Supprimer la fiche",
+  });
+  const box = $("#fi-ets"), tot = () => { const t = [...box.querySelectorAll(".d")].reduce((a, i) => a + (Number(i.value) || 0), 0), d = Number($("#fi-dur").value) || 0;
+    $("#fi-tot").textContent = `Total ${t} min` + (d && t && d !== t ? ` · ⚠ annoncé ${d} min` : ""); };
+  box.addEventListener("input", tot); $("#fi-dur").addEventListener("input", tot);
+  box.addEventListener("click", (e) => { const b = e.target.closest(".fi-et-del"); if (!b) return; b.parentElement.remove(); if (!box.children.length) box.insertAdjacentHTML("beforeend", etRow()); tot(); });
+  $("#fi-et-add").addEventListener("click", () => { box.insertAdjacentHTML("beforeend", etRow()); tot(); box.lastElementChild.querySelector(".d").focus(); });
+  tot();
+}
+function importOT() {
+  const manquent = FI_OT.filter((m) => !S.fiches.some((f) => f.code === m.code));
+  manquent.forEach((m) => save("fiches", newId("fiches"), { ...JSON.parse(JSON.stringify(m)), visibles: { ...FI_VIS }, createdAt: Date.now(), updatedAt: Date.now() }));
+  toast(`${manquent.length} fiche${manquent.length > 1 ? "s" : ""} ajoutée${manquent.length > 1 ? "s" : ""}`);
+}
 // Liste des dossiers pour choisir une période (tous niveaux, dans l'ordre de la bibliothèque)
 function periodOptions(sel) {
   const opts = [`<option value="">Aucune période</option>`];
@@ -3804,6 +3929,11 @@ function folderOptions(sel, exclude = []) {
   walk(null, 1); return opts.join("");
 }
 function viewExos() {
+  const modes = `<div class="chips" role="tablist" aria-label="Bibliothèque"><button class="chip" role="tab" data-exmode="fichiers" aria-pressed="${S.exMode !== "fiches"}" aria-selected="${S.exMode !== "fiches"}">Fichiers</button><button class="chip" role="tab" data-exmode="fiches" aria-pressed="${S.exMode === "fiches"}" aria-selected="${S.exMode === "fiches"}">Fiches d'exercices${S.fiches.length ? ` (${S.fiches.length})` : ""}</button></div>`;
+  if (S.exMode === "fiches") return modes + viewFiches();
+  return modes + viewFichiers();
+}
+function viewFichiers() {
   if (S.folder && !S.dossiers.some((d) => d.id === S.folder)) S.folder = null;
   const path = folderPath(S.folder), subs = subFolders(S.folder), docs = docsIn(S.folder);
   const crumbs = `<nav class="crumbs" aria-label="Dossier">${S.folder ? `<button data-folder="">Exercices</button>` : `<b>Exercices</b>`}
@@ -4423,7 +4553,7 @@ async function showStorage() {
   } catch (e) { console.error(e); }
 }
 // ---------- Restauration d'une sauvegarde ----------
-const BK_COLS = [["clubs", "clubs"], ["archers", "archers"], ["seances", "séances"], ["evaluations", "évaluations"], ["carnets", "carnets de saison"], ["carnetEntrees", "lignes de carnet"], ["dossiers", "dossiers"], ["documents", "fiches"], ["parametres", "paramètres"], ["attributions", "exercices attribués"], ["concours", "concours"], ["materiel", "matériel"], ["annonces", "infos du club"], ["reponses", "réponses aux entraînements"], ["mots", "mots aux archers"]];
+const BK_COLS = [["clubs", "clubs"], ["archers", "archers"], ["seances", "séances"], ["evaluations", "évaluations"], ["carnets", "carnets de saison"], ["carnetEntrees", "lignes de carnet"], ["dossiers", "dossiers"], ["documents", "documents"], ["fiches", "fiches d'exercices"], ["parametres", "paramètres"], ["attributions", "exercices attribués"], ["concours", "concours"], ["materiel", "matériel"], ["annonces", "infos du club"], ["reponses", "réponses aux entraînements"], ["mots", "mots aux archers"]];
 function startRestore() {
   const inp = document.createElement("input"); inp.type = "file"; inp.accept = "application/json,.json,application/zip,.zip";
   inp.addEventListener("change", async () => {
@@ -4773,7 +4903,7 @@ function formSeance(s = null) {
 
 // ---------- Événements ----------
 document.addEventListener("click", (e) => {
-  const t = e.target.closest("[data-tab],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab],[data-qsort],[data-coptab],[data-com-edit],[data-fmtfed],[data-fmt-del],[data-type-del],[data-fete-ap],[data-fete-new],[data-fete-edit],[data-fete-imgdel],[data-mot-edit],[data-centry-open],[data-cd-exp],[data-cd-arch]");
+  const t = e.target.closest("[data-tab],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab],[data-qsort],[data-coptab],[data-com-edit],[data-fmtfed],[data-fmt-del],[data-type-del],[data-fete-ap],[data-fete-new],[data-fete-edit],[data-fete-imgdel],[data-mot-edit],[data-centry-open],[data-cd-exp],[data-cd-arch],[data-exmode],[data-ftheme],[data-fiche]");
   if (!t || t.closest("#sheet")) return;
   if (t.dataset.dashSuivi) { const [sid, aid] = t.dataset.dashSuivi.split("|"); S.seance = sid; S.suivi = aid; S.tirOpen = null; render(); window.scrollTo(0, 0); return; }
   if (t.dataset.tab) { go(t.dataset.tab); try { history.replaceState(null, "", "#" + t.dataset.tab); } catch (_) {} return; }
@@ -4803,6 +4933,11 @@ document.addEventListener("click", (e) => {
   if (t.dataset.tcopen) { coachTir(t.dataset.tcopen); return; }
   if (t.dataset.annonce) { const n = S.annonces.find((x) => x.id === t.dataset.annonce); if (n && S.canWrite) formAnnonce(n); return; }
   if (t.dataset.partage) { const d = S.documents.find((x) => x.id === t.dataset.partage); if (d) formPartage(d); return; }
+  if (t.dataset.exmode) { S.exMode = t.dataset.exmode; try { localStorage.setItem("carnet-exmode", S.exMode); } catch (e) {} render(); return; }
+  if (t.dataset.ftheme) { S.fTheme = t.dataset.ftheme; render(); return; }
+  if (t.dataset.fiche) { const f = S.fiches.find((x) => x.id === t.dataset.fiche); if (f) openFiche(f); return; }
+  if (t.dataset.act === "fiche-new") { formFiche(); return; }
+  if (t.dataset.act === "fiche-ot") { importOT(); return; }
   if (t.dataset.doc) { const d = S.documents.find((x) => x.id === t.dataset.doc); if (d) openDoc(d); return; }
   if (t.dataset.act === "new-folder") { formFolder(); return; }
   if (t.dataset.act === "edit-folder") { formFolder(S.dossiers.find((x) => x.id === S.folder)); return; }
@@ -5139,6 +5274,7 @@ function subscribe(col) {
   }, (err) => { $("#sync").textContent = "Synchronisation interrompue"; console.error(err); });
 }
 
+try { S.exMode = localStorage.getItem("carnet-exmode"); } catch (e) {}
 try { applyDisplay(); } catch (e) { console.error(e); }
 render();
 (async () => {
@@ -5147,7 +5283,7 @@ render();
   S.db = db;
   if (user) { const w = await user.can("data.write"); if (w === false) S.canWrite = false; }
   S.seesData = user ? (user.isOwner() || user.canEdit()) : null;
-  ["clubs", "archers", "seances", "evaluations", "dossiers", "documents", "carnets", "parametres", "attributions", "concours", "materiel", "annonces", "reponses", "mots"].forEach(subscribe);
+  ["clubs", "archers", "seances", "evaluations", "dossiers", "documents", "fiches", "carnets", "parametres", "attributions", "concours", "materiel", "annonces", "reponses", "mots"].forEach(subscribe);
   claude.use("assets").then((as) => { S.assets = as; render(); });
   render();
 })();
