@@ -5,7 +5,7 @@
 // Les jetons Canva ne quittent jamais le serveur.
 //
 // Réglages (Supabase › Edge Functions › Secrets) : CANVA_CLIENT_ID, CANVA_CLIENT_SECRET, APP_URL (adresse du carnet).
-// SUPABASE_URL, SUPABASE_ANON_KEY et SUPABASE_SERVICE_ROLE_KEY sont fournis par Supabase.
+// L'adresse et les clés du projet (SUPABASE_URL, clés publique et secrète) sont fournies par Supabase.
 // À déployer SANS la vérification automatique du jeton (« Verify JWT » décoché) : Canva revient ici sans jeton,
 // et la fonction vérifie elle-même l'entraîneur pour toutes les autres demandes.
 
@@ -28,7 +28,16 @@ const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 const nomPdf = (t) => (String(t || "Fiche Canva").replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 80) || "Fiche Canva") + ".pdf";
 
 // ---------- Supabase (clé de service, côté serveur uniquement) ----------
-const srv = () => ({ apikey: env("SUPABASE_SERVICE_ROLE_KEY"), Authorization: "Bearer " + env("SUPABASE_SERVICE_ROLE_KEY") });
+// Clés du projet : anciennes (SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY) ou nouvelles (SUPABASE_PUBLISHABLE_KEYS, SUPABASE_SECRET_KEYS)
+const cle = (ancienne, nouvelles) => {
+  if (env(ancienne)) return env(ancienne);
+  const v = env(nouvelles); if (!v) return "";
+  try { const o = JSON.parse(v); return typeof o === "string" ? o : o.default || Object.values(o)[0] || ""; } catch (e) { return v.split(",")[0].trim(); }
+};
+const cleService = () => cle("SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEYS");
+const clePublique = () => cle("SUPABASE_ANON_KEY", "SUPABASE_PUBLISHABLE_KEYS");
+// une nouvelle clé secrète (sb_secret_…) passe seulement en « apikey » ; une ancienne clé (jeton) passe aussi en « Authorization »
+const srv = () => { const k = cleService(); return k.startsWith("eyJ") ? { apikey: k, Authorization: "Bearer " + k } : { apikey: k }; };
 async function rest(path, opt = {}) {
   const r = await fetch(env("SUPABASE_URL") + "/rest/v1/" + path, { ...opt, headers: { ...srv(), "Content-Type": "application/json", ...(opt.headers || {}) } });
   if (!r.ok) throw new Erreur("serveur", "Base de données : " + r.status + " " + (await r.text()).slice(0, 200), 500);
@@ -48,10 +57,10 @@ async function effacer(owner, id) {
 async function entraineur(req) {
   const jeton = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
   if (!jeton) throw new Erreur("connexion", "Connecte-toi d'abord au carnet.", 401);
-  const u = await fetch(env("SUPABASE_URL") + "/auth/v1/user", { headers: { apikey: env("SUPABASE_ANON_KEY"), Authorization: "Bearer " + jeton } });
+  const u = await fetch(env("SUPABASE_URL") + "/auth/v1/user", { headers: { apikey: clePublique(), Authorization: "Bearer " + jeton } });
   if (!u.ok) throw new Erreur("connexion", "Session expirée : reconnecte-toi au carnet.", 401);
   const user = await u.json();
-  const c = await fetch(env("SUPABASE_URL") + "/rest/v1/rpc/est_coach", { method: "POST", headers: { apikey: env("SUPABASE_ANON_KEY"), Authorization: "Bearer " + jeton, "Content-Type": "application/json" }, body: "{}" });
+  const c = await fetch(env("SUPABASE_URL") + "/rest/v1/rpc/est_coach", { method: "POST", headers: { apikey: clePublique(), Authorization: "Bearer " + jeton, "Content-Type": "application/json" }, body: "{}" });
   if (!c.ok || (await c.json()) !== true) throw new Erreur("interdit", "Réservé à l'entraîneur.", 403);
   return user.id;
 }
