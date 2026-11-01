@@ -768,7 +768,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
 <div id="toast" class="toast" hidden></div>
 <input type="file" id="file-in" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.mp4,.webm,.txt,.md,.csv,application/pdf,image/*,video/mp4,video/webm,text/plain,text/markdown,text/csv">
 
-<script>window.CARNET_VERSION = { v: "1.8", date: "2026-10-31", site: "1.8", test: false };</script>
+<script>window.CARNET_VERSION = { v: "1.9", date: "2026-11-01", site: "1.9", test: false };</script>
 <script>
 // Espace archer : l'archer (ou son parent) voit uniquement ses propres informations,
 // telles que les renvoie la base (fonction espace_archer), et remplit son carnet.
@@ -1685,6 +1685,7 @@ function render() {
   fab.hidden = true;
   if (!S.db) { v.innerHTML = noDb(); return; }
   if (!S.loaded.clubs || !S.loaded.archers || !S.loaded.seances || !S.loaded.evaluations || !S.loaded.dossiers || !S.loaded.documents || !S.loaded.carnets || !S.loaded.attributions || !S.loaded.concours || !S.loaded.materiel) { v.innerHTML = `<p class="notice">Chargement de ton carnet…</p>`; return; }
+  if (!CV.auto && CANVA()) setTimeout(canvaDemarrage, 0);
   if (S.evaluation) { v.innerHTML = viewEval(); return; }
   if (S.carnet) { v.innerHTML = viewCarnet(); return; }
   linkSubscribe();
@@ -4375,7 +4376,8 @@ const subFolders = (pid) => S.dossiers.filter((d) => (d.parentId || null) === (p
 const folderName = (id) => S.dossiers.find((d) => d.id === id)?.nom || "";
 function docRow(d, withFolder = false) {
   const k = kind(d.contentType);
-  const meta = withFolder ? [folderName(d.dossierId), d.description ? d.description.slice(0, 90) : ""].filter(Boolean).join(" · ") : (d.description ? d.description.slice(0, 120) : d.nomFichier);
+  let meta = withFolder ? [folderName(d.dossierId), d.description ? d.description.slice(0, 90) : ""].filter(Boolean).join(" · ") : (d.description ? d.description.slice(0, 120) : d.nomFichier);
+  if (d.canva?.designId) meta = ["Canva" + (d.canva.majLe ? ", à jour le " + fmtDT(d.canva.majLe) : ""), meta !== d.nomFichier ? meta : ""].filter(Boolean).join(" · ");
   return `<button class="row" data-doc="${d.id}">${k === "img" ? `<img class="thumb" src="${esc(blobUrl(d))}" alt="" loading="lazy">` : `<span class="thumb">${KIND_LAB[k]}</span>`}
     <span class="main"><span class="t">${esc(d.titre || d.nomFichier)}</span><span class="m">${esc(meta || d.nomFichier)}</span></span>
     <span class="tirline">${fmtSize(d.taille || 0)}</span></button>`;
@@ -4422,6 +4424,7 @@ function viewExos() {
     ${path.map((f, i) => `<span>›</span>${i === path.length - 1 ? `<b>${esc(f.nom)}</b>` : `<button data-folder="${f.id}">${esc(f.nom)}</button>`}`).join("")}</nav>`;
   const acts = S.canWrite ? `<div class="bar"><button class="btn" data-act="new-folder">+ Nouveau dossier</button>
       ${S.folder ? `<button class="btn" data-act="edit-folder">Renommer ou déplacer</button>` : ""}<span class="grow"></span>
+      ${window.CARNET_STANDALONE ? `<button class="btn" data-act="canva">🎨 Fiches Canva</button>` : ""}
       ${S.assets ? `<button class="btn primary" data-act="upload">Déposer des fichiers</button>` : ""}</div>` : "";
   const drop = S.canWrite ? (S.assets
     ? `<div class="drop" id="drop">${S.uploading ? `Envoi en cours… ${S.uploading} fichier${S.uploading > 1 ? "s" : ""} restant${S.uploading > 1 ? "s" : ""}` : `Glisse tes fichiers ici ou touche « Déposer des fichiers ». PDF, images, vidéos MP4 ou WebM, textes · 20 Mo maximum par fichier.`}</div>`
@@ -4530,6 +4533,7 @@ function openDoc(d) {
   el.innerHTML = `<div class="sheet-bg" data-close><div class="sheet doc" role="dialog" aria-label="${esc(d.titre)}">
     <h3>${esc(d.titre || d.nomFichier)}</h3>${media}
     ${d.description ? `<p class="prev">${esc(d.description)}</p>` : ""}
+    ${d.canva?.designId ? `<div class="bar"><span class="tirline">🎨 Fiche Canva${d.canva.majLe ? ", à jour le " + esc(fmtDT(d.canva.majLe)) : ""}</span><span class="grow"></span>${S.canWrite && CANVA() ? `<button type="button" class="btn" id="doc-cv">Mettre à jour depuis Canva</button>` : ""}</div>` : ""}
     <div class="acts">
       <button type="button" class="btn" id="doc-dl">Télécharger</button>
       ${S.canWrite ? `<button type="button" class="btn" id="doc-share">${(d.partageClubs || []).length ? "Partagé avec les archers" : "Partager avec les archers"}</button><button type="button" class="btn" id="doc-attr">Attribuer à un archer</button><button type="button" class="btn" id="doc-edit">Modifier</button>` : ""}
@@ -4544,6 +4548,11 @@ function openDoc(d) {
   const ed = $("#doc-edit"); if (ed) ed.addEventListener("click", () => formDoc(d));
   const at = $("#doc-attr"); if (at) at.addEventListener("click", () => formAttrFromDoc(d));
   const sh = $("#doc-share"); if (sh) sh.addEventListener("click", () => formPartage(d));
+  const cv = $("#doc-cv"); if (cv) cv.addEventListener("click", async () => {
+    cv.disabled = true; cv.textContent = "Mise à jour…";
+    try { const r = await CANVA()("sync", { ids: [d.id], forcer: true }); canvaBilan(r, true); const nd = S.documents.find((x) => x.id === d.id); if (nd && $("#doc-cv")) openDoc(nd); }
+    catch (e) { toast(canvaErr(e)); cv.disabled = false; cv.textContent = "Mettre à jour depuis Canva"; }
+  });
   if (k === "pdf") {
     let zoom = 1; const box = $("#pdfbox");
     renderPdf(d, box, zoom);
@@ -4552,12 +4561,97 @@ function openDoc(d) {
   }
   if (k === "txt") fetch(url).then((r) => r.text()).then((t) => { const b = $("#txtbox"); if (b) b.textContent = t; }).catch(() => { const b = $("#txtbox"); if (b) b.textContent = "Impossible d'afficher ce fichier."; });
 }
+// ---------- Fiches Canva (V.1.9) ----------
+// Le carnet récupère lui-même le PDF à jour des fiches Canva choisies (fonction Supabase « canva ») : plus besoin de les télécharger puis de les redéposer.
+const CANVA = () => window.CARNET_CANVA || null;
+const CV = { etat: null, designs: null, suite: null, recherche: "", busy: "", auto: false };
+const fmtDT = (ms) => (ms ? new Date(ms).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "");
+const canvaDocs = () => S.documents.filter((d) => d.canva?.designId).sort((a, b) => (a.titre || "").localeCompare(b.titre || "", "fr"));
+const canvaErr = (e) => (e?.code === "reconnecter" ? (CV.etat = { connecte: false }, "La liaison avec Canva a expiré : reconnecte Canva.") : e?.message || "Canva ne répond pas.");
+async function canvaEtat(force) {
+  if (!CANVA()) return null;
+  if (CV.etat && !force) return CV.etat;
+  try { CV.etat = await CANVA()("etat"); } catch (e) { CV.etat = { connecte: false, erreur: canvaErr(e), code: e?.code }; }
+  return CV.etat;
+}
+function canvaBody() {
+  if (!CANVA()) return `<p class="notice">Les fiches Canva se relient depuis l'appli installée (le site du carnet), pas depuis cette vue Claude.</p>`;
+  const st = CV.etat;
+  if (!st) return `<p class="tirline">Vérification de la liaison avec Canva…</p>`;
+  if (!st.connecte) return `<p>Relie ton compte Canva une fois : le carnet ira ensuite chercher tout seul le PDF à jour de tes fiches et les rangera dans tes documents. Plus besoin de les télécharger puis de les redéposer.</p>
+    ${st.erreur ? `<p class="notice">${esc(st.erreur)}</p>` : ""}
+    <div class="bar"><button type="button" class="btn primary" id="cv-connect" ${CV.busy || st.code === "absente" ? "disabled" : ""}>${CV.busy === "connect" ? "Ouverture de Canva…" : "Connecter Canva"}</button></div>
+    <span class="tirline">Canva te demandera d'autoriser le carnet à lire tes designs. Tu reviens ensuite ici automatiquement.</span>`;
+  const docs = canvaDocs();
+  let h = `<div class="bar"><span class="tag">✓ Relié à Canva${st.depuis ? " depuis le " + esc(new Date(st.depuis).toLocaleDateString("fr-FR")) : ""}</span><span class="grow"></span>
+    <button type="button" class="btn" id="cv-sync" ${CV.busy || !docs.length ? "disabled" : ""}>${CV.busy === "sync" ? "Mise à jour…" : "Mettre à jour maintenant"}</button></div>`;
+  h += `<h4 class="hub-h" style="margin-top:12px">Fiches reliées</h4>`;
+  h += docs.length ? `<div class="list">${docs.map((d) => `<div class="row"><span class="thumb">PDF</span><span class="main"><button type="button" class="lnk" data-cv-open="${d.id}">${esc(d.titre || d.nomFichier)}</button>
+      <span class="m">${[d.dossierId ? folderName(d.dossierId) : "Exercices", d.canva.majLe ? "à jour le " + fmtDT(d.canva.majLe) : ""].filter(Boolean).map(esc).join(" · ")}${d.canva.erreur ? ` · <b style="color:var(--danger,#b42318)">${esc(d.canva.erreur)}</b>` : ""}</span></span></div>`).join("")}</div>`
+    : `<p class="tirline">Aucune fiche reliée pour l'instant.</p>`;
+  h += `<h4 class="hub-h" style="margin-top:14px">Ajouter une fiche Canva</h4>
+    <div class="bar"><input type="search" id="cv-q" placeholder="Nom de la fiche dans Canva" value="${esc(CV.recherche)}" style="flex:1;min-width:0"><button type="button" class="btn" id="cv-find" ${CV.busy ? "disabled" : ""}>${CV.busy === "find" ? "Recherche…" : "Chercher"}</button></div>
+    <span class="tirline">La fiche est ajoutée dans le dossier ouvert (${esc(S.folder ? folderName(S.folder) : "Exercices")}). Tu pourras ensuite la partager avec les archers comme les autres documents.</span>`;
+  if (CV.designs) {
+    const lies = new Set(docs.map((d) => d.canva.designId));
+    h += CV.designs.length ? `<div class="list" style="margin-top:8px">${CV.designs.map((x) => `<div class="row">${x.vignette ? `<img class="thumb" src="${esc(x.vignette)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : `<span class="thumb">CANVA</span>`}
+        <span class="main"><span class="t">${esc(x.titre)}</span><span class="m">${x.modifieLe ? "modifiée le " + esc(fmtDT(x.modifieLe)) : ""}</span></span>
+        ${lies.has(x.id) ? `<span class="tag">déjà reliée</span>` : `<button type="button" class="btn" data-cv-add="${esc(x.id)}" ${CV.busy ? "disabled" : ""}>${CV.busy === "add:" + x.id ? "Ajout…" : "Ajouter"}</button>`}</div>`).join("")}</div>
+        ${CV.suite ? `<div class="bar"><button type="button" class="btn" id="cv-more" ${CV.busy ? "disabled" : ""}>Voir plus</button></div>` : ""}`
+      : `<p class="tirline">Aucune fiche trouvée dans Canva.</p>`;
+  }
+  h += `<div class="bar" style="margin-top:14px"><span class="grow"></span><button type="button" class="btn danger" id="cv-off" ${CV.busy ? "disabled" : ""}>Déconnecter Canva</button></div>
+    <span class="tirline">Les fiches déjà ajoutées restent dans tes documents. Le carnet les remet à jour tout seul une fois par jour quand tu l'ouvres.</span>`;
+  return h;
+}
+function openCanva() {
+  const el = $("#sheet");
+  const draw = () => {
+    if (!el.querySelector("#cv-sheet")) return;
+    el.querySelector("#cv-body").innerHTML = canvaBody();
+    const on = (id, fn) => { const b = el.querySelector("#" + id); if (b) b.addEventListener("click", fn); };
+    const run = async (busy, fn) => { CV.busy = busy; draw(); try { await fn(); } catch (e) { toast(canvaErr(e)); if (e?.code === "reconnecter") CV.designs = null; } CV.busy = ""; draw(); };
+    on("cv-connect", () => run("connect", async () => { const r = await CANVA()("debut"); location.href = r.url; await new Promise(() => {}); }));
+    on("cv-sync", () => run("sync", async () => { const r = await CANVA()("sync", { forcer: true }); try { localStorage.setItem("canva-sync", String(Date.now())); } catch (e) {} canvaBilan(r, true); }));
+    const find = (more) => { CV.recherche = el.querySelector("#cv-q")?.value.trim() || ""; run("find", async () => { const r = await CANVA()("designs", { recherche: CV.recherche, suite: more ? CV.suite : null }); CV.designs = more ? [...(CV.designs || []), ...r.designs] : r.designs; CV.suite = r.suite; }); };
+    on("cv-find", () => find(false)); on("cv-more", () => find(true));
+    const q = el.querySelector("#cv-q"); if (q) q.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); find(false); } });
+    el.querySelectorAll("[data-cv-add]").forEach((b) => b.addEventListener("click", () => run("add:" + b.dataset.cvAdd, async () => {
+      const r = await CANVA()("ajouter", { designId: b.dataset.cvAdd, dossierId: S.folder || null }); toast(r.deja ? "Fiche déjà reliée : remise à jour" : `« ${r.titre || "Fiche"} » ajoutée à tes documents`); })));
+    el.querySelectorAll("[data-cv-open]").forEach((b) => b.addEventListener("click", () => { const d = S.documents.find((x) => x.id === b.dataset.cvOpen); if (d) openDoc(d); }));
+    on("cv-off", (e) => { const b = e.currentTarget; if (!b.dataset.confirm) { b.dataset.confirm = 1; b.textContent = "Confirmer la déconnexion"; return; }
+      run("off", async () => { CV.etat = await CANVA()("deconnecter"); CV.designs = null; toast("Canva est déconnecté"); }); });
+  };
+  el.innerHTML = `<div class="sheet-bg" data-close><div class="sheet" role="dialog" aria-label="Fiches Canva" id="cv-sheet"><h3>Fiches Canva</h3><div id="cv-body"></div>
+    <div class="acts"><button type="button" class="btn primary" data-close>Fermer</button></div></div></div>`;
+  el.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", (e) => { if (e.target === b) { el.innerHTML = ""; render(); } }));
+  draw();
+  canvaEtat(true).then(draw);
+}
+function canvaBilan(r, parle) {
+  const n = (k) => (r.resultats || []).filter((x) => x.etat === k).length, maj = n("mis-a-jour"), err = (r.resultats || []).filter((x) => x.etat === "erreur");
+  if (err.length) toast(`${err.length} fiche${err.length > 1 ? "s" : ""} Canva non mise${err.length > 1 ? "s" : ""} à jour : ${err[0].titre || ""} — ${err[0].message}`);
+  else if (parle) toast(maj ? `${maj} fiche${maj > 1 ? "s" : ""} mise${maj > 1 ? "s" : ""} à jour depuis Canva` : "Tes fiches Canva sont déjà à jour");
+  else if (maj) toast(`${maj} fiche${maj > 1 ? "s" : ""} Canva mise${maj > 1 ? "s" : ""} à jour`);
+}
+// Au démarrage : retour de Canva après la connexion, puis mise à jour automatique (au plus une fois toutes les 12 h)
+async function canvaDemarrage() {
+  if (CV.auto || !CANVA() || !S.canWrite) return; CV.auto = true;
+  let retour = null; try { const m = location.hash.match(/canva=(\w+)/); if (m) { retour = m[1]; history.replaceState(null, "", location.pathname + location.search + "#exos"); } } catch (e) {}
+  if (retour) { toast(retour === "ok" ? "Canva est relié à ton carnet" : retour === "refuse" ? "Connexion à Canva annulée" : "La connexion à Canva n'a pas abouti : réessaie"); S.tab = "exos"; render(); if (retour === "ok") openCanva(); return; }
+  if (!canvaDocs().length || !navigator.onLine) return;
+  let last = 0; try { last = Number(localStorage.getItem("canva-sync")) || 0; } catch (e) {}
+  if (Date.now() - last < 12 * 3600000) return;
+  try { localStorage.setItem("canva-sync", String(Date.now())); } catch (e) {}
+  try { canvaBilan(await CANVA()("sync"), false); } catch (e) { if (["reconnecter", "pas-connecte"].includes(e?.code)) toast("Fiches Canva : " + canvaErr(e)); else console.warn("Canva", e); }
+}
+
 function formDoc(d) {
   sheet("Modifier le document", `
     <label class="f" for="f-dtit">Titre<input type="text" id="f-dtit" name="titre" value="${esc(d.titre)}"></label>
     <label class="f" for="f-ddesc">Description, consignes<textarea id="f-ddesc" name="description" placeholder="Objectif de l'exercice, matériel, déroulé…">${esc(d.description)}</textarea></label>
     <label class="f" for="f-ddos">Dossier<select id="f-ddos" name="dossierId">${folderOptions(d.dossierId)}</select></label>
-    <span class="tirline">Fichier : ${esc(d.nomFichier)} · ${fmtSize(d.taille || 0)}</span>`,
+    <span class="tirline">Fichier : ${esc(d.nomFichier)} · ${fmtSize(d.taille || 0)}${d.canva?.designId ? " · relié à Canva : le PDF est remplacé à chaque mise à jour de la fiche" : ""}</span>`,
     {
       onSave(fd) { patch("documents", d.id, { titre: fd.get("titre").trim() || d.nomFichier, description: fd.get("description").trim(), dossierId: fd.get("dossierId") || null }); toast("Document enregistré"); },
       onDelete: async () => {
@@ -5288,6 +5382,7 @@ document.addEventListener("click", (e) => {
   if (t.dataset.act === "new-folder") { formFolder(); return; }
   if (t.dataset.act === "edit-folder") { formFolder(S.dossiers.find((x) => x.id === S.folder)); return; }
   if (t.dataset.act === "upload") { $("#file-in").click(); return; }
+  if (t.dataset.act === "canva") { openCanva(); return; }
   if (t.dataset.act === "pick-exos") { pickExos(); return; }
   if (t.dataset.act === "attr-add") { pickAttr(); return; }
   if (t.dataset.act === "print-sheet") { formPrint(); return; }

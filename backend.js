@@ -209,6 +209,21 @@
   }
   navigator.serviceWorker?.addEventListener("message", (e) => { if (e.data?.type === "need-auth") tellSW(); });
 
+  // ---------- Fiches Canva (V.1.9) : la fonction Supabase « canva » exporte les PDF et met à jour les documents ----------
+  window.CARNET_CANVA = async (action, body = {}) => {
+    if (!navigator.onLine || !session || session.offline) { const e = new Error("Il faut le réseau pour parler à Canva."); e.code = "reseau"; throw e; }
+    const s = (await sb.auth.getSession()).data?.session || session;
+    let r;
+    try {
+      r = await fetch(CFG.supabaseUrl + "/functions/v1/canva", { method: "POST", headers: { "Content-Type": "application/json", apikey: CFG.supabaseAnonKey, Authorization: "Bearer " + s.access_token }, body: JSON.stringify({ action, ...body }) });
+    } catch (e) { const er = new Error("Canva ne répond pas : vérifie le réseau, ou que la fonction « canva » est bien installée dans Supabase."); er.code = "reseau"; throw er; }
+    const d = await r.json().catch(() => ({}));
+    if (r.status === 404 && !d.erreur) { const e = new Error("La fonction « canva » n'est pas encore installée dans Supabase."); e.code = "absente"; throw e; }
+    if (!r.ok || d.erreur) { const e = new Error(d.message || "Erreur " + r.status); e.code = d.erreur || "erreur"; throw e; }
+    if (["ajouter", "sync"].includes(action)) await pull().catch(() => {}); // les documents mis à jour par le serveur
+    return d;
+  };
+
   // ---------- Téléchargements ----------
   const downloads = {
     async save({ filename, data }) {
