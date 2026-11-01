@@ -597,7 +597,7 @@ table.qvq td, table.qvq th { white-space: nowrap; } .qvq-f { display: flex; gap:
 :root[data-fete] .brand .logo { background: linear-gradient(135deg, var(--fete-a), var(--fete-b)); box-shadow: 0 6px 20px color-mix(in srgb, var(--fete-a) 40%, transparent); position: relative; }
 :root[data-fete] .brand .logo svg { color: #fff; }
 :root[data-fete="fetes"] .brand .logo svg { color: #1A1205; }
-:root[data-fete] .brand .logo::after { content: "★"; position: absolute; top: -7px; right: -6px; font-size: 15px; line-height: 1; color: var(--fete-d); text-shadow: 0 1px 2px rgba(0,0,0,.5); }
+:root[data-fete] .brand .logo::after { content: var(--perso-ic, "★"); position: absolute; top: -7px; right: -6px; font-size: 15px; line-height: 1; color: var(--fete-d); text-shadow: 0 1px 2px rgba(0,0,0,.5); }
 :root[data-fete="fetes"] .brand .logo::after { color: #FDE68A; }
 :root[data-fete] .brand h1 em { background: linear-gradient(90deg, var(--accent), var(--cyan)); -webkit-background-clip: text; background-clip: text; }
 :root[data-fete] .btn.primary, :root[data-fete] .fab, :root[data-fete] .seg-mode button[aria-pressed="true"] { background: linear-gradient(135deg, var(--fete-a), var(--fete-b)); color: var(--accent-ink); box-shadow: 0 8px 22px -8px color-mix(in srgb, var(--fete-a) 70%, transparent); }
@@ -659,6 +659,11 @@ table.qvq td, table.qvq th { white-space: nowrap; } .qvq-f { display: flex; gap:
 .fete-ban.perso::after { background: linear-gradient(transparent, color-mix(in srgb, var(--perso) 25%, #fff) 7px, color-mix(in srgb, var(--perso) 40%, #fff)); }
 .fete-sw.perso { background: linear-gradient(135deg, var(--sw), color-mix(in srgb, var(--sw) 55%, #000)); color: #fff; }
 .fete-new { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ic-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 6px; }
+.ic-pick label { cursor: pointer; } .ic-pick input { position: absolute; opacity: 0; pointer-events: none; }
+.ic-pick span { display: grid; place-items: center; height: 44px; border-radius: 12px; border: 2px solid var(--line); background: var(--sunk); font-size: 1.35rem; }
+.ic-pick input:checked + span { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.ic-pick input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
 .fete-card { display: grid; gap: 12px; } .fete-list { display: grid; gap: 8px; }
 .fete-it { display: flex; gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: 14px; }
 .fete-it.on { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
@@ -1452,7 +1457,8 @@ const themePerso = (t) => ({ id: String(t.id), nom: String(t.nom || "Thème").sl
   du: MD_OK(t.du) ? t.du : "01-01", au: MD_OK(t.au) ? t.au : "01-31", on: !!t.on, image: t.image || null, message: String(t.message || "").slice(0, 120), modele: t.modele || "" });
 // les thèmes perso sont aussi joignables par leur clé « t:<id> » (clé cachée : elle n'est pas enregistrée)
 const feteCfg = (c) => { const o = c || {};
-  const r = Object.fromEntries(FETES.map(([k, , , du, au]) => [k, { on: !!(o[k] || {}).on, du: (o[k] || {}).du || du, au: (o[k] || {}).au || au, image: (o[k] || {}).image || null }]));
+  const r = Object.fromEntries(FETES.map(([k, , , du, au]) => [k, { on: !!(o[k] || {}).on, du: (o[k] || {}).du || du, au: (o[k] || {}).au || au, image: (o[k] || {}).image || null,
+    icone: String((o[k] || {}).icone || "").slice(0, 4), message: String((o[k] || {}).message || "").slice(0, 120) }]));
   r.perso = (Array.isArray(o.perso) ? o.perso : []).filter((t) => t && t.id).map(themePerso);
   r.perso.forEach((t) => Object.defineProperty(r, "t:" + t.id, { value: t, enumerable: false }));
   return r; };
@@ -1496,6 +1502,7 @@ function feteDuJour(c, d = new Date()) { const f = feteCfg(c), md = mdToday(d);
   return ["fetes", "noel"].find((k) => f[k].on && dansPeriode(md, f[k].du, f[k].au)) || ""; }
 function feteMessage(k, d = new Date(), cfg) {
   if (k && k.startsWith("t:")) { const t = feteCfg(cfg !== undefined ? cfg : (typeof S !== "undefined" && S.parametres ? prm().fetes : null))[k]; return t ? t.message || `${t.icone} ${t.nom}` : ""; }
+  if (k === "noel" || k === "fetes") { const m = feteCfg(cfg !== undefined ? cfg : (typeof S !== "undefined" && S.parametres ? prm().fetes : null))[k]?.message; if (m) return m; }
   if (k === "noel") return "🎄 Joyeux Noël !";
   if (k === "fetes") return d.getMonth() === 0 ? `✨ Bonne année ${d.getFullYear()} !` : d.getDate() >= 27 && d.getMonth() === 11 ? `✨ Bonnes fêtes de fin d'année et bonne année ${d.getFullYear() + 1} !` : "🎄 Joyeux Noël et bonnes fêtes de fin d'année !";
   return "";
@@ -1503,7 +1510,9 @@ function feteMessage(k, d = new Date(), cfg) {
 function appliquerFete(k, cfg) {
   const r = document.documentElement, t = k && k.startsWith("t:") ? feteCfg(cfg !== undefined ? cfg : (typeof S !== "undefined" && S.parametres ? prm().fetes : null))[k] : null;
   if (k && (t || !k.startsWith("t:"))) r.setAttribute("data-fete", t ? "perso" : k); else r.removeAttribute("data-fete");
-  if (t) { r.style.setProperty("--perso", t.couleur); r.style.setProperty("--perso-ic", JSON.stringify(t.icone)); } else { r.style.removeProperty("--perso"); r.style.removeProperty("--perso-ic"); }
+  const ic = t ? t.icone : k && !k.startsWith("t:") ? feteCfg(cfg !== undefined ? cfg : (typeof S !== "undefined" && S.parametres ? prm().fetes : null))[k]?.icone : "";
+  if (t) r.style.setProperty("--perso", t.couleur); else r.style.removeProperty("--perso");
+  if (ic) r.style.setProperty("--perso-ic", JSON.stringify(ic)); else r.style.removeProperty("--perso-ic");
 }
 function appliquerAnim(on) { document.documentElement.toggleAttribute("data-fete-anim", !!on); }
 window.CarnetFete = { jour: (c) => feteDuJour(c), appliquer: (k, anim = true, cfg) => { appliquerFete(k, cfg); appliquerAnim(k && anim); }, message: (k, cfg) => feteMessage(k, new Date(), cfg), banniere: (k, c, b, m) => banniereFete(k, c, b, m), liste: FETES };
@@ -4743,20 +4752,32 @@ const MOIS_C = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "aoû
 const mdLab = (md) => `${Number(md.slice(3))}${md.slice(3) === "01" ? "er" : ""} ${MOIS_C[Number(md.slice(0, 2)) - 1]}`;
 const mdSel = (k, w, md, ro) => `<span class="fete-md"><select data-fete-md="${k}|${w}|d" aria-label="Jour" ${ro}>${Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, "0")).map((d) => `<option value="${d}" ${md.slice(3) === d ? "selected" : ""}>${Number(d)}</option>`).join("")}</select>
   <select data-fete-md="${k}|${w}|m" aria-label="Mois" ${ro}>${MOIS_C.map((m, i) => { const v = String(i + 1).padStart(2, "0"); return `<option value="${v}" ${md.slice(0, 2) === v ? "selected" : ""}>${m}</option>`; }).join("")}</select></span>`;
+// symboles proposés (sur ordinateur, pas besoin de clavier à émojis)
+const THEME_ICONES = ["🎀", "🎗️", "💙", "🩷", "💜", "💛", "💚", "🧡", "❤️", "🤍", "🥸", "👨", "💪", "🤝", "⭐", "✨", "🎉", "🏆", "🎯", "🏹", "🎄", "❄️", "🎃", "🌸", "🌻", "🍂", "☀️", "🌈"];
+function iconePicker(cur) {
+  const liste = THEME_ICONES.includes(cur) || !cur ? THEME_ICONES : [cur, ...THEME_ICONES];
+  return `<div class="f">Symbole<div class="ic-pick" role="radiogroup" aria-label="Symbole du thème">${liste.map((x) => `<label><input type="radio" name="icone" value="${esc(x)}" ${x === cur ? "checked" : ""}><span>${esc(x)}</span></label>`).join("")}</div>
+    <span class="tirline">Touche un symbole. Sur ordinateur, tu peux aussi en taper un autre avec la touche Windows + point (« . ») :</span>
+    <input type="text" name="iconeLibre" maxlength="4" placeholder="Autre symbole" style="max-width:160px"></div>`;
+}
 function formTheme(id) {
-  const f = feteCfg(prm().fetes), t = f["t:" + id]; if (!t) return;
-  sheet("Thème « " + t.nom + " »", `
-    <div class="grid2"><label class="f" for="th-nom">Nom<input type="text" id="th-nom" name="nom" maxlength="40" value="${esc(t.nom)}"></label>
-      <label class="f" for="th-ic">Symbole (un émoji)<input type="text" id="th-ic" name="icone" maxlength="4" value="${esc(t.icone)}"></label></div>
-    <label class="f" for="th-coul">Couleur du thème<input type="color" id="th-coul" name="couleur" value="${esc(t.couleur)}" style="min-height:44px"></label>
-    <label class="f" for="th-msg">Message sur la bannière de l'accueil<input type="text" id="th-msg" name="message" maxlength="120" value="${esc(t.message)}" placeholder="Ex. 🎀 Octobre rose : ensemble contre le cancer du sein"></label>
-    <span class="tirline">Les dates, l'image et l'aperçu se règlent dans la liste des thèmes. Tout le carnet prend les couleurs du thème pendant ses dates.</span>`, {
+  const f = feteCfg(prm().fetes), base = FETES.find(([k]) => k === id), t = base ? f[id] : f["t:" + id]; if (!t) return;
+  const nom = base ? base[1] : t.nom, ic = base ? t.icone || base[2] : t.icone;
+  sheet("Thème « " + nom + " »", `
+    ${base ? "" : `<label class="f" for="th-nom">Nom<input type="text" id="th-nom" name="nom" maxlength="40" value="${esc(t.nom)}"></label>`}
+    ${iconePicker(ic)}
+    ${base ? `<span class="tirline">Les couleurs et le décor de ce thème sont dessinés exprès (sapins, neige, guirlande) : seuls le symbole et le message se changent.</span>`
+      : `<label class="f" for="th-coul">Couleur du thème<input type="color" id="th-coul" name="couleur" value="${esc(t.couleur)}" style="min-height:44px"></label>`}
+    <label class="f" for="th-msg">Message sur la bannière de l'accueil<input type="text" id="th-msg" name="message" maxlength="120" value="${esc(t.message)}" placeholder="${base ? "Vide : message automatique (« Joyeux Noël ! », « Bonne année ! »…)" : "Ex. 🎀 Octobre rose : ensemble contre le cancer du sein"}"></label>
+    <span class="tirline">Les dates, l'image et l'aperçu se règlent dans la liste des thèmes.</span>`, {
     onSave(fd) {
-      const g = feteCfg(prm().fetes), x = g["t:" + id]; if (!x) return;
-      x.nom = fd.get("nom").trim() || x.nom; x.icone = fd.get("icone").trim() || x.icone; x.couleur = COUL_OK(fd.get("couleur")) ? fd.get("couleur") : x.couleur; x.message = fd.get("message").trim();
+      const g = feteCfg(prm().fetes), x = base ? g[id] : g["t:" + id]; if (!x) return;
+      const libre = (fd.get("iconeLibre") || "").trim(), choix = fd.get("icone") || "";
+      if (!base) { x.nom = (fd.get("nom") || "").trim() || x.nom; x.couleur = COUL_OK(fd.get("couleur")) ? fd.get("couleur") : x.couleur; }
+      x.icone = libre || choix || x.icone; x.message = fd.get("message").trim();
       setParam({ fetes: g }); applyDisplay(); toast("Thème enregistré"); render();
     },
-    onDelete: () => { const g = feteCfg(prm().fetes); g.perso = g.perso.filter((x) => x.id !== id); if (S.feteApercu === "t:" + id) S.feteApercu = null; setParam({ fetes: g }); applyDisplay(); toast("Thème supprimé"); render(); },
+    onDelete: base ? null : () => { const g = feteCfg(prm().fetes); g.perso = g.perso.filter((x) => x.id !== id); if (S.feteApercu === "t:" + id) S.feteApercu = null; setParam({ fetes: g }); applyDisplay(); toast("Thème supprimé"); render(); },
     deleteLabel: "Supprimer le thème",
   });
 }
@@ -4769,14 +4790,14 @@ function feteCard(ro) {
       <div class="fete-list">
         <div class="fete-it"><span class="fete-sw" data-sw=""></span><div class="main"><b>Thème habituel</b><span class="tirline">Le reste de l'année.</span></div>
           <button class="btn ghost" data-fete-ap="" aria-pressed="${ap === ""}">Aperçu</button></div>
-        ${[...FETES, ...f.perso.map((t) => ["t:" + t.id, t.nom, t.icone])].map(([k, l, ic]) => `<div class="fete-it${f[k].on ? " on" : ""}"><span class="fete-sw${k.startsWith("t:") ? " perso" : ""}" data-sw="${k}" ${k.startsWith("t:") ? `style="--sw:${esc(f[k].couleur)}"` : ""} aria-hidden="true">${esc(ic)}</span>
+        ${[...FETES.map(([k, l, ic]) => [k, l, f[k].icone || ic]), ...f.perso.map((t) => ["t:" + t.id, t.nom, t.icone])].map(([k, l, ic]) => `<div class="fete-it${f[k].on ? " on" : ""}"><span class="fete-sw${k.startsWith("t:") ? " perso" : ""}" data-sw="${k}" ${k.startsWith("t:") ? `style="--sw:${esc(f[k].couleur)}"` : ""} aria-hidden="true">${esc(ic)}</span>
           <div class="main"><label class="fete-on"><input type="checkbox" data-fete-on="${k}" ${f[k].on ? "checked" : ""} ${ro}> <b>${esc(l)}</b></label>
-            ${k.startsWith("t:") && f[k].message ? `<span class="tirline">« ${esc(f[k].message)} »</span>` : ""}
+            ${f[k].message ? `<span class="tirline">« ${esc(f[k].message)} »</span>` : ""}
             <span class="fete-dates">du ${mdSel(k, "du", f[k].du, ro)} au ${mdSel(k, "au", f[k].au, ro)}</span>
             <span class="tirline">${f[k].on ? `Diffusé chaque année du ${mdLab(f[k].du)} au ${mdLab(f[k].au)}${jour === k ? " · en ce moment" : ""}` : "Pas diffusé : coche pour le programmer."}</span>
             <span class="fete-img">${f[k].image?.assetId ? `<img src="${esc(BLOB_BASE + f[k].image.assetId)}" alt="">` : ""}<span class="tirline">${f[k].image?.assetId ? "Ta bannière" : "Bannière dessinée du thème"}</span>
               ${ro ? "" : `<label class="btn ghost fete-up">${f[k].image?.assetId ? "Changer l'image" : "Mettre ma propre image"}<input type="file" accept="image/png,image/jpeg,image/webp" data-fete-img="${k}" hidden></label>${f[k].image?.assetId ? `<button class="btn ghost" data-fete-imgdel="${k}">Reprendre le dessin</button>` : ""}`}</span></div>
-          <span style="display:grid;gap:6px"><button class="btn ghost" data-fete-ap="${k}" aria-pressed="${ap === k}">Aperçu</button>${k.startsWith("t:") && !ro ? `<button class="btn ghost" data-fete-edit="${k.slice(2)}">Modifier</button>` : ""}</span></div>`).join("")}
+          <span style="display:grid;gap:6px"><button class="btn ghost" data-fete-ap="${k}" aria-pressed="${ap === k}">Aperçu</button>${!ro ? `<button class="btn ghost" data-fete-edit="${k.startsWith("t:") ? k.slice(2) : k}">Modifier</button>` : ""}</span></div>`).join("")}
       </div>
       ${ro ? "" : `<div class="fete-new"><b>Nouveau thème</b><select id="fete-modele" aria-label="Modèle du nouveau thème">${THEMES_MODELES.filter((m) => !f.perso.some((t) => t.modele === m.modele)).map((m) => `<option value="${m.modele}">${esc(m.icone + " " + m.nom)}</option>`).join("")}<option value="">✏️ Thème vide (cause, événement du club…)</option></select>
         <button class="btn" data-fete-new="1">Créer</button><span class="tirline">Chaque thème a ses dates, sa couleur, son message et peut avoir ta bannière (Canva par exemple).</span></div>`}
