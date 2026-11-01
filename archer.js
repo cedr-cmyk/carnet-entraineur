@@ -75,7 +75,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     St.err = ""; St.data = null; render();
     try { API.fichiers(who()); St.data = await API.charger(who());
       // thème de fête choisi par l'entraîneur (dans l'aperçu côté entraîneur, la page garde le sien)
-      if (!PREVIEW && !TESTW && window.CarnetFete) window.CarnetFete.appliquer(window.CarnetFete.jour((St.data.reglagesEspace || {}).fetes), (St.data.reglagesEspace || {}).fetesAnim !== false);
+      if (!PREVIEW && !TESTW && window.CarnetFete) window.CarnetFete.appliquer(window.CarnetFete.jour((St.data.reglagesEspace || {}).fetes), (St.data.reglagesEspace || {}).fetesAnim !== false, (St.data.reglagesEspace || {}).fetes || null);
     }
     catch (e) { console.error(e); St.err = "Impossible de charger ton espace. Vérifie ta connexion."; }
     render();

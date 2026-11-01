@@ -638,6 +638,27 @@ table.qvq td, table.qvq th { white-space: nowrap; } .qvq-f { display: flex; gap:
 .fete-up { cursor: pointer; }
 .fete-msg { display: inline-block; margin-top: 6px; padding: 6px 14px; border-radius: 999px; font-weight: 700; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--ink); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); }
 .mots-card { display: grid; gap: 10px; } .mot-row.past { opacity: .7; } .mot-rep { display: block; margin-top: 4px; padding: 6px 10px; border-left: 3px solid var(--cyan, var(--accent)); background: color-mix(in srgb, var(--cyan, var(--accent)) 10%, transparent); border-radius: 0 8px 8px 0; font-size: .92rem; }
+/* ===== Thèmes créés par l'entraîneur (V.1.9) : une couleur choisie (--perso) décline toute la palette ===== */
+:root[data-fete="perso"] {
+  --bg: color-mix(in srgb, var(--perso) 9%, #070A12); --surface: color-mix(in srgb, var(--perso) 12%, #0C111D); --sunk: color-mix(in srgb, var(--perso) 15%, #0F1524);
+  --line: color-mix(in srgb, var(--perso) 26%, #1A2133); --line-2: color-mix(in srgb, var(--perso) 40%, #262F47); --field: color-mix(in srgb, var(--perso) 9%, rgba(7,10,18,.86)); --field-2: color-mix(in srgb, var(--perso) 55%, #000);
+  --accent: color-mix(in srgb, var(--perso) 70%, #fff); --accent-2: var(--perso); --accent-ink: #fff; --cyan: color-mix(in srgb, var(--perso) 40%, #fff); --gold: color-mix(in srgb, var(--perso) 25%, #FDE68A); --muted: color-mix(in srgb, var(--perso) 18%, #A3ACC2);
+  --fete-a: var(--perso); --fete-b: color-mix(in srgb, var(--perso) 65%, #000); --fete-c: color-mix(in srgb, var(--perso) 45%, #fff); --fete-d: color-mix(in srgb, var(--perso) 20%, #fff); --fete-flake: color-mix(in srgb, var(--perso) 45%, transparent);
+}
+:root[data-fete="perso"][data-theme="light"] {
+  --bg: color-mix(in srgb, var(--perso) 6%, #FFFFFF); --surface: #FFFFFF; --sunk: color-mix(in srgb, var(--perso) 9%, #F8FAFC); --ink: #1C1917; --muted: #57534E;
+  --line: color-mix(in srgb, var(--perso) 18%, #E7E5E4); --line-2: color-mix(in srgb, var(--perso) 32%, #D6D3D1); --field: rgba(255,255,255,.88); --field-ink: #1C1917; --field-muted: #57534E;
+  --accent: color-mix(in srgb, var(--perso) 85%, #000); --accent-2: color-mix(in srgb, var(--perso) 70%, #000); --accent-ink: #fff; --cyan: color-mix(in srgb, var(--perso) 60%, #000); --gold: color-mix(in srgb, var(--perso) 60%, #000); --fete-flake: color-mix(in srgb, var(--perso) 16%, transparent);
+}
+:root[data-fete="perso"] .btn.primary, :root[data-fete="perso"] .fab, :root[data-fete="perso"] .seg-mode button[aria-pressed="true"] { color: #fff; }
+:root[data-fete="perso"] .brand .logo::after { content: var(--perso-ic, "★"); color: #fff; font-size: 14px; }
+:root[data-fete="perso"] .hub-h::before { content: var(--perso-ic, "★") " "; }
+:root[data-fete="perso"][data-fete-anim] body::after { opacity: .5; background-image: radial-gradient(circle, color-mix(in srgb, var(--perso) 60%, #fff) 1.6px, transparent 2.2px), radial-gradient(circle, rgba(255,255,255,.55) 1px, transparent 1.6px), radial-gradient(circle, color-mix(in srgb, var(--perso) 80%, #fff) 2.2px, transparent 2.8px); }
+:root[data-fete="perso"][data-theme="light"][data-fete-anim] body::after { opacity: .8; background-image: radial-gradient(circle, color-mix(in srgb, var(--perso) 45%, transparent) 1.6px, transparent 2.2px), radial-gradient(circle, color-mix(in srgb, var(--perso) 30%, transparent) 1px, transparent 1.6px); }
+.fete-ban.perso { background: radial-gradient(500px 160px at 75% 0, color-mix(in srgb, var(--perso) 70%, #fff 0%), transparent 70%), linear-gradient(135deg, color-mix(in srgb, var(--perso) 55%, #050814), color-mix(in srgb, var(--perso) 85%, #000)); border-color: color-mix(in srgb, var(--perso) 60%, transparent); }
+.fete-ban.perso::after { background: linear-gradient(transparent, color-mix(in srgb, var(--perso) 25%, #fff) 7px, color-mix(in srgb, var(--perso) 40%, #fff)); }
+.fete-sw.perso { background: linear-gradient(135deg, var(--sw), color-mix(in srgb, var(--sw) 55%, #000)); color: #fff; }
+.fete-new { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .fete-card { display: grid; gap: 12px; } .fete-list { display: grid; gap: 8px; }
 .fete-it { display: flex; gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: 14px; }
 .fete-it.on { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
@@ -827,7 +848,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     St.err = ""; St.data = null; render();
     try { API.fichiers(who()); St.data = await API.charger(who());
       // thème de fête choisi par l'entraîneur (dans l'aperçu côté entraîneur, la page garde le sien)
-      if (!PREVIEW && !TESTW && window.CarnetFete) window.CarnetFete.appliquer(window.CarnetFete.jour((St.data.reglagesEspace || {}).fetes), (St.data.reglagesEspace || {}).fetesAnim !== false);
+      if (!PREVIEW && !TESTW && window.CarnetFete) window.CarnetFete.appliquer(window.CarnetFete.jour((St.data.reglagesEspace || {}).fetes), (St.data.reglagesEspace || {}).fetesAnim !== false, (St.data.reglagesEspace || {}).fetes || null);
     }
     catch (e) { console.error(e); St.err = "Impossible de charger ton espace. Vérifie ta connexion."; }
     render();
@@ -1419,7 +1440,23 @@ window.CarnetModules = (a, n, cfg, ne) => arModules(a, n, cfg || espaceCfg(), ne
 window.CarnetAvatar = { svg: (a, n) => avatarSvg(a, n), choisir: (a, f) => avatarPicker(a, f) };
 // ---------- Thèmes de fête (V.1.8) : Noël, Noël et fêtes de fin d'année, diffusés entre deux dates chaque année ----------
 const FETES = [["noel", "Noël", "🎄", "12-01", "12-26"], ["fetes", "Noël et fêtes de fin d'année", "✨", "12-01", "01-03"]];
-const feteCfg = (c) => { const o = c || {}; return Object.fromEntries(FETES.map(([k, , , du, au]) => [k, { on: !!(o[k] || {}).on, du: (o[k] || {}).du || du, au: (o[k] || {}).au || au, image: (o[k] || {}).image || null }])); };
+// Thèmes créés par l'entraîneur (V.1.9) : causes et événements (Octobre rose, Movember, Mars bleu…), rangés dans fetes.perso
+const THEMES_MODELES = [
+  { modele: "octobre-rose", nom: "Octobre rose", icone: "🎀", couleur: "#DB2777", du: "10-01", au: "10-31", message: "🎀 Octobre rose : ensemble contre le cancer du sein" },
+  { modele: "movember", nom: "Movember", icone: "🥸", couleur: "#2563EB", du: "11-01", au: "11-30", message: "Movember : contre les cancers de la prostate et du testicule, et pour la santé mentale" },
+  { modele: "mars-bleu", nom: "Mars bleu", icone: "💙", couleur: "#1E40AF", du: "03-01", au: "03-31", message: "💙 Mars bleu : ensemble contre le cancer colorectal" },
+];
+const MD_OK = (v) => /^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(v || "");
+const COUL_OK = (v) => /^#[0-9a-f]{6}$/i.test(v || "");
+const themePerso = (t) => ({ id: String(t.id), nom: String(t.nom || "Thème").slice(0, 40), icone: String(t.icone || "★").slice(0, 4), couleur: COUL_OK(t.couleur) ? t.couleur : "#2563EB",
+  du: MD_OK(t.du) ? t.du : "01-01", au: MD_OK(t.au) ? t.au : "01-31", on: !!t.on, image: t.image || null, message: String(t.message || "").slice(0, 120), modele: t.modele || "" });
+// les thèmes perso sont aussi joignables par leur clé « t:<id> » (clé cachée : elle n'est pas enregistrée)
+const feteCfg = (c) => { const o = c || {};
+  const r = Object.fromEntries(FETES.map(([k, , , du, au]) => [k, { on: !!(o[k] || {}).on, du: (o[k] || {}).du || du, au: (o[k] || {}).au || au, image: (o[k] || {}).image || null }]));
+  r.perso = (Array.isArray(o.perso) ? o.perso : []).filter((t) => t && t.id).map(themePerso);
+  r.perso.forEach((t) => Object.defineProperty(r, "t:" + t.id, { value: t, enumerable: false }));
+  return r; };
+const feteNom = (k, c) => (k.startsWith("t:") ? feteCfg(c)[k]?.nom || "Thème" : (FETES.find(([x]) => x === k) || [])[1] || "");
 // Bannières dessinées (dessins originaux) : sapins, cible enneigée et flèche pour Noël ; feux d'artifice en plus pour les fêtes
 const BAN_SAPIN = (x, y, h, c) => `<path d="M${x} ${y - h}l${h * .32} ${h * .42}h-${h * .14}l${h * .26} ${h * .34}h-${h * .16}l${h * .24} ${h * .24}h-${h * 1.24}l${h * .24}-${h * .24}h-${h * .16}l${h * .26}-${h * .34}h-${h * .14}z" fill="${c}"/><rect x="${x - h * .05}" y="${y}" width="${h * .1}" height="${h * .1}" fill="#5B3A1E"/>`;
 const BAN_CIBLE = (x, y, r) => `<g><circle cx="${x}" cy="${y}" r="${r}" fill="#F8FAFC"/><circle cx="${x}" cy="${y}" r="${r * .8}" fill="#1E293B"/><circle cx="${x}" cy="${y}" r="${r * .6}" fill="#06B6D4"/><circle cx="${x}" cy="${y}" r="${r * .4}" fill="#EF4444"/><circle cx="${x}" cy="${y}" r="${r * .2}" fill="#FFD700"/>
@@ -1427,6 +1464,13 @@ const BAN_CIBLE = (x, y, r) => `<g><circle cx="${x}" cy="${y}" r="${r}" fill="#F
   <line x1="${x + r * .08}" y1="${y - r * .06}" x2="${x + r * 1.9}" y2="${y - r * .9}" stroke="#E2E8F0" stroke-width="${r * .07}" stroke-linecap="round"/><path d="M${x + r * 1.75} ${y - r * .98}l${r * .38}-${r * .12}-${r * .1} ${r * .3}zM${x + r * 1.62} ${y - r * .74}l${r * .38}-${r * .1}-${r * .14} ${r * .28}z" fill="#DC2626"/></g>`;
 const BAN_FLOCONS = (n, seed) => Array.from({ length: n }, (_, i) => { const a = (i * 97 + seed * 31) % 800, b = (i * 53 + seed * 17) % 120, r = 1 + ((i * 7) % 3); return `<circle cx="${a}" cy="${b}" r="${r}" fill="#fff" opacity="${.35 + ((i * 13) % 5) / 10}"/>`; }).join("");
 const BAN_FEU = (x, y, r, c) => Array.from({ length: 12 }, (_, i) => { const t = (i / 12) * Math.PI * 2; return `<line x1="${x + Math.cos(t) * r * .3}" y1="${y + Math.sin(t) * r * .3}" x2="${x + Math.cos(t) * r}" y2="${y + Math.sin(t) * r}" stroke="${c}" stroke-width="2.4" stroke-linecap="round"/><circle cx="${x + Math.cos(t) * r * 1.14}" cy="${y + Math.sin(t) * r * 1.14}" r="1.8" fill="${c}"/>`; }).join("");
+const BAN_RUBAN = (x, y, h, c) => `<path d="M${x - h * .16} ${y + h * .5}L${x + h * .1} ${y - h * .08}C${x + h * .2} ${y - h * .3} ${x + h * .14} ${y - h * .5} ${x} ${y - h * .5}C${x - h * .14} ${y - h * .5} ${x - h * .2} ${y - h * .3} ${x - h * .1} ${y - h * .08}L${x + h * .16} ${y + h * .5}" fill="none" stroke="${c}" stroke-width="${h * .11}" stroke-linecap="round" stroke-linejoin="round"/>`;
+function banniereSvgPerso(t) {
+  // dessin des thèmes perso : un ruban de la couleur du thème, des cœurs, la cible et sa flèche
+  const c = t.couleur, coeur = (x, y, r, o) => `<path d="M${x} ${y + r * .9}C${x - r * 1.6} ${y - r * .2} ${x - r * .6} ${y - r * 1.3} ${x} ${y - r * .4}C${x + r * .6} ${y - r * 1.3} ${x + r * 1.6} ${y - r * .2} ${x} ${y + r * .9}Z" fill="#fff" opacity="${o}"/>`;
+  return `<svg class="fete-ban-svg" viewBox="0 0 420 140" aria-hidden="true">${coeur(40, 30, 8, .55)}${coeur(160, 18, 6, .4)}${coeur(250, 40, 7, .5)}${coeur(390, 22, 6, .45)}
+    ${BAN_RUBAN(300, 78, 96, "#fff")}${BAN_RUBAN(300, 78, 82, c)}${BAN_CIBLE(130, 92, 26)}</svg>`;
+}
 function banniereSvg(k) {
   // scène dessinée à droite de la bannière ; le ciel et la neige du sol sont en fond (CSS), le message à gauche
   const sapins = BAN_SAPIN(220, 110, 72, "#166534") + BAN_SAPIN(298, 114, 56, "#15803D") + BAN_SAPIN(360, 112, 64, "#14532D") + BAN_SAPIN(408, 116, 42, "#166534");
@@ -1438,23 +1482,31 @@ function banniereSvg(k) {
 // bannière d'accueil : l'image choisie par l'entraîneur (faite avec Canva par exemple) ou le dessin du thème
 function banniereFete(k, cfg, base, avecMsg = true) {
   const f = feteCfg(cfg)[k]; if (!f) return "";
-  const msg = avecMsg ? feteMessage(k) : "";
+  const msg = avecMsg ? feteMessage(k, new Date(), cfg) : "";
   // une image perso porte déjà son texte (bannière Canva) : pas de message en plus
-  if (f.image?.assetId) return `<div class="fete-ban img"><img src="${esc((base || "/_blob/") + f.image.assetId)}" alt="${esc(feteMessage(k) || FETES.find(([x]) => x === k)[1])}" loading="lazy"></div>`;
-  return `<div class="fete-ban">${msg ? `<span class="fete-ban-msg">${esc(msg)}</span>` : ""}${banniereSvg(k)}</div>`;
+  if (f.image?.assetId) return `<div class="fete-ban img"><img src="${esc((base || "/_blob/") + f.image.assetId)}" alt="${esc(feteMessage(k, new Date(), cfg) || feteNom(k, cfg))}" loading="lazy"></div>`;
+  return `<div class="fete-ban${k.startsWith("t:") ? " perso" : ""}" ${k.startsWith("t:") ? `style="--perso:${esc(f.couleur)}"` : ""}>${msg ? `<span class="fete-ban-msg">${esc(msg)}</span>` : ""}${k.startsWith("t:") ? banniereSvgPerso(f) : banniereSvg(k)}</div>`;
 }
 const mdToday = (d = new Date()) => String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 const dansPeriode = (md, du, au) => (du <= au ? md >= du && md <= au : md >= du || md <= au);
 // thème du jour ; si les deux périodes se chevauchent, « Noël et fêtes » l'emporte (il contient Noël)
-function feteDuJour(c, d = new Date()) { const f = feteCfg(c), md = mdToday(d); return ["fetes", "noel"].find((k) => f[k].on && dansPeriode(md, f[k].du, f[k].au)) || ""; }
-function feteMessage(k, d = new Date()) {
+// les thèmes perso passent avant Noël et les fêtes (dans l'ordre de la liste) quand leurs dates se chevauchent
+function feteDuJour(c, d = new Date()) { const f = feteCfg(c), md = mdToday(d);
+  const t = f.perso.find((x) => x.on && dansPeriode(md, x.du, x.au)); if (t) return "t:" + t.id;
+  return ["fetes", "noel"].find((k) => f[k].on && dansPeriode(md, f[k].du, f[k].au)) || ""; }
+function feteMessage(k, d = new Date(), cfg) {
+  if (k && k.startsWith("t:")) { const t = feteCfg(cfg !== undefined ? cfg : (typeof S !== "undefined" && S.parametres ? prm().fetes : null))[k]; return t ? t.message || `${t.icone} ${t.nom}` : ""; }
   if (k === "noel") return "🎄 Joyeux Noël !";
   if (k === "fetes") return d.getMonth() === 0 ? `✨ Bonne année ${d.getFullYear()} !` : d.getDate() >= 27 && d.getMonth() === 11 ? `✨ Bonnes fêtes de fin d'année et bonne année ${d.getFullYear() + 1} !` : "🎄 Joyeux Noël et bonnes fêtes de fin d'année !";
   return "";
 }
-function appliquerFete(k) { const r = document.documentElement; if (k) r.setAttribute("data-fete", k); else r.removeAttribute("data-fete"); }
+function appliquerFete(k, cfg) {
+  const r = document.documentElement, t = k && k.startsWith("t:") ? feteCfg(cfg !== undefined ? cfg : (typeof S !== "undefined" && S.parametres ? prm().fetes : null))[k] : null;
+  if (k && (t || !k.startsWith("t:"))) r.setAttribute("data-fete", t ? "perso" : k); else r.removeAttribute("data-fete");
+  if (t) { r.style.setProperty("--perso", t.couleur); r.style.setProperty("--perso-ic", JSON.stringify(t.icone)); } else { r.style.removeProperty("--perso"); r.style.removeProperty("--perso-ic"); }
+}
 function appliquerAnim(on) { document.documentElement.toggleAttribute("data-fete-anim", !!on); }
-window.CarnetFete = { jour: (c) => feteDuJour(c), appliquer: (k, anim = true) => { appliquerFete(k); appliquerAnim(k && anim); }, message: (k) => feteMessage(k), banniere: (k, c, b, m) => banniereFete(k, c, b, m), liste: FETES };
+window.CarnetFete = { jour: (c) => feteDuJour(c), appliquer: (k, anim = true, cfg) => { appliquerFete(k, cfg); appliquerAnim(k && anim); }, message: (k, cfg) => feteMessage(k, new Date(), cfg), banniere: (k, c, b, m) => banniereFete(k, c, b, m), liste: FETES };
 window.CarnetCible = { svg: (t) => targetSvg(t), face: (t) => faceOf(t), scoreAt: (f, r) => scoreAt(f, r), groupe: (t) => groupStats(t), carte: (t, a, s) => tirCarte(t, a, s), viewer: (t, s, a, o) => tirViewer(t, s, a, o), bilan: (t, o) => tirBilan(t, o) };
 const ARCS = ["Classique", "Poulies", "Barebow", "Arc droit", "Arc chasse"];
 const CATS = ["U11", "U13", "U15", "U18", "U21", "Senior 1", "Senior 2", "Senior 3"];
@@ -4691,25 +4743,46 @@ const MOIS_C = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "aoû
 const mdLab = (md) => `${Number(md.slice(3))}${md.slice(3) === "01" ? "er" : ""} ${MOIS_C[Number(md.slice(0, 2)) - 1]}`;
 const mdSel = (k, w, md, ro) => `<span class="fete-md"><select data-fete-md="${k}|${w}|d" aria-label="Jour" ${ro}>${Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, "0")).map((d) => `<option value="${d}" ${md.slice(3) === d ? "selected" : ""}>${Number(d)}</option>`).join("")}</select>
   <select data-fete-md="${k}|${w}|m" aria-label="Mois" ${ro}>${MOIS_C.map((m, i) => { const v = String(i + 1).padStart(2, "0"); return `<option value="${v}" ${md.slice(0, 2) === v ? "selected" : ""}>${m}</option>`; }).join("")}</select></span>`;
+function formTheme(id) {
+  const f = feteCfg(prm().fetes), t = f["t:" + id]; if (!t) return;
+  sheet("Thème « " + t.nom + " »", `
+    <div class="grid2"><label class="f" for="th-nom">Nom<input type="text" id="th-nom" name="nom" maxlength="40" value="${esc(t.nom)}"></label>
+      <label class="f" for="th-ic">Symbole (un émoji)<input type="text" id="th-ic" name="icone" maxlength="4" value="${esc(t.icone)}"></label></div>
+    <label class="f" for="th-coul">Couleur du thème<input type="color" id="th-coul" name="couleur" value="${esc(t.couleur)}" style="min-height:44px"></label>
+    <label class="f" for="th-msg">Message sur la bannière de l'accueil<input type="text" id="th-msg" name="message" maxlength="120" value="${esc(t.message)}" placeholder="Ex. 🎀 Octobre rose : ensemble contre le cancer du sein"></label>
+    <span class="tirline">Les dates, l'image et l'aperçu se règlent dans la liste des thèmes. Tout le carnet prend les couleurs du thème pendant ses dates.</span>`, {
+    onSave(fd) {
+      const g = feteCfg(prm().fetes), x = g["t:" + id]; if (!x) return;
+      x.nom = fd.get("nom").trim() || x.nom; x.icone = fd.get("icone").trim() || x.icone; x.couleur = COUL_OK(fd.get("couleur")) ? fd.get("couleur") : x.couleur; x.message = fd.get("message").trim();
+      setParam({ fetes: g }); applyDisplay(); toast("Thème enregistré"); render();
+    },
+    onDelete: () => { const g = feteCfg(prm().fetes); g.perso = g.perso.filter((x) => x.id !== id); if (S.feteApercu === "t:" + id) S.feteApercu = null; setParam({ fetes: g }); applyDisplay(); toast("Thème supprimé"); render(); },
+    deleteLabel: "Supprimer le thème",
+  });
+}
 function feteCard(ro) {
   const p = prm(), f = feteCfg(p.fetes), jour = feteDuJour(p.fetes), ap = S.feteApercu, arch = p.fetesArchers !== false, msg = p.fetesMessage !== false;
   const chev = f.noel.on && f.fetes.on && FETES.some(([k]) => { const o = k === "noel" ? f.fetes : f.noel; return dansPeriode(f[k].du, o.du, o.au) || dansPeriode(f[k].au, o.du, o.au); });
   return `<h2 class="sec">Thèmes de fête</h2>
     <div class="card fete-card">
-      <p style="margin:0;color:var(--muted)">L'appli change de couleurs et de décor entre les dates choisies, chaque année, puis revient toute seule au thème habituel. ${jour ? `<b>En ce moment : ${esc(FETES.find(([k]) => k === jour)[1])}.</b>` : "En ce moment : thème habituel."}</p>
+      <p style="margin:0;color:var(--muted)">L'appli change de couleurs et de décor entre les dates choisies, chaque année, puis revient toute seule au thème habituel. ${jour ? `<b>En ce moment : ${esc(feteNom(jour, p.fetes))}.</b>` : "En ce moment : thème habituel."}</p>
       <div class="fete-list">
         <div class="fete-it"><span class="fete-sw" data-sw=""></span><div class="main"><b>Thème habituel</b><span class="tirline">Le reste de l'année.</span></div>
           <button class="btn ghost" data-fete-ap="" aria-pressed="${ap === ""}">Aperçu</button></div>
-        ${FETES.map(([k, l, ic]) => `<div class="fete-it${f[k].on ? " on" : ""}"><span class="fete-sw" data-sw="${k}" aria-hidden="true">${ic}</span>
+        ${[...FETES, ...f.perso.map((t) => ["t:" + t.id, t.nom, t.icone])].map(([k, l, ic]) => `<div class="fete-it${f[k].on ? " on" : ""}"><span class="fete-sw${k.startsWith("t:") ? " perso" : ""}" data-sw="${k}" ${k.startsWith("t:") ? `style="--sw:${esc(f[k].couleur)}"` : ""} aria-hidden="true">${esc(ic)}</span>
           <div class="main"><label class="fete-on"><input type="checkbox" data-fete-on="${k}" ${f[k].on ? "checked" : ""} ${ro}> <b>${esc(l)}</b></label>
+            ${k.startsWith("t:") && f[k].message ? `<span class="tirline">« ${esc(f[k].message)} »</span>` : ""}
             <span class="fete-dates">du ${mdSel(k, "du", f[k].du, ro)} au ${mdSel(k, "au", f[k].au, ro)}</span>
             <span class="tirline">${f[k].on ? `Diffusé chaque année du ${mdLab(f[k].du)} au ${mdLab(f[k].au)}${jour === k ? " · en ce moment" : ""}` : "Pas diffusé : coche pour le programmer."}</span>
             <span class="fete-img">${f[k].image?.assetId ? `<img src="${esc(BLOB_BASE + f[k].image.assetId)}" alt="">` : ""}<span class="tirline">${f[k].image?.assetId ? "Ta bannière" : "Bannière dessinée du thème"}</span>
               ${ro ? "" : `<label class="btn ghost fete-up">${f[k].image?.assetId ? "Changer l'image" : "Mettre ma propre image"}<input type="file" accept="image/png,image/jpeg,image/webp" data-fete-img="${k}" hidden></label>${f[k].image?.assetId ? `<button class="btn ghost" data-fete-imgdel="${k}">Reprendre le dessin</button>` : ""}`}</span></div>
-          <button class="btn ghost" data-fete-ap="${k}" aria-pressed="${ap === k}">Aperçu</button></div>`).join("")}
+          <span style="display:grid;gap:6px"><button class="btn ghost" data-fete-ap="${k}" aria-pressed="${ap === k}">Aperçu</button>${k.startsWith("t:") && !ro ? `<button class="btn ghost" data-fete-edit="${k.slice(2)}">Modifier</button>` : ""}</span></div>`).join("")}
       </div>
+      ${ro ? "" : `<div class="fete-new"><b>Nouveau thème</b><select id="fete-modele" aria-label="Modèle du nouveau thème">${THEMES_MODELES.filter((m) => !f.perso.some((t) => t.modele === m.modele)).map((m) => `<option value="${m.modele}">${esc(m.icone + " " + m.nom)}</option>`).join("")}<option value="">✏️ Thème vide (cause, événement du club…)</option></select>
+        <button class="btn" data-fete-new="1">Créer</button><span class="tirline">Chaque thème a ses dates, sa couleur, son message et peut avoir ta bannière (Canva par exemple).</span></div>`}
       ${chev ? `<p class="notice" style="margin:0">Les deux périodes se chevauchent : pendant les jours communs, c'est « Noël et fêtes de fin d'année » qui s'affiche.</p>` : ""}
-      ${ap != null ? `<p class="notice fete-ap" style="margin:0">Aperçu sur cet appareil seulement : ${ap ? esc(FETES.find(([k]) => k === ap)[1]) : "thème habituel"}. Les archers ne voient rien. <button class="btn" data-fete-ap="stop">Arrêter l'aperçu</button></p>` : ""}
+      ${f.perso.length ? `<span class="tirline">Si un de tes thèmes tombe en même temps que Noël ou les fêtes, c'est ton thème qui s'affiche (le premier de la liste s'il y en a plusieurs).</span>` : ""}
+      ${ap != null ? `<p class="notice fete-ap" style="margin:0">Aperçu sur cet appareil seulement : ${ap ? esc(feteNom(ap, p.fetes)) : "thème habituel"}. Les archers ne voient rien. <button class="btn" data-fete-ap="stop">Arrêter l'aperçu</button></p>` : ""}
       <label class="fete-on"><input type="checkbox" data-fete-opt="fetesArchers" ${arch ? "checked" : ""} ${ro}> Aussi dans l'espace des archers <span class="tirline">(chacun garde son avatar)</span></label>
       <label class="fete-on"><input type="checkbox" data-fete-opt="fetesMessage" ${msg ? "checked" : ""} ${ro}> Message de fête sur la bannière de l'accueil <span class="tirline">(« Joyeux Noël ! », « Bonne année ! »)</span></label>
       <label class="fete-on"><input type="checkbox" data-fete-opt="fetesAnim" ${p.fetesAnim !== false ? "checked" : ""} ${ro}> Animation : neige qui tombe et guirlande qui scintille <span class="tirline">(coupée d'office sur les appareils réglés pour limiter les animations)</span></label>
@@ -5334,7 +5407,7 @@ function formSeance(s = null) {
 
 // ---------- Événements ----------
 document.addEventListener("click", (e) => {
-  const t = e.target.closest("[data-tab],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab],[data-qsort],[data-coptab],[data-com-edit],[data-fmtfed],[data-fmt-del],[data-type-del],[data-fete-ap],[data-fete-imgdel],[data-mot-edit],[data-centry-open],[data-cd-exp],[data-cd-arch]");
+  const t = e.target.closest("[data-tab],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab],[data-qsort],[data-coptab],[data-com-edit],[data-fmtfed],[data-fmt-del],[data-type-del],[data-fete-ap],[data-fete-new],[data-fete-edit],[data-fete-imgdel],[data-mot-edit],[data-centry-open],[data-cd-exp],[data-cd-arch]");
   if (!t || t.closest("#sheet")) return;
   if (t.dataset.dashSuivi) { const [sid, aid] = t.dataset.dashSuivi.split("|"); S.seance = sid; S.suivi = aid; S.tirOpen = null; render(); window.scrollTo(0, 0); return; }
   if (t.dataset.tab) { go(t.dataset.tab); try { history.replaceState(null, "", "#" + t.dataset.tab); } catch (_) {} return; }
@@ -5346,6 +5419,12 @@ document.addEventListener("click", (e) => {
   if (t.dataset.folder !== undefined) { S.folder = t.dataset.folder || null; render(); window.scrollTo(0, 0); return; }
   if (t.dataset.qsort) { const k = t.dataset.qsort, so = S.qvqSort || { k: "nom", d: 1 }; S.qvqSort = { k, d: so.k === k ? -so.d : k === "nom" || k === "profil" ? 1 : -1 }; render(); return; }
   if (t.dataset.feteImgdel) { const f = feteCfg(prm().fetes); f[t.dataset.feteImgdel].image = null; setParam({ fetes: f }); toast("Retour à la bannière dessinée"); render(); return; }
+  if (t.dataset.feteNew && S.canWrite) {
+    const mod = $("#fete-modele")?.value || "", m = THEMES_MODELES.find((x) => x.modele === mod), g = feteCfg(prm().fetes);
+    const nt = themePerso({ ...(m || { nom: "Nouveau thème", icone: "★", couleur: "#0E7490", du: mdToday(), au: mdToday(), message: "" }), id: newId("parametres").slice(0, 8), on: false });
+    g.perso.push(nt); setParam({ fetes: g }); toast(`Thème « ${nt.nom} » créé : coche-le pour le programmer`); render(); if (!m) formTheme(nt.id); return;
+  }
+  if (t.dataset.feteEdit) { formTheme(t.dataset.feteEdit); return; }
   if (t.dataset.feteAp != null) { const v = t.dataset.feteAp; S.feteApercu = v === "stop" ? null : v; applyDisplay(); render(); return; }
   if (t.dataset.fmtfed) { S.fmtFed = t.dataset.fmtfed; render(); return; }
   if (t.dataset.fmtDel) { const [fd, ty] = t.dataset.fmtDel.split("|"); setParam({ co: { fmtRows: { [fd]: fmtRows(fd).filter((k) => k !== ty) } } }); toast(`${typeLab(ty)} retiré du format de secours ${fd}`); render(); return; }
