@@ -107,7 +107,7 @@ h2.sec { font-family: var(--font-display); font-weight: 600; text-transform: upp
 .list { display: grid; gap: 8px; }
 .ar-an { width: 100%; border-collapse: collapse; font-size: .92rem; } .ar-an th, .ar-an td { padding: 7px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; } .ar-an th { font-size: .8rem; color: var(--muted); } .ar-an tr.moi td { font-weight: 700; background: var(--sunk); }
 .an-eqs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; } .an-eq { border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; font-size: .85rem; }
-.an-eqf { border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; margin-bottom: 8px; } .an-eqas { display: grid; gap: 6px; } .an-eqa { display: grid; grid-template-columns: 1fr 160px; align-items: center; gap: 8px; }
+.an-eqf { border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; margin-bottom: 8px; } .an-eqchk { margin: 8px 0; } .an-pris { opacity: .6; } .an-pris small { font-size: .78rem; } .an-sans { border: 1px dashed var(--line); border-radius: 10px; padding: 8px 12px; margin: 0 0 10px; } .an-sans.ok { border-style: solid; }
 .an-wrap { overflow-x: auto; } .an-tab { width: 100%; border-collapse: collapse; font-size: .92rem; } .an-tab th, .an-tab td { padding: 7px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; } .an-tab .n { text-align: right; }
 .an-tab th { font-size: .8rem; color: var(--muted); } .an-pod1 td { font-weight: 700; }
 .an-sc { font-size: 1.3rem; font-weight: 800; display: grid; justify-items: end; line-height: 1.1; } .an-sc small { font-size: .72rem; font-weight: 600; color: var(--muted); }
@@ -4648,17 +4648,21 @@ function formEquipes(a) {
   if (!eqs.length) eqs = [{ id: "e1", nom: "Équipe 1", chefId: null, membres: [] }, { id: "e2", nom: "Équipe 2", chefId: null, membres: [] }];
   if (!ars.length) { toast("Choisis d'abord les archers de l'animation (Modifier)"); return; }
   const draw = () => {
+    const sans = ars.filter((x) => !eqs.some((e) => e.membres.includes(x.id)));
+    $("#eq-sans").innerHTML = sans.length ? `<b>Sans équipe (${sans.length}) :</b> ${sans.map((x) => esc(fullName(x))).join(", ")}` : `<b>✓ Tous les archers ont une équipe.</b>`;
+    $("#eq-sans").className = "an-sans" + (sans.length ? "" : " ok");
     $("#eq-box").innerHTML = eqs.map((e, i) => `<div class="an-eqf"><div class="an-zr" style="grid-template-columns:1fr auto"><input type="text" class="eqn" data-i="${i}" value="${esc(e.nom)}" aria-label="Nom de l'équipe"><button type="button" class="btn eq-del" data-i="${i}" aria-label="Retirer cette équipe">✕</button></div>
-      <label class="f">Chef d'équipe<select class="eqc" data-i="${i}"><option value="">Pas de chef</option>${ars.filter((x) => e.membres.includes(x.id)).map((x) => `<option value="${x.id}" ${x.id === e.chefId ? "selected" : ""}>${esc(fullName(x))}</option>`).join("")}</select></label></div>`).join("");
-    $("#eq-ars").innerHTML = ars.map((x) => { const cur = eqs.findIndex((e) => e.membres.includes(x.id)); return `<label class="f an-eqa">${esc(fullName(x))}<select class="eqa" data-a="${x.id}"><option value="">Sans équipe</option>${eqs.map((e, i) => `<option value="${i}" ${i === cur ? "selected" : ""}>${esc(e.nom)}</option>`).join("")}</select></label>`; }).join("");
+      <div class="checks an-eqchk">${ars.map((x) => { const autre = eqs.find((q, k) => k !== i && q.membres.includes(x.id)); return `<label class="${autre ? "an-pris" : ""}"><input type="checkbox" class="eqm" data-i="${i}" value="${x.id}" ${e.membres.includes(x.id) ? "checked" : ""}>${esc(fullName(x))}${autre ? ` <small>(${esc(autre.nom)})</small>` : ""}</label>`; }).join("")}</div>
+      <label class="f">Chef d'équipe<select class="eqc" data-i="${i}"><option value="">Pas de chef</option>${ars.filter((x) => e.membres.includes(x.id)).map((x) => `<option value="${x.id}" ${x.id === e.chefId ? "selected" : ""}>${esc(fullName(x))}</option>`).join("")}</select></label>
+      <span class="tirline">${e.membres.length} archer${e.membres.length > 1 ? "s" : ""}</span></div>`).join("");
   };
-  sheet("Équipes", `<p class="tirline">Le chef d'équipe voit l'animation dans son espace dès qu'il est nommé et marque les points des archers de son équipe.</p>
-    <div id="eq-box"></div><div><button type="button" class="btn" id="eq-add">+ Ajouter une équipe</button></div>
-    <h4 style="margin:14px 0 6px">Archers</h4><div id="eq-ars" class="an-eqas"></div>`, {
+  sheet("Équipes", `<p class="tirline">Coche les archers de chaque équipe. Un archer coché dans une autre équipe y est déplacé. Le chef d'équipe voit l'animation dans son espace dès qu'il est nommé et marque les points de son équipe.</p>
+    <p id="eq-sans"></p><div id="eq-box"></div><div><button type="button" class="btn" id="eq-add">+ Ajouter une équipe</button></div>`, {
     onSave() {
       const out = eqs.map((e) => ({ ...e, nom: e.nom.trim() || "Équipe" })).filter((e) => e.membres.length);
       const f = animCur() || a, { id, ...data } = f; save("animations", a.id, { ...data, equipes: out, updatedAt: Date.now() });
-      const sansChef = out.filter((e) => !e.chefId).length; toast(sansChef ? `Équipes enregistrées · ${sansChef} sans chef` : "Équipes enregistrées");
+      const sansChef = out.filter((e) => !e.chefId).length, sans = ars.filter((x) => !out.some((e) => e.membres.includes(x.id))).length;
+      toast(["Équipes enregistrées", sansChef ? `${sansChef} sans chef` : "", sans ? `${sans} archer${sans > 1 ? "s" : ""} sans équipe` : ""].filter(Boolean).join(" · "));
     },
   });
   const el = $("#sheet");
@@ -4666,7 +4670,9 @@ function formEquipes(a) {
   el.addEventListener("change", (e) => {
     const t = e.target;
     if (t.classList.contains("eqc")) { eqs[t.dataset.i].chefId = t.value || null; return; }
-    if (t.classList.contains("eqa")) { const aid = t.dataset.a; eqs.forEach((q) => { q.membres = q.membres.filter((m) => m !== aid); if (q.chefId === aid) q.chefId = null; }); if (t.value !== "") eqs[Number(t.value)].membres.push(aid); draw(); }
+    if (t.classList.contains("eqm")) { const aid = t.value, i = Number(t.dataset.i);
+      eqs.forEach((q, k) => { if (k !== i || !t.checked) { q.membres = q.membres.filter((m) => m !== aid); if (q.chefId === aid) q.chefId = null; } });
+      if (t.checked) eqs[i].membres.push(aid); draw(); }
   });
   el.addEventListener("click", (e) => { const b = e.target.closest(".eq-del"); if (!b) return; eqs.splice(Number(b.dataset.i), 1); draw(); });
   $("#eq-add").addEventListener("click", () => { eqs.push({ id: "e" + Date.now().toString(36), nom: "Équipe " + (eqs.length + 1), chefId: null, membres: [] }); draw(); });
