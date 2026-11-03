@@ -1,7 +1,7 @@
 -- 9. Animations (V.1.9) : espace archer pour les animations.
 --   · un archer participant voit les scores et le classement d'une animation que l'entraîneur a ouverte aux archers ;
 --   · un chef d'équipe voit l'animation dès qu'il est nommé et compte les flèches de son équipe, essai par essai.
---     Une équipe peut refaire un jeu : c'est l'entraîneur qui choisit l'essai qui compte (un seul essai = compté d'office).
+--     Une équipe peut refaire une partie et choisir l'essai à garder ; il compte quand l'entraîneur le valide (un seul essai = compté d'office).
 --   · les points des zones ne sont jamais envoyés aux archers : ils ne reçoivent que les noms des zones et les scores finaux.
 --   · les règles (texte, et PDF ou image choisis dans les documents) sont lisibles par ceux qui voient l'animation.
 -- À exécuter une fois dans Supabase › SQL Editor, APRÈS les scripts 1 à 8 (relançable sans risque).
@@ -55,7 +55,8 @@ begin
     mon := null;
     if e is not null then
       select coalesce(jsonb_object_agg(j->>'id', (select coalesce(jsonb_agg(jsonb_build_object('id', s->>'id', 'le', s->'le',
-            'retenu', coalesce(r.data->'retenus'->(e->>'id')->>(j->>'id') = s->>'id', false), 'scores', coalesce(s->'scores', '{}'::jsonb)) order by k), '[]'::jsonb)
+            'retenu', coalesce(r.data->'retenus'->(e->>'id')->>(j->>'id') = s->>'id', false),
+            'choisi', coalesce(r.data->'choix'->(e->>'id')->>(j->>'id') = s->>'id', false), 'scores', coalesce(s->'scores', '{}'::jsonb)) order by k), '[]'::jsonb)
           from jsonb_array_elements(coalesce(r.data->'essais'->(e->>'id')->(j->>'id'), '[]'::jsonb)) with ordinality u(s, k))), '{}'::jsonb)
         into ess from jsonb_array_elements(coalesce(r.data->'jeux', '[]'::jsonb)) j;
       mon := jsonb_build_object('id', e->>'id', 'nom', e->>'nom', 'membres', coalesce(e->'membres', '[]'::jsonb), 'essais', ess);
@@ -71,7 +72,7 @@ revoke execute on function public.archer_animations(uuid, text) from public, ano
 grant execute on function public.archer_animations(uuid, text) to authenticated;
 
 -- Chef d'équipe : p_essai vide = nouvel essai ; p_cible + p_compte = flèches d'un archer de son équipe (p_compte null = effacer) ;
--- p_essai sans p_cible ni p_compte = supprimer l'essai. Un essai choisi par l'entraîneur est verrouillé. Renvoie l'identifiant de l'essai.
+-- p_essai sans p_cible ni p_compte = supprimer l'essai ; p_cible = '@garder' = l'équipe choisit cet essai. Un essai choisi par l'entraîneur est verrouillé. Renvoie l'identifiant de l'essai.
 create or replace function public.archer_anim_essai(p_owner uuid, p_archer text, p_anim text, p_jeu text, p_essai text, p_cible text, p_compte jsonb)
 returns text language plpgsql security definer set search_path = public as $$
 declare d jsonb; e jsonb; eid text; n int; l jsonb; nl jsonb := '[]'::jsonb; s jsonb; v jsonb; trouve boolean := false; nouv boolean := false;
@@ -85,6 +86,14 @@ begin
   eid := e->>'id';
   select jsonb_array_length(coalesce(j->'zones', '[]'::jsonb)) into n from jsonb_array_elements(coalesce(d->'jeux', '[]'::jsonb)) j where j->>'id' = p_jeu;
   if n is null then raise exception 'jeu introuvable'; end if;
+  -- « garder cet essai » : le choix de l'équipe, que l'entraîneur valide ensuite
+  if p_cible = '@garder' then
+    if not exists (select 1 from jsonb_array_elements(coalesce(d->'essais'->eid->p_jeu, '[]'::jsonb)) q where q->>'id' = p_essai) then raise exception 'essai introuvable'; end if;
+    update docs set data = jsonb_set(data, '{choix}', coalesce(data->'choix', '{}'::jsonb)
+        || jsonb_build_object(eid, coalesce(data->'choix'->eid, '{}'::jsonb) || jsonb_build_object(p_jeu, p_essai))), updated_at = now()
+      where owner = p_owner and col = 'animations' and id = p_anim;
+    return p_essai;
+  end if;
   if p_cible is not null and not coalesce(e->'membres', '[]'::jsonb) ? p_cible then raise exception 'pas dans ton equipe'; end if;
   if p_compte is not null and jsonb_typeof(p_compte) = 'null' then p_compte := null; end if;
   if p_compte is not null then
@@ -115,6 +124,11 @@ begin
   update docs set data = jsonb_set(data, '{essais}', coalesce(data->'essais', '{}'::jsonb)
       || jsonb_build_object(eid, coalesce(data->'essais'->eid, '{}'::jsonb) || jsonb_build_object(p_jeu, nl))), updated_at = now()
     where owner = p_owner and col = 'animations' and id = p_anim;
+  -- essai supprimé : on oublie aussi le choix de l'équipe s'il le visait
+  if not nouv and p_cible is null and p_compte is null then
+    update docs set data = jsonb_set(data, array['choix', eid], coalesce(data->'choix'->eid, '{}'::jsonb) - p_jeu)
+      where owner = p_owner and col = 'animations' and id = p_anim and data->'choix'->eid->>p_jeu = p_essai;
+  end if;
   return case when not nouv and p_cible is null and p_compte is null then null else p_essai end;
 end $$;
 revoke execute on function public.archer_anim_essai(uuid, text, text, text, text, text, jsonb) from public, anon;

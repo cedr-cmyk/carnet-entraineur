@@ -584,11 +584,11 @@ window.CarnetArcherUI = (API, opts = {}) => {
         const jid = (St.anJeu || {})[a.id] && jeux.some((j) => j.id === St.anJeu[a.id]) ? St.anJeu[a.id] : jeux[0]?.id, L = mon.essais?.[jid] || [];
         const mb = (a.participants || []).filter((p) => mon.membres.includes(p.id)).sort((x, y) => (x.nom || "").localeCompare(y.nom || "", "fr"));
         const nb = (c) => (c || []).reduce((t, x) => t + (Number(x) || 0), 0);
-        h += `<div class="card" style="gap:8px"><b>Chef de l'équipe ${esc(mon.nom)}</b><span class="m">${a.saisie ? `Choisis le jeu, crée un essai, puis touche chaque archer pour compter ses flèches par zone${a.fleches ? ` (${a.fleches} flèches chacun)` : ""}. Ton équipe peut refaire un jeu : c'est ton entraîneur qui choisit l'essai qui compte.` : "La saisie est close par ton entraîneur."}</span>
+        h += `<div class="card" style="gap:8px"><b>Chef de l'équipe ${esc(mon.nom)}</b><span class="m">${a.saisie ? `Choisis le jeu, crée un essai, puis touche chaque archer pour compter ses flèches par zone${a.fleches ? ` (${a.fleches} flèches chacun)` : ""}. Ton équipe peut demander à refaire une partie : touche « Refaire une partie », puis choisis l'essai que vous voulez garder. Il comptera quand ton entraîneur l'aura validé.` : "La saisie est close par ton entraîneur."}</span>
           <div class="chips">${jeux.map((x) => `<button class="chip" data-an-jeu="${a.id}|${x.id}" aria-pressed="${x.id === jid}">${esc(x.nom)}</button>`).join("")}</div>
-          ${L.map((es, k) => `<div class="an-essai${es.retenu ? " on" : ""}"><div class="bar"><b>Essai ${k + 1}</b><span class="m">${anHeure(es.le)}${es.retenu ? " · choisi par ton entraîneur (verrouillé)" : ""}</span><span class="grow"></span>${a.saisie && !es.retenu ? `<button class="btn" data-an-del="${a.id}|${jid}|${es.id}" aria-label="Supprimer l'essai ${k + 1}">✕</button>` : ""}</div>
+          ${L.map((es, k) => `<div class="an-essai${es.retenu ? " on" : ""}"><div class="bar"><b>Essai ${k + 1}</b><span class="m">${anHeure(es.le)}${es.retenu ? " · validé par ton entraîneur (verrouillé)" : es.choisi ? " · votre choix, en attente de validation" : ""}</span><span class="grow"></span>${a.saisie && L.length > 1 && !es.choisi && !L.some((x) => x.retenu) ? `<button class="btn" data-an-garder="${a.id}|${jid}|${es.id}">Garder cet essai</button>` : ""}${a.saisie && !es.retenu ? `<button class="btn" data-an-del="${a.id}|${jid}|${es.id}" aria-label="Supprimer l'essai ${k + 1}">✕</button>` : ""}</div>
             <div class="list">${mb.map((p) => { const c = es.scores?.[p.id]; return `<button class="row" ${a.saisie && !es.retenu ? `data-an-saisie="${a.id}|${jid}|${es.id}|${p.id}"` : "disabled"}><span class="main"><span class="t">${esc(p.nom)}</span><span class="m">${c ? `${nb(c)} flèche${nb(c) > 1 ? "s" : ""} dans les zones` : "Pas encore compté"}</span></span>${c ? "<b>✓</b>" : ""}</button>`; }).join("")}</div></div>`).join("")}
-          ${a.saisie ? `<button class="btn primary" data-an-essai="${a.id}|${jid}">+ ${L.length ? "Nouvel essai" : "Commencer le premier essai"}</button>` : ""}</div>`;
+          ${a.saisie ? `<button class="btn primary" data-an-essai="${a.id}|${jid}">${L.length ? "↻ Refaire une partie" : "+ Commencer le premier essai"}</button>` : ""}</div>`;
       }
       if (!a.partage) return h;
       if (moi) h += `<div class="list">${jeux.map((j) => `<div class="row"><span class="main"><span class="t">${esc(j.nom)}</span></span><b>${moi.sc[j.id] == null ? "–" : moi.sc[j.id] + " pts"}</b></div>`).join("")}
@@ -604,7 +604,8 @@ window.CarnetArcherUI = (API, opts = {}) => {
   }
   const anErr = (err) => toast("Impossible : " + (/fermee/.test(err.message) ? "la saisie est close" : /trop de fleches/.test(err.message) ? "plus de flèches que prévu" : /retenu/.test(err.message) ? "cet essai a été choisi par ton entraîneur" : err.message));
   const anRecharger = () => API.charger(who()).then((d) => { if (d) { St.data = d; render(); } }).catch(() => {});
-  async function anEssai(animId, jid) { try { await API.animEssai(who(), animId, jid, null, null, null); toast("Nouvel essai"); await anRecharger(); } catch (err) { anErr(err); } }
+  async function anEssai(animId, jid) { try { await API.animEssai(who(), animId, jid, null, null, null); toast("Nouvelle partie : compte les flèches de chacun"); await anRecharger(); } catch (err) { anErr(err); } }
+  async function anGarder(animId, jid, essaiId) { try { await API.animEssai(who(), animId, jid, essaiId, "@garder", null); toast("C'est noté : ton entraîneur va valider"); await anRecharger(); } catch (err) { anErr(err); } }
   async function anSupprEssai(animId, jid, essaiId) { try { await API.animEssai(who(), animId, jid, essaiId, null, null); toast("Essai supprimé"); await anRecharger(); } catch (err) { anErr(err); } }
   function anSaisie(animId, jid, essaiId, cible) {
     const a = (St.data.animations || []).find((x) => x.id === animId), j = a?.jeux?.find((x) => x.id === jid), p = a?.participants?.find((x) => x.id === cible);
@@ -661,13 +662,14 @@ window.CarnetArcherUI = (API, opts = {}) => {
     if (t.hasAttribute("data-pref-chrono")) { chronoStore.setLast(t.value); toast("Réglage du chrono enregistré"); }
   });
   root.addEventListener("click", async (ev) => {
-    const t = ev.target.closest("[data-an-jeu],[data-an-saisie],[data-an-essai],[data-an-del],[data-atab],[data-who],[data-act],[data-saison],[data-entry],[data-eval],[data-arcombo],[data-rep],[data-artc],[data-artcp],[data-asub],[data-seance-ar],[data-mot-rep],[data-mot-arch],#ar-out"); if (!t) return;
+    const t = ev.target.closest("[data-an-jeu],[data-an-saisie],[data-an-essai],[data-an-del],[data-an-garder],[data-atab],[data-who],[data-act],[data-saison],[data-entry],[data-eval],[data-arcombo],[data-rep],[data-artc],[data-artcp],[data-asub],[data-seance-ar],[data-mot-rep],[data-mot-arch],#ar-out"); if (!t) return;
     ev.stopPropagation();
     if (t.dataset.act === "close-preview") { root.remove(); return; }
     if (t.id === "ar-out") return API.deconnexion();
     if (t.dataset.atab) { St.tab = t.dataset.atab; render(); return; }
     if (t.dataset.anJeu) { const [aid, jid] = t.dataset.anJeu.split("|"); St.anJeu = { ...(St.anJeu || {}), [aid]: jid }; render(); return; }
     if (t.dataset.anSaisie) { const [aid, jid, es, cid] = t.dataset.anSaisie.split("|"); anSaisie(aid, jid, es, cid); return; }
+    if (t.dataset.anGarder) { const [aid, jid, es] = t.dataset.anGarder.split("|"); anGarder(aid, jid, es); return; }
     if (t.dataset.anEssai) { const [aid, jid] = t.dataset.anEssai.split("|"); anEssai(aid, jid); return; }
     if (t.dataset.anDel) { if (t.dataset.confirm !== "1") { t.dataset.confirm = "1"; t.textContent = "Supprimer ?"; return; } const [aid, jid, es] = t.dataset.anDel.split("|"); anSupprEssai(aid, jid, es); return; }
     if (t.dataset.eval) { St.evalId = t.dataset.eval; if (t.dataset.asubGo) { St.tab = "entrainement"; St.sub = "evaluations"; } render(); return; }
