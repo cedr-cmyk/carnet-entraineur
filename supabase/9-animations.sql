@@ -3,7 +3,8 @@
 --   · un chef d'équipe voit l'animation dès qu'il est nommé et compte les flèches de son équipe, essai par essai.
 --     Une équipe peut refaire un jeu : c'est l'entraîneur qui choisit l'essai qui compte (un seul essai = compté d'office).
 --   · les points des zones ne sont jamais envoyés aux archers : ils ne reçoivent que les noms des zones et les scores finaux.
--- À exécuter une fois dans Supabase › SQL Editor, après les scripts 1 à 8 (relançable sans risque).
+--   · les règles (texte, et PDF ou image choisis dans les documents) sont lisibles par ceux qui voient l'animation.
+-- À exécuter une fois dans Supabase › SQL Editor, APRÈS les scripts 1 à 8 (relançable sans risque).
 
 drop function if exists public.archer_anim_score(uuid, text, text, text, text, jsonb);
 
@@ -39,7 +40,8 @@ begin
     select q into e from jsonb_array_elements(coalesce(r.data->'equipes', '[]'::jsonb)) q where q->>'chefId' = p_archer limit 1;
     if not ((ouvert and coalesce(r.data->'participants', '[]'::jsonb) ? p_archer) or e is not null) then continue; end if;
     -- jeux sans les points
-    select coalesce(jsonb_agg(jsonb_build_object('id', j->>'id', 'nom', j->>'nom',
+    select coalesce(jsonb_agg(jsonb_build_object('id', j->>'id', 'nom', j->>'nom', 'regle', coalesce(j->>'regle', ''),
+        'regleAsset', (select g.data->>'assetId' from docs g where g.owner = p_owner and g.col = 'documents' and g.id = j->>'regleDoc'),
         'zones', (select coalesce(jsonb_agg(jsonb_build_object('nom', z->>'nom') order by i), '[]'::jsonb) from jsonb_array_elements(coalesce(j->'zones', '[]'::jsonb)) with ordinality t(z, i)))), '[]'::jsonb)
       into jeux from jsonb_array_elements(coalesce(r.data->'jeux', '[]'::jsonb)) j;
     select coalesce(jsonb_agg(jsonb_build_object('id', q->>'id', 'nom', q->>'nom', 'chefId', q->>'chefId', 'membres', q->'membres')), '[]'::jsonb)
@@ -60,7 +62,8 @@ begin
     end if;
     out := out || jsonb_build_array(jsonb_build_object('id', r.id, 'nom', r.data->>'nom', 'date', r.data->>'date', 'lieu', r.data->>'lieu',
       'classement', coalesce(r.data->>'classement', 'true') <> 'false', 'partage', ouvert, 'saisie', coalesce(r.data->>'saisieChefs', 'true') <> 'false',
-      'fleches', r.data->'fleches', 'jeux', jeux, 'equipes', eqs, 'participants', parts, 'monEquipe', mon));
+      'fleches', r.data->'fleches', 'jeux', jeux, 'regles', coalesce(r.data->>'regles', ''),
+      'reglesAsset', (select g.data->>'assetId' from docs g where g.owner = p_owner and g.col = 'documents' and g.id = r.data->>'reglesDoc'), 'equipes', eqs, 'participants', parts, 'monEquipe', mon));
   end loop;
   return out;
 end $$;
@@ -118,3 +121,44 @@ revoke execute on function public.archer_anim_essai(uuid, text, text, text, text
 grant execute on function public.archer_anim_essai(uuid, text, text, text, text, text, jsonb) to authenticated;
 revoke execute on function public.anim_compte(jsonb, text, text) from public, anon;
 revoke execute on function public.anim_points(jsonb, text, text) from public, anon;
+
+-- Lecture des fichiers par les archers : reprend le script 8 et ajoute les règles des animations
+create or replace function public.archer_peut_lire(p_name text) returns boolean language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from acces a
+    join docs t on t.owner = a.owner and t.col = 'attributions' and t.data->>'archerId' = a.archer_id and t.data->>'visible' = 'true'
+    join docs d on d.owner = a.owner and d.col = 'documents' and d.id = t.data->>'documentId'
+    where a.user_id = auth.uid() and a.owner::text = split_part(p_name, '/', 1) and d.data->>'assetId' = split_part(p_name, '/', 2))
+  or exists (
+    select 1 from acces a
+    join docs c on c.owner = a.owner and c.col = 'concours' and jsonb_typeof(c.data->'resultats'->a.archer_id) = 'object' and jsonb_typeof(c.data->'classements') = 'array'
+    cross join lateral jsonb_array_elements(c.data->'classements') k
+    where a.user_id = auth.uid() and a.owner::text = split_part(p_name, '/', 1) and k->>'assetId' = split_part(p_name, '/', 2))
+  or exists (
+    select 1 from acces a
+    join docs ar on ar.owner = a.owner and ar.col = 'archers' and ar.id = a.archer_id
+    join docs d on d.owner = a.owner and d.col = 'documents' and public.doc_partage(d.data, ar.data->'clubIds')
+    where a.user_id = auth.uid() and a.owner::text = split_part(p_name, '/', 1) and d.data->>'assetId' = split_part(p_name, '/', 2))
+  -- image d'un thème de fête (Paramètres › Général), visible par les archers si le thème leur est diffusé
+  or exists (
+    select 1 from acces a
+    join docs p on p.owner = a.owner and p.col = 'parametres' and p.id = 'general'
+    where a.user_id = auth.uid() and a.owner::text = split_part(p_name, '/', 1) and coalesce(p.data->>'fetesArchers', 'true') <> 'false'
+      and split_part(p_name, '/', 2) in (coalesce(p.data#>>'{fetes,noel,image,assetId}', ''), coalesce(p.data#>>'{fetes,fetes,image,assetId}', '')) and split_part(p_name, '/', 2) <> '')
+  -- image d'un thème créé par l'entraîneur (V.1.9 : Octobre rose, Movember, Mars bleu…)
+  or exists (
+    select 1 from acces a
+    join docs p on p.owner = a.owner and p.col = 'parametres' and p.id = 'general' and jsonb_typeof(p.data#>'{fetes,perso}') = 'array'
+    cross join lateral jsonb_array_elements(p.data#>'{fetes,perso}') t
+    where a.user_id = auth.uid() and a.owner::text = split_part(p_name, '/', 1) and coalesce(p.data->>'fetesArchers', 'true') <> 'false'
+      and t#>>'{image,assetId}' = split_part(p_name, '/', 2) and split_part(p_name, '/', 2) <> '')
+  -- règles d'une animation (V.1.9, script 9) : pour le chef d'équipe, et pour les participants si l'animation leur est ouverte
+  or exists (
+    select 1 from acces a
+    join docs n on n.owner = a.owner and n.col = 'animations'
+    join docs d on d.owner = a.owner and d.col = 'documents' and d.data->>'assetId' = split_part(p_name, '/', 2)
+      and (d.id = n.data->>'reglesDoc' or exists (select 1 from jsonb_array_elements(coalesce(n.data->'jeux', '[]'::jsonb)) j where j->>'regleDoc' = d.id))
+    where a.user_id = auth.uid() and a.owner::text = split_part(p_name, '/', 1)
+      and ((n.data->>'partage' = 'true' and coalesce(n.data->'participants', '[]'::jsonb) ? a.archer_id)
+        or exists (select 1 from jsonb_array_elements(coalesce(n.data->'equipes', '[]'::jsonb)) e where e->>'chefId' = a.archer_id)))
+$$;

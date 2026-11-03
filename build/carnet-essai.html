@@ -90,6 +90,7 @@ h2.sec { font-family: var(--font-display); font-weight: 600; text-transform: upp
 .an-eqf { border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; margin-bottom: 8px; } .an-eqchk { margin: 8px 0; } .an-pris { opacity: .6; } .an-pris small { font-size: .78rem; } .an-sans { border: 1px dashed var(--line); border-radius: 10px; padding: 8px 12px; margin: 0 0 10px; } .an-sans.ok { border-style: solid; }
 .an-ko { border-color: #b45309; } .an-warn { color: #b45309; font-weight: 600; } .an-b:disabled { opacity: .35; }
 .an-team { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; margin: 10px 0; display: grid; gap: 8px; } .an-essai { border-left: 3px solid var(--line); padding-left: 10px; display: grid; gap: 6px; } .an-essai.on { border-left-color: var(--accent); }
+.an-reg { border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; margin: 0 0 10px; } .an-reg summary { cursor: pointer; font-weight: 600; } .an-reg p { margin: 6px 0; }
 .an-wrap { overflow-x: auto; } .an-tab { width: 100%; border-collapse: collapse; font-size: .92rem; } .an-tab th, .an-tab td { padding: 7px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; } .an-tab .n { text-align: right; }
 .an-tab th { font-size: .8rem; color: var(--muted); } .an-pod1 td { font-weight: 700; }
 .an-sc { font-size: 1.3rem; font-weight: 800; display: grid; justify-items: end; line-height: 1.1; } .an-sc small { font-size: .72rem; font-weight: 600; color: var(--muted); }
@@ -1380,6 +1381,9 @@ window.CarnetArcherUI = (API, opts = {}) => {
       const jeux = a.jeux || [], P = (a.participants || []).map((p) => { const sc = p.scores || {}; return { ...p, sc, total: jeux.reduce((t, j) => t + (Number(sc[j.id]) || 0), 0), joue: jeux.some((j) => sc[j.id] != null) }; });
       const moi = P.find((p) => p.moi), joues = P.filter((p) => p.joue), me = who().archer_id || St.data.archer?.id, mon = a.monEquipe;
       let h = `<h2 class="sec">${esc(a.nom || "Animation")}</h2><p class="m" style="margin:0 0 8px">${esc([a.date ? fmtLong(a.date) : "", a.lieu].filter(Boolean).join(" · "))}</p>`;
+      const regle = (txt, asset) => `${(txt || "").split(/\n+/).filter(Boolean).map((l) => `<p>${esc(l)}</p>`).join("")}${asset ? `<a class="btn" href="${BLOB}${esc(asset)}" target="_blank" rel="noopener">📄 Ouvrir la règle</a>` : ""}`;
+      const avecRegle = jeux.filter((j) => j.regle || j.regleAsset);
+      if (a.regles || a.reglesAsset || avecRegle.length) h += `<details class="an-reg"><summary>Les règles</summary>${a.regles || a.reglesAsset ? `<h4>Règles générales</h4>${regle(a.regles, a.reglesAsset)}` : ""}${avecRegle.map((j) => `<h4>${esc(j.nom)}</h4>${regle(j.regle, j.regleAsset)}`).join("")}</details>`;
       if (mon) {
         const jid = (St.anJeu || {})[a.id] && jeux.some((j) => j.id === St.anJeu[a.id]) ? St.anJeu[a.id] : jeux[0]?.id, L = mon.essais?.[jid] || [];
         const mb = (a.participants || []).filter((p) => mon.membres.includes(p.id)).sort((x, y) => (x.nom || "").localeCompare(y.nom || "", "fr"));
@@ -4530,8 +4534,17 @@ const ANIM_JEUX_DEF = [
   { id: "cadeaux", nom: "Les cadeaux de Noël", zones: [-1, -2, -3, 4, 5, 6, 7, 8, 9, -10, 11, 12, -13, 14, 15, 16].map((v, i) => ["Cadeau " + (i + 1), v]) },
   { id: "sapin", nom: "Le sapin", zones: [["Sapin", 10], ["Pied du sapin", 2], ["L'étoile", 8], ["Guirlande", 6], ["Les boules de Noël", 4]] },
   { id: "boules", nom: "Les boules de Noël", zones: [1, 2, 3, 4].map((n) => ["Boule " + n, 0]) },
-].map((j) => ({ ...j, zones: j.zones.map(([nom, points]) => ({ nom, points })) }));
-const animJeux = () => prm().animJeux || ANIM_JEUX_DEF;
+].map((j) => ({ ...j, zones: j.zones.map(([nom, points]) => ({ nom, points })), regle: {
+  bonhomme: "Les chiffres qui sont indiqués dans les zones peuvent rajouter des points ou vous en faire perdre… même si c'est peut-être juste pour vous perturber que je dis ça.",
+  cadeaux: "Le principe est le même que pour le bonhomme de neige.\nSauf que là, c'est multiplier ou diviser.",
+  sapin: "Le sapin en lui-même rapporte un certain nombre de points.\nToutes les flèches dans le pied du sapin vous feront gagner ___ points.\nL'étoile qui scintille au-dessus vous rapporte ??? points.\nLa très belle guirlande ne rapporte pas grand-chose…\nLes boules de Noël, là vous aurez droit à… ERREUR 404",
+}[j.id] || "" }));
+const animJeux = () => (prm().animJeux || ANIM_JEUX_DEF).map((j) => (j.regle === undefined ? { ...j, regle: ANIM_JEUX_DEF.find((d) => d.id === j.id)?.regle || "" } : j));
+// Règles générales proposées pour une nouvelle animation (reprises de la dernière animation s'il y en a une)
+const ANIM_REGLES_DEF = "Trois archers par équipe.\nChaque équipe tire un total de 9 flèches.\nArc d'initiation pour tout le monde.\nLes tirs s'effectuent à 25 m ou 10 m.\nLes cordons sont positifs.\nSeul l'animateur aura autorité en la matière.\nAucune corruption ne sera permise, de quelque sorte qu'elle soit…";
+const docsRegle = () => S.documents.filter((d) => ["pdf", "img"].includes(kind(d.contentType))).sort((a, b) => (a.titre || "").localeCompare(b.titre || "", "fr"));
+const docOptions = (sel) => `<option value="">Aucun</option>${docsRegle().map((d) => `<option value="${d.id}" ${d.id === sel ? "selected" : ""}>${esc(d.titre || d.nomFichier)}</option>`).join("")}`;
+const regleHtml = (txt, docId) => { const d = docId && S.documents.find((x) => x.id === docId); return `${(txt || "").split(/\n+/).filter(Boolean).map((l) => `<p>${esc(l)}</p>`).join("")}${d ? `<button type="button" class="btn" data-doc="${d.id}">📄 ${esc(d.titre || "Règle en PDF")}</button>` : ""}`; };
 const animCur = () => S.animations.find((x) => x.id === S.anim);
 const jeuScore = (j, c) => (j.zones || []).reduce((t, z, i) => t + (Number(c?.[i]) || 0) * (Number(z.points) || 0), 0);
 // Essais : une équipe peut refaire un jeu ; l'entraîneur choisit l'essai qui compte (un seul essai = compté d'office)
@@ -4578,6 +4591,7 @@ function viewAnimation(a) {
   if (eqs.length) h += `<div class="an-eqs">${eqs.map((e) => { const ch = S.archers.find((x) => x.id === e.chefId); return `<span class="an-eq${a.parEquipe && e.membres.length !== a.parEquipe ? " an-ko" : ""}"><b>${esc(e.nom)}</b> · ${e.membres.length}${a.parEquipe ? "/" + a.parEquipe : ""} archer${e.membres.length > 1 ? "s" : ""}${ch ? ` · chef : ${esc(fullName(ch))}` : ""}</span>`; }).join("")}</div>
     ${window.CarnetArcherUI && eqs.some((e) => e.chefId) ? `<div class="bar"><span class="tirline">${a.saisieChefs === false ? "Saisie des chefs d'équipe fermée : les scores ne bougent plus." : "Les chefs d'équipe marquent les points de leur équipe depuis leur espace."}</span><span class="grow"></span>${S.canWrite ? `<button class="btn" data-act="anim-saisie-chefs">${a.saisieChefs === false ? "Rouvrir la saisie" : "Clore la saisie"}</button>` : ""}</div>` : ""}`;
   if (!jeux.length || !ars.length) return h + `<div class="empty"><h3>Animation à compléter</h3><p>Touche « Modifier » pour choisir ${!jeux.length ? "les jeux" : ""}${!jeux.length && !ars.length ? " et " : ""}${!ars.length ? "les archers participants" : ""}.</p></div>`;
+  if (a.regles || a.reglesDoc) h += `<details class="an-reg"><summary>Règles générales</summary>${regleHtml(a.regles, a.reglesDoc)}</details>`;
   h += `<div class="chips" role="tablist" aria-label="Jeux">${jeux.map((j) => `<button class="chip" role="tab" data-animvue="${j.id}" aria-pressed="${vue === j.id}" aria-selected="${vue === j.id}">${esc(j.nom)}</button>`).join("")}${eqs.length ? `<button class="chip" role="tab" data-animvue="equipes" aria-pressed="${vue === "equipes"}" aria-selected="${vue === "equipes"}">Équipes</button>` : ""}<button class="chip" role="tab" data-animvue="total" aria-pressed="${vue === "total"}" aria-selected="${vue === "total"}">${a.classement === false ? "Total" : "Classement général"}</button></div>`;
   const cls = a.classement !== false;
   if (vue === "equipes") {
@@ -4598,6 +4612,7 @@ function viewAnimation(a) {
   }
   const j = jeux.find((x) => x.id === vue);
   h += `<p class="tirline">${(j.zones || []).map((z) => `${esc(z.nom)} ${fmtPts(Number(z.points) || 0)}`).join(" · ")}</p>`;
+  if (j.regle || j.regleDoc) h += `<details class="an-reg"><summary>Règle : ${esc(j.nom)}</summary>${regleHtml(j.regle, j.regleDoc)}</details>`;
   const r = cls ? animRangs(ars.filter((x) => animCompte(a, x.id, j.id)), (x) => animScore(a, x.id, j.id)) : [];
   const rang = Object.fromEntries(r.map((o) => [o.x.id, o.rang]));
   const detail = (c) => (c || []).map((n, i) => n ? `${esc(j.zones[i]?.nom || "")} ×${n}` : "").filter(Boolean).join(" · ") || "Aucune flèche dans les zones";
@@ -4656,13 +4671,16 @@ function majEssais(fn) { const f = animCur(); if (!f) return; const { id, ...dat
 function animPourArcher(n, aid) {
   const eqs = animEquipes(n), mon = eqs.find((e) => e.chefId === aid), court = (x) => [x.prenom, x.nom ? x.nom[0] + "." : ""].filter(Boolean).join(" ");
   return { id: n.id, nom: n.nom, date: n.date, lieu: n.lieu, classement: n.classement !== false, partage: !!n.partage, saisie: n.saisieChefs !== false, fleches: n.fleches || null,
-    jeux: (n.jeux || []).map((j) => ({ id: j.id, nom: j.nom, zones: (j.zones || []).map((z) => ({ nom: z.nom })) })),
+    regles: n.regles || "", reglesAsset: S.documents.find((d) => d.id === n.reglesDoc)?.assetId || null,
+    jeux: (n.jeux || []).map((j) => ({ id: j.id, nom: j.nom, zones: (j.zones || []).map((z) => ({ nom: z.nom })), regle: j.regle || "", regleAsset: S.documents.find((d) => d.id === j.regleDoc)?.assetId || null })),
     equipes: eqs.map((e) => ({ id: e.id, nom: e.nom, chefId: e.chefId, membres: e.membres })),
     participants: (n.participants || []).filter((pid) => n.partage || mon?.membres.includes(pid)).map((pid) => S.archers.find((x) => x.id === pid)).filter(Boolean)
       .map((x) => ({ id: x.id, moi: x.id === aid, nom: court(x), scores: n.partage ? Object.fromEntries((n.jeux || []).map((j) => [j.id, animScore(n, x.id, j.id)])) : {} })),
     monEquipe: mon ? { id: mon.id, nom: mon.nom, membres: mon.membres, essais: Object.fromEntries((n.jeux || []).map((j) => [j.id, animEssais(n, mon.id, j.id).map((es) => ({ id: es.id, le: es.le, retenu: n.retenus?.[mon.id]?.[j.id] === es.id, scores: es.scores || {} }))])) } : null };
 }
 function formAnimation(a = null) {
+  const der = a ? null : S.animations.slice().sort((x, y) => (y.date || "").localeCompare(x.date || ""))[0];
+  const dft = a || { parEquipe: der ? der.parEquipe : 3, fleches: der ? der.fleches : 3, regles: der ? der.regles : ANIM_REGLES_DEF, reglesDoc: der?.reglesDoc || "" };
   const lib = animJeux(), choisis = new Set((a?.jeux || []).map((j) => j.id)), parts = new Set(a?.participants || []);
   const jeuxOpts = [...lib, ...(a?.jeux || []).filter((j) => !lib.some((x) => x.id === j.id))];
   const arsHtml = (cid) => S.archers.filter((x) => !cid || (x.clubIds || []).includes(cid)).sort(byName).map((x) => `<label><input type="checkbox" name="part" value="${x.id}" ${parts.has(x.id) ? "checked" : ""}>${esc(fullName(x))}</label>`).join("") || `<span class="tirline">Aucun archer dans ce club.</span>`;
@@ -4670,17 +4688,22 @@ function formAnimation(a = null) {
     <label class="f" for="an-nom">Nom<input type="text" id="an-nom" name="nom" value="${esc(a?.nom)}" placeholder="Ex. Tir de Noël 2026"></label>
     <div class="grid2"><label class="f" for="an-date">Date<input type="date" id="an-date" name="date" value="${esc(a?.date || todayISO())}"></label>
       <label class="f" for="an-lieu">Lieu<input type="text" id="an-lieu" name="lieu" value="${esc(a?.lieu)}"></label></div>
-    <div class="grid2"><label class="f" for="an-npe">Archers par équipe<input type="number" inputmode="numeric" min="1" max="50" id="an-npe" name="parEquipe" value="${esc(a?.parEquipe ?? "")}" placeholder="Ex. 4"></label>
-      <label class="f" for="an-nfl">Flèches par archer et par jeu<input type="number" inputmode="numeric" min="1" max="99" id="an-nfl" name="fleches" value="${esc(a?.fleches ?? "")}" placeholder="Ex. 6"></label></div>
+    <div class="grid2"><label class="f" for="an-npe">Archers par équipe<input type="number" inputmode="numeric" min="1" max="50" id="an-npe" name="parEquipe" value="${esc(dft.parEquipe ?? "")}" placeholder="Ex. 4"></label>
+      <label class="f" for="an-nfl">Flèches par archer et par jeu<input type="number" inputmode="numeric" min="1" max="99" id="an-nfl" name="fleches" value="${esc(dft.fleches ?? "")}" placeholder="Ex. 6"></label></div>
     <label class="f" for="an-club">Club<select id="an-club" name="clubId"><option value="">Tous les clubs</option>${clubOptions(a?.clubId ?? (S.club !== "all" ? S.club : ""))}</select></label>
     <div class="f">Jeux<div class="checks">${jeuxOpts.map((j) => `<label><input type="checkbox" name="jeu" value="${j.id}" ${choisis.has(j.id) ? "checked" : ""}>${esc(j.nom)}</label>`).join("") || `<span class="tirline">Crée d'abord tes jeux dans « Mes jeux ».</span>`}</div></div>
     <div class="f">Archers participants <span class="tirline"><button type="button" class="btn" id="an-tous">Tout cocher</button></span><div class="checks" id="an-ars"></div></div>
+    <label class="f" for="an-reg">Règles générales (visibles par les chefs d'équipe et les participants)<textarea id="an-reg" name="regles" rows="5">${esc(dft.regles || "")}</textarea></label>
+    <label class="f" for="an-regd">Règles en PDF ou en image (depuis tes documents)<select id="an-regd" name="reglesDoc">${docOptions(dft.reglesDoc)}</select></label>
     <label class="chk" style="display:flex;gap:8px;align-items:center;border:0"><input type="checkbox" name="classement" ${a?.classement === false ? "" : "checked"}> Afficher un classement (places et podium)</label>
     ${window.CarnetArcherUI ? `<label class="chk" style="display:flex;gap:8px;align-items:center;border:0"><input type="checkbox" name="partage" ${a?.partage ? "checked" : ""}> Ouvrir aux archers participants : ils voient les scores${""} de cette animation dans leur espace</label>` : ""}`, {
     onSave(fd) {
       const nom = fd.get("nom").trim(); if (!nom) { toast("Donne un nom à l'animation"); return false; }
-      const ids = fd.getAll("jeu"), jeux = ids.map((id) => (a?.jeux || []).find((j) => j.id === id) || JSON.parse(JSON.stringify(lib.find((j) => j.id === id)))).filter(Boolean);
-      const data = { nom, date: fd.get("date"), lieu: fd.get("lieu").trim(), clubId: fd.get("clubId") || null, jeux, participants: fd.getAll("part"), classement: !!fd.get("classement"), partage: !!fd.get("partage"), parEquipe: Number(fd.get("parEquipe")) || null, fleches: Number(fd.get("fleches")) || null,
+      // un jeu déjà choisi garde ses points ; sa règle suit « Mes jeux »
+      const ids = fd.getAll("jeu"), jeux = ids.map((id) => { const old = (a?.jeux || []).find((j) => j.id === id), l = lib.find((j) => j.id === id);
+        return old ? { ...old, ...(l ? { regle: l.regle || "", regleDoc: l.regleDoc || "" } : {}) } : l ? JSON.parse(JSON.stringify(l)) : null; }).filter(Boolean);
+      const garde = a ? (({ id, ...r }) => r)(a) : {};
+      const data = { ...garde, regles: String(fd.get("regles") || "").trim(), reglesDoc: fd.get("reglesDoc") || "", nom, date: fd.get("date"), lieu: fd.get("lieu").trim(), clubId: fd.get("clubId") || null, jeux, participants: fd.getAll("part"), classement: !!fd.get("classement"), partage: !!fd.get("partage"), parEquipe: Number(fd.get("parEquipe")) || null, fleches: Number(fd.get("fleches")) || null,
         scores: a?.scores || {}, equipes: (a?.equipes || []).map((e) => ({ ...e, membres: (e.membres || []).filter((m) => fd.getAll("part").includes(m)), chefId: fd.getAll("part").includes(e.chefId) ? e.chefId : null })), saisieChefs: a?.saisieChefs !== false, createdAt: a?.createdAt || Date.now(), updatedAt: Date.now() };
       const id = a?.id || newId("animations"); save("animations", id, data); toast(a ? "Animation enregistrée" : "Animation créée"); S.anim = id; S.animVue = null; render();
     },
@@ -4740,6 +4763,8 @@ function formJeu(j = null) {
   const zRow = (z = {}) => `<div class="an-zr"><input type="text" class="zn" value="${esc(z.nom || "")}" placeholder="Zone (ex. Tête)" aria-label="Nom de la zone"><input type="number" inputmode="numeric" class="zp" value="${esc(z.points ?? "")}" placeholder="Points" aria-label="Points"><button type="button" class="btn an-zdel" aria-label="Retirer cette zone">✕</button></div>`;
   sheet(j ? "Modifier le jeu" : "Nouveau jeu", `
     <label class="f" for="jeu-nom">Nom du jeu<input type="text" id="jeu-nom" name="nom" value="${esc(j?.nom)}" placeholder="Ex. La citrouille"></label>
+    <label class="f" for="jeu-reg">Règle du jeu (ce que lisent les archers)<textarea id="jeu-reg" name="regle" rows="4" placeholder="Ex. Les chiffres dans les zones peuvent rajouter des points… ou en faire perdre">${esc(j?.regle || "")}</textarea></label>
+    <label class="f" for="jeu-regd">Règle en PDF ou en image (depuis tes documents)<select id="jeu-regd" name="regleDoc">${docOptions(j?.regleDoc)}</select></label>
     <div class="f">Zones et points <span class="tirline">(mets un signe moins pour une zone qui fait perdre des points)</span><div id="jeu-zones">${(j?.zones?.length ? j.zones : [{}, {}]).map(zRow).join("")}</div>
       <div><button type="button" class="btn" id="jeu-zadd">+ Ajouter une zone</button></div></div>`, {
     onSave(fd) {
@@ -4747,7 +4772,8 @@ function formJeu(j = null) {
       const zones = [...document.querySelectorAll("#jeu-zones .an-zr")].map((r) => ({ nom: r.querySelector(".zn").value.trim(), points: Number(r.querySelector(".zp").value) || 0 })).filter((z) => z.nom);
       if (!zones.length) { toast("Ajoute au moins une zone"); return false; }
       const lib = animJeux().slice(), id = j?.id || "j" + Date.now().toString(36), i = lib.findIndex((x) => x.id === id);
-      if (i >= 0) lib[i] = { id, nom, zones }; else lib.push({ id, nom, zones });
+      const jj = { id, nom, zones, regle: String(fd.get("regle") || "").trim(), regleDoc: fd.get("regleDoc") || "" };
+      if (i >= 0) lib[i] = jj; else lib.push(jj);
       setParam({ animJeux: lib }); toast(j ? "Jeu enregistré" : "Jeu créé"); setTimeout(listeJeux, 30);
     },
     onDelete: j ? () => { setParam({ animJeux: animJeux().filter((x) => x.id !== j.id) }); toast("Jeu supprimé"); setTimeout(listeJeux, 30); } : null, deleteLabel: "Supprimer le jeu",

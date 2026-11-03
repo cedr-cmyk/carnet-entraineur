@@ -577,6 +577,9 @@ window.CarnetArcherUI = (API, opts = {}) => {
       const jeux = a.jeux || [], P = (a.participants || []).map((p) => { const sc = p.scores || {}; return { ...p, sc, total: jeux.reduce((t, j) => t + (Number(sc[j.id]) || 0), 0), joue: jeux.some((j) => sc[j.id] != null) }; });
       const moi = P.find((p) => p.moi), joues = P.filter((p) => p.joue), me = who().archer_id || St.data.archer?.id, mon = a.monEquipe;
       let h = `<h2 class="sec">${esc(a.nom || "Animation")}</h2><p class="m" style="margin:0 0 8px">${esc([a.date ? fmtLong(a.date) : "", a.lieu].filter(Boolean).join(" · "))}</p>`;
+      const regle = (txt, asset) => `${(txt || "").split(/\n+/).filter(Boolean).map((l) => `<p>${esc(l)}</p>`).join("")}${asset ? `<a class="btn" href="${BLOB}${esc(asset)}" target="_blank" rel="noopener">📄 Ouvrir la règle</a>` : ""}`;
+      const avecRegle = jeux.filter((j) => j.regle || j.regleAsset);
+      if (a.regles || a.reglesAsset || avecRegle.length) h += `<details class="an-reg"><summary>Les règles</summary>${a.regles || a.reglesAsset ? `<h4>Règles générales</h4>${regle(a.regles, a.reglesAsset)}` : ""}${avecRegle.map((j) => `<h4>${esc(j.nom)}</h4>${regle(j.regle, j.regleAsset)}`).join("")}</details>`;
       if (mon) {
         const jid = (St.anJeu || {})[a.id] && jeux.some((j) => j.id === St.anJeu[a.id]) ? St.anJeu[a.id] : jeux[0]?.id, L = mon.essais?.[jid] || [];
         const mb = (a.participants || []).filter((p) => mon.membres.includes(p.id)).sort((x, y) => (x.nom || "").localeCompare(y.nom || "", "fr"));
