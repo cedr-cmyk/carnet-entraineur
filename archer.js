@@ -565,25 +565,57 @@ window.CarnetArcherUI = (API, opts = {}) => {
       <a class="btn" href="${BLOB}${esc(d.assetId)}" target="_blank" rel="noopener">Ouvrir</a></div>`).join("")}</div>` : `<p class="notice">Aucun document partagé pour l'instant (calendrier des concours, règlement…).</p>`;
     return h + `<h2 class="sec">Mes exercices</h2>` + vExos();
   }
-  // Animations ouvertes par l'entraîneur : scores de chaque jeu et classement
+  // Animations : scores, classement, et saisie par le chef d'équipe
+  const anPts = (j, c) => (j.zones || []).reduce((t, z, i) => t + (Number(c?.[i]) || 0) * (Number(z.points) || 0), 0);
+  const anMed = (n) => (n === 1 ? "🥇" : n === 2 ? "🥈" : n === 3 ? "🥉" : n);
+  const anRang = (list, f) => { const r = list.slice().sort((x, y) => f(y) - f(x)); let k = 0; r.forEach((p, i) => { if (i === 0 || f(p) !== f(r[i - 1])) k = i + 1; p.rang = k; }); return r; };
   function vAnimations() {
-    const pts = (j, c) => (j.zones || []).reduce((t, z, i) => t + (Number(c?.[i]) || 0) * (Number(z.points) || 0), 0);
     const list = St.data.animations || [];
     if (!list.length) return `<p class="notice">Aucune animation pour l'instant.</p>`;
     return list.map((a) => {
-      const jeux = a.jeux || [], P = (a.participants || []).map((p) => ({ ...p, sc: Object.fromEntries(jeux.map((j) => [j.id, p.scores?.[j.id] ? pts(j, p.scores[j.id]) : null])) }))
+      const jeux = a.jeux || [], P = (a.participants || []).map((p) => ({ ...p, sc: Object.fromEntries(jeux.map((j) => [j.id, p.scores?.[j.id] ? anPts(j, p.scores[j.id]) : null])) }))
         .map((p) => ({ ...p, total: jeux.reduce((t, j) => t + (p.sc[j.id] || 0), 0), joue: jeux.some((j) => p.sc[j.id] != null) }));
-      const moi = P.find((p) => p.moi), joues = P.filter((p) => p.joue);
-      let r = joues.slice().sort((x, y) => y.total - x.total), rang = 0;
-      r.forEach((p, i) => { if (i === 0 || p.total !== r[i - 1].total) rang = i + 1; p.rang = rang; });
-      if (!a.classement) r = joues.slice().sort((x, y) => (x.nom || "").localeCompare(y.nom || "", "fr"));
-      const med = (n) => (n === 1 ? "🥇" : n === 2 ? "🥈" : n === 3 ? "🥉" : n);
-      return `<h2 class="sec">${esc(a.nom || "Animation")}</h2><p class="m" style="margin:0 0 8px">${esc([a.date ? fmtLong(a.date) : "", a.lieu].filter(Boolean).join(" · "))}</p>
-        ${moi ? `<div class="list">${jeux.map((j) => `<div class="row"><span class="main"><span class="t">${esc(j.nom)}</span></span><b>${moi.sc[j.id] == null ? "–" : moi.sc[j.id] + " pts"}</b></div>`).join("")}
-          <div class="row"><span class="main"><span class="t">Mon total</span>${a.classement && moi.joue ? `<span class="m">${moi.rang === 1 ? "1re" : moi.rang + "e"} place sur ${joues.length}</span>` : ""}</span><b>${moi.joue ? moi.total + " pts" : "pas encore tiré"}</b></div></div>` : ""}
-        ${r.length ? `<div style="overflow-x:auto;margin-top:10px"><table class="ar-an"><thead><tr>${a.classement ? "<th>Place</th>" : ""}<th>Archer</th>${jeux.map((j) => `<th>${esc(j.nom)}</th>`).join("")}<th>Total</th></tr></thead><tbody>
-          ${r.map((p) => `<tr${p.moi ? ' class="moi"' : ""}>${a.classement ? `<td>${med(p.rang)}</td>` : ""}<td>${esc(p.nom)}</td>${jeux.map((j) => `<td>${p.sc[j.id] ?? "–"}</td>`).join("")}<td><b>${p.total}</b></td></tr>`).join("")}</tbody></table></div>` : ""}`;
+      const moi = P.find((p) => p.moi), joues = P.filter((p) => p.joue), me = who().archer_id || St.data.archer?.id;
+      const monEq = (a.equipes || []).find((e) => e.chefId === me);
+      let h = `<h2 class="sec">${esc(a.nom || "Animation")}</h2><p class="m" style="margin:0 0 8px">${esc([a.date ? fmtLong(a.date) : "", a.lieu].filter(Boolean).join(" · "))}</p>`;
+      if (monEq) {
+        const jid = (St.anJeu || {})[a.id] && jeux.some((j) => j.id === St.anJeu[a.id]) ? St.anJeu[a.id] : jeux[0]?.id, j = jeux.find((x) => x.id === jid);
+        const mb = P.filter((p) => monEq.membres.includes(p.id)).sort((x, y) => (x.nom || "").localeCompare(y.nom || "", "fr"));
+        h += `<div class="card" style="gap:8px"><b>Chef de l'équipe ${esc(monEq.nom)}</b><span class="m">${a.saisie ? "Choisis le jeu, puis touche un archer pour compter ses flèches." : "La saisie est close par ton entraîneur."}</span>
+          <div class="chips">${jeux.map((x) => `<button class="chip" data-an-jeu="${a.id}|${x.id}" aria-pressed="${x.id === jid}">${esc(x.nom)}</button>`).join("")}</div>
+          ${j ? `<div class="list">${mb.map((p) => `<button class="row" ${a.saisie ? `data-an-saisie="${a.id}|${p.id}|${j.id}"` : "disabled"}><span class="main"><span class="t">${esc(p.nom)}</span><span class="m">${p.sc[j.id] == null ? "Pas encore tiré" : "Touche pour corriger"}</span></span><b>${p.sc[j.id] == null ? "–" : p.sc[j.id] + " pts"}</b></button>`).join("")}</div>
+            <span class="m">Total de l'équipe sur ce jeu : <b>${mb.reduce((t, p) => t + (p.sc[j.id] || 0), 0)} pts</b> · tous jeux : <b>${mb.reduce((t, p) => t + p.total, 0)} pts</b></span>` : ""}</div>`;
+      }
+      if (!a.partage) return h;
+      if (moi) h += `<div class="list">${jeux.map((j) => `<div class="row"><span class="main"><span class="t">${esc(j.nom)}</span></span><b>${moi.sc[j.id] == null ? "–" : moi.sc[j.id] + " pts"}</b></div>`).join("")}
+          <div class="row"><span class="main"><span class="t">Mon total</span>${a.classement && moi.joue ? `<span class="m">${anRang(joues, (p) => p.total).find((p) => p.moi).rang === 1 ? "1re" : anRang(joues, (p) => p.total).find((p) => p.moi).rang + "e"} place sur ${joues.length}</span>` : ""}</span><b>${moi.joue ? moi.total + " pts" : "pas encore tiré"}</b></div></div>`;
+      const eqs = (a.equipes || []).filter((e) => e.membres?.length).map((e) => ({ ...e, total: P.filter((p) => e.membres.includes(p.id)).reduce((t, p) => t + p.total, 0), moi: e.membres.includes(me) }));
+      if (eqs.length) { const r = a.classement ? anRang(eqs, (e) => e.total) : eqs;
+        h += `<div style="overflow-x:auto;margin-top:10px"><table class="ar-an"><thead><tr>${a.classement ? "<th>Place</th>" : ""}<th>Équipe</th><th>Total</th></tr></thead><tbody>${r.map((e) => `<tr${e.moi ? ' class="moi"' : ""}>${a.classement ? `<td>${anMed(e.rang)}</td>` : ""}<td>${esc(e.nom)}</td><td><b>${e.total}</b></td></tr>`).join("")}</tbody></table></div>`; }
+      const r = a.classement ? anRang(joues, (p) => p.total) : joues.slice().sort((x, y) => (x.nom || "").localeCompare(y.nom || "", "fr"));
+      if (r.length) h += `<div style="overflow-x:auto;margin-top:10px"><table class="ar-an"><thead><tr>${a.classement ? "<th>Place</th>" : ""}<th>Archer</th>${jeux.map((j) => `<th>${esc(j.nom)}</th>`).join("")}<th>Total</th></tr></thead><tbody>
+          ${r.map((p) => `<tr${p.moi ? ' class="moi"' : ""}>${a.classement ? `<td>${anMed(p.rang)}</td>` : ""}<td>${esc(p.nom)}</td>${jeux.map((j) => `<td>${p.sc[j.id] ?? "–"}</td>`).join("")}<td><b>${p.total}</b></td></tr>`).join("")}</tbody></table></div>`;
+      return h;
     }).join("");
+  }
+  function anSaisie(animId, cible, jid) {
+    const a = (St.data.animations || []).find((x) => x.id === animId), j = a?.jeux?.find((x) => x.id === jid), p = a?.participants?.find((x) => x.id === cible); if (!j || !p) return;
+    const c = j.zones.map((_, i) => Number(p.scores?.[jid]?.[i]) || 0), el = $("#sheet");
+    el.innerHTML = `<div class="sheet-bg" data-close><form class="sheet" id="an-form"><h3>${esc(p.nom)} · ${esc(j.nom)}</h3><span class="tirline">Compte les flèches tombées dans chaque zone.</span>
+      <div class="an-zones">${j.zones.map((z, i) => `<div class="an-z"><span class="main"><b>${esc(z.nom)}</b><span class="tirline">${z.points > 0 ? "+" : ""}${Number(z.points) || 0} pt${Math.abs(z.points) > 1 ? "s" : ""}</span></span>
+        <button type="button" class="btn an-b" data-z="${i}" data-d="-1" aria-label="Une flèche de moins dans ${esc(z.nom)}">−</button><output class="an-c" id="anc${i}">${c[i]}</output><button type="button" class="btn an-b" data-z="${i}" data-d="1" aria-label="Une flèche de plus dans ${esc(z.nom)}">+</button></div>`).join("")}</div>
+      <p class="an-tot">Score : <b id="an-t">${anPts(j, c)}</b></p>
+      <div class="acts">${p.scores?.[jid] ? `<button type="button" class="btn danger left" id="an-del">Effacer</button>` : ""}<button type="button" class="btn" data-close>Annuler</button><button class="btn primary">Enregistrer</button></div></form></div>`;
+    el.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", (ev) => { if (ev.target === b) el.innerHTML = ""; }));
+    el.querySelector(".an-zones").addEventListener("click", (ev) => { const b = ev.target.closest(".an-b"); if (!b) return; const i = Number(b.dataset.z); c[i] = Math.max(0, Math.min(99, c[i] + Number(b.dataset.d))); $("#anc" + i).textContent = c[i]; $("#an-t").textContent = anPts(j, c); });
+    const send = async (compte) => {
+      try { await API.animScore(who(), animId, cible, jid, compte); p.scores = { ...(p.scores || {}) }; if (compte) p.scores[jid] = compte; else delete p.scores[jid];
+        el.innerHTML = ""; toast(compte ? `${p.nom} : ${anPts(j, compte)} points` : "Score effacé"); render();
+        API.charger(who()).then((d) => { if (d) { St.data = d; render(); } }).catch(() => {}); }
+      catch (err) { toast("Impossible : " + (/fermee/.test(err.message) ? "la saisie est close" : err.message)); }
+    };
+    $("#an-form").addEventListener("submit", (ev) => { ev.preventDefault(); send(c); });
+    const d = $("#an-del"); if (d) d.addEventListener("click", () => send(null));
   }
   function vExos() {
     const list = St.data.exercices.slice().sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.createdAt || 0) - (a.createdAt || 0));
@@ -620,11 +652,13 @@ window.CarnetArcherUI = (API, opts = {}) => {
     if (t.hasAttribute("data-pref-chrono")) { chronoStore.setLast(t.value); toast("Réglage du chrono enregistré"); }
   });
   root.addEventListener("click", async (ev) => {
-    const t = ev.target.closest("[data-atab],[data-who],[data-act],[data-saison],[data-entry],[data-eval],[data-arcombo],[data-rep],[data-artc],[data-artcp],[data-asub],[data-seance-ar],[data-mot-rep],[data-mot-arch],#ar-out"); if (!t) return;
+    const t = ev.target.closest("[data-an-jeu],[data-an-saisie],[data-atab],[data-who],[data-act],[data-saison],[data-entry],[data-eval],[data-arcombo],[data-rep],[data-artc],[data-artcp],[data-asub],[data-seance-ar],[data-mot-rep],[data-mot-arch],#ar-out"); if (!t) return;
     ev.stopPropagation();
     if (t.dataset.act === "close-preview") { root.remove(); return; }
     if (t.id === "ar-out") return API.deconnexion();
     if (t.dataset.atab) { St.tab = t.dataset.atab; render(); return; }
+    if (t.dataset.anJeu) { const [aid, jid] = t.dataset.anJeu.split("|"); St.anJeu = { ...(St.anJeu || {}), [aid]: jid }; render(); return; }
+    if (t.dataset.anSaisie) { const [aid, cid, jid] = t.dataset.anSaisie.split("|"); anSaisie(aid, cid, jid); return; }
     if (t.dataset.eval) { St.evalId = t.dataset.eval; if (t.dataset.asubGo) { St.tab = "entrainement"; St.sub = "evaluations"; } render(); return; }
     if (t.dataset.rep) {
       const [sid, val] = t.dataset.rep.split("|"), e = (St.data.entrainements || []).find((x) => x.id === sid); if (!e) return;
