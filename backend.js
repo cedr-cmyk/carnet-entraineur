@@ -273,7 +273,12 @@
     await domReady();
     window.carnetArcherAPI = {
       list,
-      charger: (a) => rpc("espace_archer", { p_owner: a.owner, p_archer: a.archer_id }),
+      charger: async (a) => {
+        const d = await rpc("espace_archer", { p_owner: a.owner, p_archer: a.archer_id });
+        // Animations ouvertes aux archers (V.1.9, script 9) : si le script n'est pas encore installé, l'onglet reste simplement caché
+        try { if (d) d.animations = await rpc("archer_animations", { p_owner: a.owner, p_archer: a.archer_id }); } catch (e) { if (d) d.animations = []; }
+        return d;
+      },
       ecrire: (a, id, data) => rpc("archer_ecrire_entree", { p_owner: a.owner, p_archer: a.archer_id, p_id: id, p_data: data }),
       supprimer: (a, id) => rpc("archer_supprimer_entree", { p_owner: a.owner, p_archer: a.archer_id, p_id: id }),
       repondre: (a, seance, reponse) => rpc("archer_repondre", { p_owner: a.owner, p_archer: a.archer_id, p_seance: seance, p_reponse: reponse }),

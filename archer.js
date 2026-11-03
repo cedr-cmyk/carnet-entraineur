@@ -81,8 +81,8 @@ window.CarnetArcherUI = (API, opts = {}) => {
     render();
   }
   function header() {
-    const tabs = [["accueil", "Accueil"], ["entrainement", "Entraînement"], ["concours", "Mes concours"], ["documents", "Documents"], ["parametres", "Paramètres"]];
-    const m = M(), vis = { entrainement: ["seances", "carnet", "tir", "impacts", "evals"].some((k) => m.has(k)), concours: m.has("concours"), documents: m.has("documents") };
+    const tabs = [["accueil", "Accueil"], ["entrainement", "Entraînement"], ["concours", "Mes concours"], ["documents", "Documents"], ["animations", "Animations"], ["parametres", "Paramètres"]];
+    const m = M(), vis = { entrainement: ["seances", "carnet", "tir", "impacts", "evals"].some((k) => m.has(k)), concours: m.has("concours"), documents: m.has("documents"), animations: (St.data?.animations || []).length > 0 };
     const shownTabs = tabs.filter(([k]) => vis[k] !== false);
     if (!shownTabs.some(([k]) => k === St.tab) && !["carnet", "evaluations"].includes(St.tab)) St.tab = "accueil";
     top.innerHTML = `<div class="top-in"><div class="brand">${window.CarnetAvatar && St.data?.archer ? "" : `<span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/></svg></span>`}
@@ -98,7 +98,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     else h += `<div class="bar"><span class="grow"></span><button class="btn ghost" data-act="add-code">J'ai un autre code (frère, sœur…)</button></div>`;
     if (St.err) h += `<p class="notice">${esc(St.err)}</p><button class="btn" data-act="reload">Réessayer</button>`;
     else if (!St.data) h += `<p class="notice">Chargement…</p>`;
-    else h += ({ accueil: vAccueil, entrainement: vEntrainement, carnet: vEntrainement, evaluations: vEntrainement, concours: vConcours, documents: vDocs, parametres: vParams }[St.tab] || vAccueil)();
+    else h += ({ accueil: vAccueil, entrainement: vEntrainement, carnet: vEntrainement, evaluations: vEntrainement, concours: vConcours, documents: vDocs, animations: vAnimations, parametres: vParams }[St.tab] || vAccueil)();
     view.innerHTML = h;
   }
   // Réglages du chrono de l'archer : gardés sur son appareil
@@ -564,6 +564,26 @@ window.CarnetArcherUI = (API, opts = {}) => {
     h += docs.length ? `<div class="list">${docs.map((d) => `<div class="row"><span class="thumb">${(d.contentType || "").startsWith("image/") ? "IMG" : "PDF"}</span><span class="main"><span class="t">${esc(d.titre || d.nomFichier)}</span>${d.description ? `<span class="m">${esc(d.description.slice(0, 140))}</span>` : ""}</span>
       <a class="btn" href="${BLOB}${esc(d.assetId)}" target="_blank" rel="noopener">Ouvrir</a></div>`).join("")}</div>` : `<p class="notice">Aucun document partagé pour l'instant (calendrier des concours, règlement…).</p>`;
     return h + `<h2 class="sec">Mes exercices</h2>` + vExos();
+  }
+  // Animations ouvertes par l'entraîneur : scores de chaque jeu et classement
+  function vAnimations() {
+    const pts = (j, c) => (j.zones || []).reduce((t, z, i) => t + (Number(c?.[i]) || 0) * (Number(z.points) || 0), 0);
+    const list = St.data.animations || [];
+    if (!list.length) return `<p class="notice">Aucune animation pour l'instant.</p>`;
+    return list.map((a) => {
+      const jeux = a.jeux || [], P = (a.participants || []).map((p) => ({ ...p, sc: Object.fromEntries(jeux.map((j) => [j.id, p.scores?.[j.id] ? pts(j, p.scores[j.id]) : null])) }))
+        .map((p) => ({ ...p, total: jeux.reduce((t, j) => t + (p.sc[j.id] || 0), 0), joue: jeux.some((j) => p.sc[j.id] != null) }));
+      const moi = P.find((p) => p.moi), joues = P.filter((p) => p.joue);
+      let r = joues.slice().sort((x, y) => y.total - x.total), rang = 0;
+      r.forEach((p, i) => { if (i === 0 || p.total !== r[i - 1].total) rang = i + 1; p.rang = rang; });
+      if (!a.classement) r = joues.slice().sort((x, y) => (x.nom || "").localeCompare(y.nom || "", "fr"));
+      const med = (n) => (n === 1 ? "🥇" : n === 2 ? "🥈" : n === 3 ? "🥉" : n);
+      return `<h2 class="sec">${esc(a.nom || "Animation")}</h2><p class="m" style="margin:0 0 8px">${esc([a.date ? fmtLong(a.date) : "", a.lieu].filter(Boolean).join(" · "))}</p>
+        ${moi ? `<div class="list">${jeux.map((j) => `<div class="row"><span class="main"><span class="t">${esc(j.nom)}</span></span><b>${moi.sc[j.id] == null ? "–" : moi.sc[j.id] + " pts"}</b></div>`).join("")}
+          <div class="row"><span class="main"><span class="t">Mon total</span>${a.classement && moi.joue ? `<span class="m">${moi.rang === 1 ? "1re" : moi.rang + "e"} place sur ${joues.length}</span>` : ""}</span><b>${moi.joue ? moi.total + " pts" : "pas encore tiré"}</b></div></div>` : ""}
+        ${r.length ? `<div style="overflow-x:auto;margin-top:10px"><table class="ar-an"><thead><tr>${a.classement ? "<th>Place</th>" : ""}<th>Archer</th>${jeux.map((j) => `<th>${esc(j.nom)}</th>`).join("")}<th>Total</th></tr></thead><tbody>
+          ${r.map((p) => `<tr${p.moi ? ' class="moi"' : ""}>${a.classement ? `<td>${med(p.rang)}</td>` : ""}<td>${esc(p.nom)}</td>${jeux.map((j) => `<td>${p.sc[j.id] ?? "–"}</td>`).join("")}<td><b>${p.total}</b></td></tr>`).join("")}</tbody></table></div>` : ""}`;
+    }).join("");
   }
   function vExos() {
     const list = St.data.exercices.slice().sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.createdAt || 0) - (a.createdAt || 0));

@@ -105,6 +105,13 @@ textarea { min-height: 90px; resize: vertical; }
 
 h2.sec { font-family: var(--font-display); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; font-size: .95rem; color: var(--muted); margin: 8px 0 -4px; }
 .list { display: grid; gap: 8px; }
+.ar-an { width: 100%; border-collapse: collapse; font-size: .92rem; } .ar-an th, .ar-an td { padding: 7px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; } .ar-an th { font-size: .8rem; color: var(--muted); } .ar-an tr.moi td { font-weight: 700; background: var(--sunk); }
+.an-wrap { overflow-x: auto; } .an-tab { width: 100%; border-collapse: collapse; font-size: .92rem; } .an-tab th, .an-tab td { padding: 7px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; } .an-tab .n { text-align: right; }
+.an-tab th { font-size: .8rem; color: var(--muted); } .an-pod1 td { font-weight: 700; }
+.an-sc { font-size: 1.3rem; font-weight: 800; display: grid; justify-items: end; line-height: 1.1; } .an-sc small { font-size: .72rem; font-weight: 600; color: var(--muted); }
+.an-zones { display: grid; gap: 8px; } .an-z { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; } .an-z .main { flex: 1; display: grid; }
+.an-b { min-width: 52px; min-height: 48px; font-size: 1.4rem; font-weight: 700; justify-content: center; } .an-c { min-width: 2ch; text-align: center; font-size: 1.4rem; font-weight: 800; }
+.an-tot { font-size: 1.1rem; margin: 12px 0 0; } .an-zr { display: grid; grid-template-columns: 1fr 90px auto; gap: 6px; margin-bottom: 6px; }
 .fi-grp { margin: 18px 0 8px; font-size: 1rem; display: flex; gap: 8px; align-items: baseline; }
 .sheet.fiche .fi-fam { margin: 0; font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 .fi-sec { margin-top: 14px; } .fi-sec h4 { margin: 0 0 6px; font-size: .95rem; }
@@ -804,7 +811,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
 <div id="toast" class="toast" hidden></div>
 <input type="file" id="file-in" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.mp4,.webm,.txt,.md,.csv,application/pdf,image/*,video/mp4,video/webm,text/plain,text/markdown,text/csv">
 
-<script>window.CARNET_VERSION = { v: "1.9", date: "2026-11-01", site: "1.9", test: false };</script>
+<script>window.CARNET_VERSION = { v: "1.9", date: "2026-11-03", site: "1.9", test: false };</script>
 <script>
 // Espace archer : l'archer (ou son parent) voit uniquement ses propres informations,
 // telles que les renvoie la base (fonction espace_archer), et remplit son carnet.
@@ -889,8 +896,8 @@ window.CarnetArcherUI = (API, opts = {}) => {
     render();
   }
   function header() {
-    const tabs = [["accueil", "Accueil"], ["entrainement", "Entraînement"], ["concours", "Mes concours"], ["documents", "Documents"], ["parametres", "Paramètres"]];
-    const m = M(), vis = { entrainement: ["seances", "carnet", "tir", "impacts", "evals"].some((k) => m.has(k)), concours: m.has("concours"), documents: m.has("documents") };
+    const tabs = [["accueil", "Accueil"], ["entrainement", "Entraînement"], ["concours", "Mes concours"], ["documents", "Documents"], ["animations", "Animations"], ["parametres", "Paramètres"]];
+    const m = M(), vis = { entrainement: ["seances", "carnet", "tir", "impacts", "evals"].some((k) => m.has(k)), concours: m.has("concours"), documents: m.has("documents"), animations: (St.data?.animations || []).length > 0 };
     const shownTabs = tabs.filter(([k]) => vis[k] !== false);
     if (!shownTabs.some(([k]) => k === St.tab) && !["carnet", "evaluations"].includes(St.tab)) St.tab = "accueil";
     top.innerHTML = `<div class="top-in"><div class="brand">${window.CarnetAvatar && St.data?.archer ? "" : `<span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/></svg></span>`}
@@ -906,7 +913,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     else h += `<div class="bar"><span class="grow"></span><button class="btn ghost" data-act="add-code">J'ai un autre code (frère, sœur…)</button></div>`;
     if (St.err) h += `<p class="notice">${esc(St.err)}</p><button class="btn" data-act="reload">Réessayer</button>`;
     else if (!St.data) h += `<p class="notice">Chargement…</p>`;
-    else h += ({ accueil: vAccueil, entrainement: vEntrainement, carnet: vEntrainement, evaluations: vEntrainement, concours: vConcours, documents: vDocs, parametres: vParams }[St.tab] || vAccueil)();
+    else h += ({ accueil: vAccueil, entrainement: vEntrainement, carnet: vEntrainement, evaluations: vEntrainement, concours: vConcours, documents: vDocs, animations: vAnimations, parametres: vParams }[St.tab] || vAccueil)();
     view.innerHTML = h;
   }
   // Réglages du chrono de l'archer : gardés sur son appareil
@@ -1373,6 +1380,26 @@ window.CarnetArcherUI = (API, opts = {}) => {
       <a class="btn" href="${BLOB}${esc(d.assetId)}" target="_blank" rel="noopener">Ouvrir</a></div>`).join("")}</div>` : `<p class="notice">Aucun document partagé pour l'instant (calendrier des concours, règlement…).</p>`;
     return h + `<h2 class="sec">Mes exercices</h2>` + vExos();
   }
+  // Animations ouvertes par l'entraîneur : scores de chaque jeu et classement
+  function vAnimations() {
+    const pts = (j, c) => (j.zones || []).reduce((t, z, i) => t + (Number(c?.[i]) || 0) * (Number(z.points) || 0), 0);
+    const list = St.data.animations || [];
+    if (!list.length) return `<p class="notice">Aucune animation pour l'instant.</p>`;
+    return list.map((a) => {
+      const jeux = a.jeux || [], P = (a.participants || []).map((p) => ({ ...p, sc: Object.fromEntries(jeux.map((j) => [j.id, p.scores?.[j.id] ? pts(j, p.scores[j.id]) : null])) }))
+        .map((p) => ({ ...p, total: jeux.reduce((t, j) => t + (p.sc[j.id] || 0), 0), joue: jeux.some((j) => p.sc[j.id] != null) }));
+      const moi = P.find((p) => p.moi), joues = P.filter((p) => p.joue);
+      let r = joues.slice().sort((x, y) => y.total - x.total), rang = 0;
+      r.forEach((p, i) => { if (i === 0 || p.total !== r[i - 1].total) rang = i + 1; p.rang = rang; });
+      if (!a.classement) r = joues.slice().sort((x, y) => (x.nom || "").localeCompare(y.nom || "", "fr"));
+      const med = (n) => (n === 1 ? "🥇" : n === 2 ? "🥈" : n === 3 ? "🥉" : n);
+      return `<h2 class="sec">${esc(a.nom || "Animation")}</h2><p class="m" style="margin:0 0 8px">${esc([a.date ? fmtLong(a.date) : "", a.lieu].filter(Boolean).join(" · "))}</p>
+        ${moi ? `<div class="list">${jeux.map((j) => `<div class="row"><span class="main"><span class="t">${esc(j.nom)}</span></span><b>${moi.sc[j.id] == null ? "–" : moi.sc[j.id] + " pts"}</b></div>`).join("")}
+          <div class="row"><span class="main"><span class="t">Mon total</span>${a.classement && moi.joue ? `<span class="m">${moi.rang === 1 ? "1re" : moi.rang + "e"} place sur ${joues.length}</span>` : ""}</span><b>${moi.joue ? moi.total + " pts" : "pas encore tiré"}</b></div></div>` : ""}
+        ${r.length ? `<div style="overflow-x:auto;margin-top:10px"><table class="ar-an"><thead><tr>${a.classement ? "<th>Place</th>" : ""}<th>Archer</th>${jeux.map((j) => `<th>${esc(j.nom)}</th>`).join("")}<th>Total</th></tr></thead><tbody>
+          ${r.map((p) => `<tr${p.moi ? ' class="moi"' : ""}>${a.classement ? `<td>${med(p.rang)}</td>` : ""}<td>${esc(p.nom)}</td>${jeux.map((j) => `<td>${p.sc[j.id] ?? "–"}</td>`).join("")}<td><b>${p.total}</b></td></tr>`).join("")}</tbody></table></div>` : ""}`;
+    }).join("");
+  }
   function vExos() {
     const list = St.data.exercices.slice().sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.createdAt || 0) - (a.createdAt || 0));
     if (!list.length) return `<p class="notice">Ton entraîneur ne t'a pas encore partagé de fiche d'exercice.</p>`;
@@ -1569,7 +1596,7 @@ const PALETTE = [
   ["#6aa84f", "Vert pomme"], ["#8a9a3b", "Olive"], ["#8b5a2b", "Marron"], ["#a8896c", "Sable"], ["#7d8a96", "Gris"], ["#3a4652", "Ardoise"],
 ];
 const COLORS = PALETTE.map(([c]) => c);
-const S = { clubs: [], archers: [], seances: [], mots: [], tab: "accueil", club: "all", q: "", seance: null, archer: null, loaded: {}, db: null, canWrite: true, past: false, suivi: null, tirOpen: null, overlay: {}, tt: {}, stale: false, evaluations: [], evaluation: null, evalFrom: null, evalOv: {}, evalT: {}, dossiers: [], documents: [], fiches: [], exMode: null, fTheme: "all", folder: null, assets: null, uploading: 0, parametres: [], attributions: [], concours: [], materiel: [], matEtat: "all", concoursId: null, coSaison: null, carnets: [], centrees: [], annonces: [], reponses: [], carnet: null, cSaison: null, cTab: null, cMonth: 9 };
+const S = { clubs: [], archers: [], seances: [], mots: [], tab: "accueil", club: "all", q: "", seance: null, archer: null, loaded: {}, db: null, canWrite: true, past: false, suivi: null, tirOpen: null, overlay: {}, tt: {}, stale: false, evaluations: [], evaluation: null, evalFrom: null, evalOv: {}, evalT: {}, dossiers: [], documents: [], fiches: [], animations: [], anim: null, animVue: null, exMode: null, fTheme: "all", folder: null, assets: null, uploading: 0, parametres: [], attributions: [], concours: [], materiel: [], matEtat: "all", concoursId: null, coSaison: null, carnets: [], centrees: [], annonces: [], reponses: [], carnet: null, cSaison: null, cTab: null, cMonth: 9 };
 const $ = (s) => document.querySelector(s);
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const todayISO = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
@@ -1729,8 +1756,8 @@ const remove = (col, id) => write(`${col}/${id}`, () => S.db.collection(col).doc
 const newId = (col) => S.db.collection(col).doc().id;
 
 // ---------- Navigation ----------
-const TABS = [["accueil", "Accueil"], ["seances", "Séances"], ["archers", "Archers"], ["clubs", "Clubs"], ["exos", "Exercices"], ["concours", "Concours"], ["materiel", "Matériel"], ["parametres", "Paramètres"]];
-function go(tab) { S.tab = tab; S.quick = false; S.concoursId = null; S.seance = null; S.archer = null; S.suivi = null; S.tirOpen = null; S.evaluation = null; if (S.carnet) { S.carnet = null; carnetSubscribe(); } render(); window.scrollTo(0, 0); }
+const TABS = [["accueil", "Accueil"], ["seances", "Séances"], ["archers", "Archers"], ["clubs", "Clubs"], ["exos", "Exercices"], ["concours", "Concours"], ["materiel", "Matériel"], ["animations", "Animations"], ["parametres", "Paramètres"]];
+function go(tab) { S.tab = tab; S.anim = null; S.quick = false; S.concoursId = null; S.seance = null; S.archer = null; S.suivi = null; S.tirOpen = null; S.evaluation = null; if (S.carnet) { S.carnet = null; carnetSubscribe(); } render(); window.scrollTo(0, 0); }
 try { const h = location.hash.slice(1); if (TABS.some((t) => t[0] === h)) S.tab = h; } catch (e) {}
 try { const c = localStorage.getItem("club"); if (c) S.club = c; } catch (e) {}
 
@@ -1770,6 +1797,7 @@ function render() {
   if (S.tab === "clubs") { v.innerHTML = viewClubs(); fab.hidden = false; fab.textContent = "+ Nouveau club"; fab.onclick = () => formClub(); }
   if (S.tab === "accueil") v.innerHTML = viewAccueil();
   if (S.tab === "materiel") { v.innerHTML = viewMateriel(); if (S.canWrite && S.clubs.length) { fab.hidden = false; fab.textContent = "+ Nouveau matériel"; fab.onclick = () => formMat(); } }
+  if (S.tab === "animations") { v.innerHTML = viewAnimations(); if (S.canWrite && !S.anim) { fab.hidden = false; fab.textContent = "+ Nouvelle animation"; fab.onclick = () => formAnimation(); } }
   if (S.tab === "concours") { v.innerHTML = S.concoursId ? viewConcours() : viewConcoursList(); if (S.canWrite && !S.concoursId) { fab.hidden = false; fab.textContent = "+ Nouveau concours"; fab.onclick = () => formConcours(); } }
   if (S.tab === "exos") { v.innerHTML = viewExos(); if (S.exMode === "fiches" && S.canWrite) { fab.hidden = false; fab.textContent = "+ Nouvelle fiche"; fab.onclick = () => formFiche(); } else if (S.assets && S.canWrite) { fab.hidden = false; fab.textContent = "+ Déposer des fichiers"; fab.onclick = () => $("#file-in").click(); } }
   if (S.tab === "parametres") { v.innerHTML = viewData(); showStorage(); }
@@ -4109,6 +4137,8 @@ async function previewArcher(aid, testWrite = false) {
       mots: S.mots.filter((m) => m.archerId === aid).map((m) => ({ id: m.id, date: m.date, texte: m.texte, reponse: m.reponse || "", reponseLe: m.reponseLe || null, archive: !!m.archive })),
       seances: S.seances.filter((x) => (x.presents || []).includes(aid)).map((x) => ({ id: x.id, date: x.date, heure: x.heure, groupe: x.groupe, theme: x.theme, lieu: x.lieu, clubId: x.clubId, exercices: (x.exercices || []).map((d) => docOf(d)?.titre).filter(Boolean) })),
       annonces: S.annonces.filter((n) => annActive(n) && (!(n.clubIds || []).length || n.clubIds.some((id) => (a.clubIds || []).includes(id)))),
+      animations: S.animations.filter((n) => n.partage && (n.participants || []).includes(aid)).sort((x, y) => (y.date || "").localeCompare(x.date || "")).map((n) => ({ id: n.id, nom: n.nom, date: n.date, lieu: n.lieu, jeux: n.jeux || [], classement: n.classement !== false,
+        participants: (n.participants || []).map((pid) => S.archers.find((x) => x.id === pid)).filter(Boolean).map((x) => ({ id: x.id, moi: x.id === aid, scores: n.scores?.[x.id] || {}, nom: [x.prenom, x.nom ? x.nom[0] + "." : ""].filter(Boolean).join(" ") })) })),
       documents: S.documents.filter((d) => (d.partageClubs || []).some((id) => id === "*" || (a.clubIds || []).includes(id))).map((d) => ({ id: d.id, titre: d.titre, description: d.description, assetId: d.assetId, contentType: d.contentType, nomFichier: d.nomFichier, partageLe: d.partageLe })),
       entrainements: S.seances.filter((s) => s.public && s.date >= todayISO() && s.date <= addDaysISO(todayISO(), 42) && concerne(s, a)).sort((p, q) => (p.date + (p.heure || "")).localeCompare(q.date + (q.heure || ""))).map((s) => {
         const rs = repsOf(s.id), names = (v) => rs.filter((r) => r.reponse === v).map((r) => S.archers.find((x) => x.id === r.archerId)).sort(byName).map(fullName);
@@ -4452,6 +4482,139 @@ function docRow(d, withFolder = false) {
   return `<button class="row" data-doc="${d.id}">${k === "img" ? `<img class="thumb" src="${esc(blobUrl(d))}" alt="" loading="lazy">` : `<span class="thumb">${KIND_LAB[k]}</span>`}
     <span class="main"><span class="t">${esc(d.titre || d.nomFichier)}</span><span class="m">${esc(meta || d.nomFichier)}</span></span>
     <span class="tirline">${fmtSize(d.taille || 0)}</span></button>`;
+}
+// ---------- Animations (V.1.9) : jeux à zones, scores des archers, classement ----------
+// Chaque jeu = des zones de cible qui valent des points (parfois négatifs). On compte les flèches par zone, le carnet calcule.
+const ANIM_JEUX_DEF = [
+  { id: "bonhomme", nom: "Le bonhomme de neige", zones: [["Boule du bas", 2], ["Boule du milieu", -4], ["Tête", 6], ["Écharpe", -8], ["Chapeau", 10], ["Main gauche", -12], ["Main droite", 14]] },
+  { id: "cadeaux", nom: "Les cadeaux de Noël", zones: [-1, -2, -3, 4, 5, 6, 7, 8, 9, -10, 11, 12, -13, 14, 15, 16].map((v, i) => ["Cadeau " + (i + 1), v]) },
+  { id: "sapin", nom: "Le sapin", zones: [["Sapin", 10], ["Pied du sapin", 2], ["L'étoile", 8], ["Guirlande", 6], ["Les boules de Noël", 4]] },
+  { id: "boules", nom: "Les boules de Noël", zones: [1, 2, 3, 4].map((n) => ["Boule " + n, 0]) },
+].map((j) => ({ ...j, zones: j.zones.map(([nom, points]) => ({ nom, points })) }));
+const animJeux = () => prm().animJeux || ANIM_JEUX_DEF;
+const animCur = () => S.animations.find((x) => x.id === S.anim);
+const jeuScore = (j, c) => (j.zones || []).reduce((t, z, i) => t + (Number(c?.[i]) || 0) * (Number(z.points) || 0), 0);
+const animScore = (a, aid, jid) => { const j = (a.jeux || []).find((x) => x.id === jid), c = a.scores?.[aid]?.[jid]; return j && c ? jeuScore(j, c) : null; };
+const animTotal = (a, aid) => (a.jeux || []).reduce((t, j) => t + (animScore(a, aid, j.id) || 0), 0);
+const animJoue = (a, aid) => (a.jeux || []).some((j) => a.scores?.[aid]?.[j.id]);
+const animArchers = (a) => (a.participants || []).map((id) => S.archers.find((x) => x.id === id)).filter(Boolean).sort(byName);
+const fmtPts = (n) => (n > 0 ? "+" : "") + n;
+const fmtDateL = (d) => (d ? new Date(d + "T12:00").toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "long", year: "numeric" }) : "");
+// Rang avec ex æquo : deux scores égaux ont la même place
+function animRangs(list, f) {
+  const r = list.map((x) => ({ x, v: f(x) })).sort((a, b) => b.v - a.v); let rang = 0;
+  r.forEach((o, i) => { if (i === 0 || o.v !== r[i - 1].v) rang = i + 1; o.rang = rang; }); return r;
+}
+function viewAnimations() {
+  if (S.anim && animCur()) return viewAnimation(animCur());
+  const list = S.animations.slice().sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  let h = `<div class="bar"><h2 class="sec" style="margin:0">Animations</h2><span class="grow"></span>${S.canWrite ? `<button class="btn" data-act="anim-jeux">Mes jeux (${animJeux().length})</button><button class="btn primary" data-act="anim-new">+ Nouvelle animation</button>` : ""}</div>`;
+  if (!list.length) return h + `<div class="empty"><h3>Tes animations</h3><p>Prépare tes jeux (bonhomme de neige, sapin, cadeaux…) dans « Mes jeux », avec les points de chaque zone. Crée ensuite une animation, choisis les jeux et les archers : tu comptes les flèches par zone, le carnet calcule les scores et le classement.</p></div>`;
+  return h + `<div class="list">${list.map((a) => {
+    const n = (a.participants || []).length, faits = animArchers(a).filter((x) => animJoue(a, x.id)).length;
+    return `<button class="row" data-anim="${a.id}"><span class="thumb">🎯</span><span class="main"><span class="t">${esc(a.nom || "Animation")}</span>
+      <span class="m">${esc([fmtDateL(a.date), a.lieu, club(a.clubId)?.nom].filter(Boolean).join(" · "))}</span>
+      <span class="m">${esc([(a.jeux || []).map((j) => j.nom).join(", "), `${n} archer${n > 1 ? "s" : ""}${faits ? ` · ${faits} ont tiré` : ""}`].filter(Boolean).join(" · "))}</span></span>
+      ${a.partage ? `<span class="tirline">Ouverte aux archers</span>` : ""}</button>`;
+  }).join("")}</div>`;
+}
+function viewAnimation(a) {
+  const jeux = a.jeux || [], ars = animArchers(a), vue = S.animVue && (S.animVue === "total" || jeux.some((j) => j.id === S.animVue)) ? S.animVue : (jeux[0]?.id || "total");
+  let h = `<div class="bar"><button class="btn ghost" data-act="anim-back">← Animations</button><span class="grow"></span>${S.canWrite ? `<button class="btn" data-act="anim-edit">Modifier</button>` : ""}</div>
+    <h2 class="sec" style="margin:4px 0 2px">${esc(a.nom || "Animation")}</h2><p class="tirline" style="margin:0 0 10px">${esc([fmtDateL(a.date), a.lieu, club(a.clubId)?.nom].filter(Boolean).join(" · "))}${a.partage ? " · ouverte aux archers participants" : ""}</p>`;
+  if (!jeux.length || !ars.length) return h + `<div class="empty"><h3>Animation à compléter</h3><p>Touche « Modifier » pour choisir ${!jeux.length ? "les jeux" : ""}${!jeux.length && !ars.length ? " et " : ""}${!ars.length ? "les archers participants" : ""}.</p></div>`;
+  h += `<div class="chips" role="tablist" aria-label="Jeux">${jeux.map((j) => `<button class="chip" role="tab" data-animvue="${j.id}" aria-pressed="${vue === j.id}" aria-selected="${vue === j.id}">${esc(j.nom)}</button>`).join("")}<button class="chip" role="tab" data-animvue="total" aria-pressed="${vue === "total"}" aria-selected="${vue === "total"}">${a.classement === false ? "Total" : "Classement général"}</button></div>`;
+  const cls = a.classement !== false;
+  if (vue === "total") {
+    const r = cls ? animRangs(ars.filter((x) => animJoue(a, x.id)), (x) => animTotal(a, x.id)) : ars.filter((x) => animJoue(a, x.id)).map((x) => ({ x, v: animTotal(a, x.id) }));
+    const pas = ars.filter((x) => !animJoue(a, x.id));
+    h += `<div class="an-wrap"><table class="an-tab"><thead><tr>${cls ? "<th>Place</th>" : ""}<th>Archer</th>${jeux.map((j) => `<th class="n">${esc(j.nom)}</th>`).join("")}<th class="n">Total</th></tr></thead><tbody>
+      ${r.map((o) => `<tr class="${cls && o.rang <= 3 ? "an-pod" + o.rang : ""}">${cls ? `<td>${o.rang === 1 ? "🥇" : o.rang === 2 ? "🥈" : o.rang === 3 ? "🥉" : o.rang}</td>` : ""}<td>${esc(fullName(o.x))}</td>${jeux.map((j) => { const v = animScore(a, o.x.id, j.id); return `<td class="n">${v == null ? "–" : v}</td>`; }).join("")}<td class="n"><b>${o.v}</b></td></tr>`).join("")}</tbody></table></div>`;
+    if (!r.length) h += `<p class="notice">Aucun score pour l'instant : choisis un jeu et touche le nom d'un archer pour compter ses flèches.</p>`;
+    if (pas.length) h += `<p class="tirline">Pas encore tiré : ${pas.map((x) => esc(fullName(x))).join(", ")}</p>`;
+    return h;
+  }
+  const j = jeux.find((x) => x.id === vue);
+  h += `<p class="tirline">${(j.zones || []).map((z) => `${esc(z.nom)} ${fmtPts(Number(z.points) || 0)}`).join(" · ")}</p>`;
+  const r = cls ? animRangs(ars.filter((x) => a.scores?.[x.id]?.[j.id]), (x) => animScore(a, x.id, j.id)) : [];
+  const rang = Object.fromEntries(r.map((o) => [o.x.id, o.rang]));
+  h += `<div class="list">${ars.map((x) => { const v = animScore(a, x.id, j.id); return `<button class="row" data-anim-saisie="${x.id}"><span class="main"><span class="t">${esc(fullName(x))}</span>
+    <span class="m">${v == null ? "Pas encore tiré · touche pour compter ses flèches" : (a.scores[x.id][j.id] || []).map((c, i) => c ? `${esc(j.zones[i]?.nom || "")} ×${c}` : "").filter(Boolean).join(" · ") || "Aucune flèche dans les zones"}</span></span>
+    ${v == null ? "" : `<span class="an-sc">${v}${cls ? `<small>${rang[x.id] === 1 ? "1er" : rang[x.id] + "e"}</small>` : ""}</span>`}</button>`; }).join("")}</div>`;
+  return h;
+}
+function saisieAnim(a, aid, jid) {
+  const j = (a.jeux || []).find((x) => x.id === jid), ar = S.archers.find((x) => x.id === aid); if (!j || !ar) return;
+  const c = (a.scores?.[aid]?.[jid] || []).slice(); j.zones.forEach((_, i) => { c[i] = Number(c[i]) || 0; });
+  sheet(`${fullName(ar)} · ${j.nom}`, `<p class="tirline">Compte les flèches tombées dans chaque zone.</p><div class="an-zones" id="an-zones">${j.zones.map((z, i) => `<div class="an-z"><span class="main"><b>${esc(z.nom)}</b><span class="tirline">${fmtPts(Number(z.points) || 0)} pt${Math.abs(z.points) > 1 ? "s" : ""}</span></span>
+      <button type="button" class="btn an-b" data-z="${i}" data-d="-1" aria-label="Une flèche de moins dans ${esc(z.nom)}">−</button><output class="an-c" id="an-c${i}">${c[i]}</output><button type="button" class="btn an-b" data-z="${i}" data-d="1" aria-label="Une flèche de plus dans ${esc(z.nom)}">+</button></div>`).join("")}</div>
+    <p class="an-tot">Score : <b id="an-tot">${jeuScore(j, c)}</b> <span class="tirline" id="an-nb"></span></p>`, {
+    onSave() {
+      const scores = JSON.parse(JSON.stringify(a.scores || {})); scores[aid] = scores[aid] || {}; scores[aid][jid] = c;
+      const { id, ...data } = a; save("animations", a.id, { ...data, scores, updatedAt: Date.now() }); toast(`${fullName(ar)} : ${jeuScore(j, c)} points`);
+    },
+    onDelete: a.scores?.[aid]?.[jid] ? () => { const scores = JSON.parse(JSON.stringify(a.scores)); delete scores[aid][jid]; const { id, ...data } = a; save("animations", a.id, { ...data, scores, updatedAt: Date.now() }); toast("Score effacé"); } : null, deleteLabel: "Effacer ce score",
+  });
+  const maj = () => { $("#an-tot").textContent = jeuScore(j, c); const n = c.reduce((t, x) => t + x, 0); $("#an-nb").textContent = `· ${n} flèche${n > 1 ? "s" : ""} dans les zones`; };
+  $("#an-zones").addEventListener("click", (e) => { const b = e.target.closest(".an-b"); if (!b) return; const i = Number(b.dataset.z); c[i] = Math.max(0, c[i] + Number(b.dataset.d)); $("#an-c" + i).textContent = c[i]; maj(); });
+  maj();
+}
+function formAnimation(a = null) {
+  const lib = animJeux(), choisis = new Set((a?.jeux || []).map((j) => j.id)), parts = new Set(a?.participants || []);
+  const jeuxOpts = [...lib, ...(a?.jeux || []).filter((j) => !lib.some((x) => x.id === j.id))];
+  const arsHtml = (cid) => S.archers.filter((x) => !cid || (x.clubIds || []).includes(cid)).sort(byName).map((x) => `<label><input type="checkbox" name="part" value="${x.id}" ${parts.has(x.id) ? "checked" : ""}>${esc(fullName(x))}</label>`).join("") || `<span class="tirline">Aucun archer dans ce club.</span>`;
+  sheet(a ? "Modifier l'animation" : "Nouvelle animation", `
+    <label class="f" for="an-nom">Nom<input type="text" id="an-nom" name="nom" value="${esc(a?.nom)}" placeholder="Ex. Tir de Noël 2026"></label>
+    <div class="grid2"><label class="f" for="an-date">Date<input type="date" id="an-date" name="date" value="${esc(a?.date || todayISO())}"></label>
+      <label class="f" for="an-lieu">Lieu<input type="text" id="an-lieu" name="lieu" value="${esc(a?.lieu)}"></label></div>
+    <label class="f" for="an-club">Club<select id="an-club" name="clubId"><option value="">Tous les clubs</option>${clubOptions(a?.clubId ?? (S.club !== "all" ? S.club : ""))}</select></label>
+    <div class="f">Jeux<div class="checks">${jeuxOpts.map((j) => `<label><input type="checkbox" name="jeu" value="${j.id}" ${choisis.has(j.id) ? "checked" : ""}>${esc(j.nom)}</label>`).join("") || `<span class="tirline">Crée d'abord tes jeux dans « Mes jeux ».</span>`}</div></div>
+    <div class="f">Archers participants <span class="tirline"><button type="button" class="btn" id="an-tous">Tout cocher</button></span><div class="checks" id="an-ars"></div></div>
+    <label class="chk" style="display:flex;gap:8px;align-items:center;border:0"><input type="checkbox" name="classement" ${a?.classement === false ? "" : "checked"}> Afficher un classement (places et podium)</label>
+    ${window.CarnetArcherUI ? `<label class="chk" style="display:flex;gap:8px;align-items:center;border:0"><input type="checkbox" name="partage" ${a?.partage ? "checked" : ""}> Ouvrir aux archers participants : ils voient les scores${""} de cette animation dans leur espace</label>` : ""}`, {
+    onSave(fd) {
+      const nom = fd.get("nom").trim(); if (!nom) { toast("Donne un nom à l'animation"); return false; }
+      const ids = fd.getAll("jeu"), jeux = ids.map((id) => (a?.jeux || []).find((j) => j.id === id) || JSON.parse(JSON.stringify(lib.find((j) => j.id === id)))).filter(Boolean);
+      const data = { nom, date: fd.get("date"), lieu: fd.get("lieu").trim(), clubId: fd.get("clubId") || null, jeux, participants: fd.getAll("part"), classement: !!fd.get("classement"), partage: !!fd.get("partage"),
+        scores: a?.scores || {}, createdAt: a?.createdAt || Date.now(), updatedAt: Date.now() };
+      const id = a?.id || newId("animations"); save("animations", id, data); toast(a ? "Animation enregistrée" : "Animation créée"); S.anim = id; S.animVue = null; render();
+    },
+    onDelete: a ? () => { remove("animations", a.id); S.anim = null; toast("Animation supprimée"); render(); } : null, deleteLabel: "Supprimer l'animation",
+  });
+  const box = $("#an-ars"), sel = $("#an-club");
+  const redraw = () => { box.querySelectorAll("input").forEach((i) => (i.checked ? parts.add(i.value) : parts.delete(i.value))); box.innerHTML = arsHtml(sel.value); };
+  box.innerHTML = arsHtml(sel.value); sel.addEventListener("change", redraw);
+  $("#an-tous").addEventListener("click", () => { const all = [...box.querySelectorAll("input")], on = all.some((i) => !i.checked); all.forEach((i) => (i.checked = on)); });
+}
+function listeJeux() {
+  const el = $("#sheet"), lib = animJeux();
+  el.innerHTML = `<div class="sheet-bg" data-close><div class="sheet" role="dialog" aria-label="Mes jeux"><h3>Mes jeux</h3>
+    <p class="tirline">Les points se règlent ici. Une animation garde les points du jour où tu as choisi le jeu : modifier un jeu ne change pas les scores déjà comptés.</p>
+    <div class="list">${lib.map((j) => `<button class="row" data-jeu="${j.id}"><span class="main"><span class="t">${esc(j.nom)}</span><span class="m">${(j.zones || []).length} zones · ${(j.zones || []).map((z) => fmtPts(Number(z.points) || 0)).join(" ")}</span></span></button>`).join("")}</div>
+    <div class="acts"><button type="button" class="btn" id="jeu-new">+ Nouveau jeu</button><button type="button" class="btn primary" data-close>Fermer</button></div></div></div>`;
+  el.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", (e) => { if (e.target === b) { el.innerHTML = ""; if (S.stale) { S.stale = false; render(); } } }));
+  el.querySelectorAll("[data-jeu]").forEach((b) => b.addEventListener("click", () => formJeu(lib.find((j) => j.id === b.dataset.jeu))));
+  $("#jeu-new").addEventListener("click", () => formJeu());
+}
+function formJeu(j = null) {
+  const zRow = (z = {}) => `<div class="an-zr"><input type="text" class="zn" value="${esc(z.nom || "")}" placeholder="Zone (ex. Tête)" aria-label="Nom de la zone"><input type="number" inputmode="numeric" class="zp" value="${esc(z.points ?? "")}" placeholder="Points" aria-label="Points"><button type="button" class="btn an-zdel" aria-label="Retirer cette zone">✕</button></div>`;
+  sheet(j ? "Modifier le jeu" : "Nouveau jeu", `
+    <label class="f" for="jeu-nom">Nom du jeu<input type="text" id="jeu-nom" name="nom" value="${esc(j?.nom)}" placeholder="Ex. La citrouille"></label>
+    <div class="f">Zones et points <span class="tirline">(mets un signe moins pour une zone qui fait perdre des points)</span><div id="jeu-zones">${(j?.zones?.length ? j.zones : [{}, {}]).map(zRow).join("")}</div>
+      <div><button type="button" class="btn" id="jeu-zadd">+ Ajouter une zone</button></div></div>`, {
+    onSave(fd) {
+      const nom = fd.get("nom").trim(); if (!nom) { toast("Donne un nom au jeu"); return false; }
+      const zones = [...document.querySelectorAll("#jeu-zones .an-zr")].map((r) => ({ nom: r.querySelector(".zn").value.trim(), points: Number(r.querySelector(".zp").value) || 0 })).filter((z) => z.nom);
+      if (!zones.length) { toast("Ajoute au moins une zone"); return false; }
+      const lib = animJeux().slice(), id = j?.id || "j" + Date.now().toString(36), i = lib.findIndex((x) => x.id === id);
+      if (i >= 0) lib[i] = { id, nom, zones }; else lib.push({ id, nom, zones });
+      setParam({ animJeux: lib }); toast(j ? "Jeu enregistré" : "Jeu créé"); setTimeout(listeJeux, 30);
+    },
+    onDelete: j ? () => { setParam({ animJeux: animJeux().filter((x) => x.id !== j.id) }); toast("Jeu supprimé"); setTimeout(listeJeux, 30); } : null, deleteLabel: "Supprimer le jeu",
+  });
+  const box = $("#jeu-zones");
+  box.addEventListener("click", (e) => { const b = e.target.closest(".an-zdel"); if (b) b.parentElement.remove(); });
+  $("#jeu-zadd").addEventListener("click", () => { box.insertAdjacentHTML("beforeend", zRow()); box.lastElementChild.querySelector(".zn").focus(); });
 }
 // ---------- Fiches d'exercices structurées (V.1.9) ----------
 // Le contenu des fiches (objectifs, consignes, déroulé…) se lit et se modifie directement dans le carnet, sans ouvrir de PDF.
@@ -5228,7 +5391,7 @@ async function showStorage() {
   } catch (e) { console.error(e); }
 }
 // ---------- Restauration d'une sauvegarde ----------
-const BK_COLS = [["clubs", "clubs"], ["archers", "archers"], ["seances", "séances"], ["evaluations", "évaluations"], ["carnets", "carnets de saison"], ["carnetEntrees", "lignes de carnet"], ["dossiers", "dossiers"], ["documents", "documents"], ["fiches", "fiches d'exercices"], ["parametres", "paramètres"], ["attributions", "exercices attribués"], ["concours", "concours"], ["materiel", "matériel"], ["annonces", "infos du club"], ["reponses", "réponses aux entraînements"], ["mots", "mots aux archers"]];
+const BK_COLS = [["clubs", "clubs"], ["archers", "archers"], ["seances", "séances"], ["evaluations", "évaluations"], ["carnets", "carnets de saison"], ["carnetEntrees", "lignes de carnet"], ["dossiers", "dossiers"], ["documents", "documents"], ["fiches", "fiches d'exercices"], ["animations", "animations"], ["parametres", "paramètres"], ["attributions", "exercices attribués"], ["concours", "concours"], ["materiel", "matériel"], ["annonces", "infos du club"], ["reponses", "réponses aux entraînements"], ["mots", "mots aux archers"]];
 function startRestore() {
   const inp = document.createElement("input"); inp.type = "file"; inp.accept = "application/json,.json,application/zip,.zip";
   inp.addEventListener("change", async () => {
@@ -5578,7 +5741,7 @@ function formSeance(s = null) {
 
 // ---------- Événements ----------
 document.addEventListener("click", (e) => {
-  const t = e.target.closest("[data-tab],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab],[data-qsort],[data-coptab],[data-com-edit],[data-fmtfed],[data-fmt-del],[data-type-del],[data-fete-ap],[data-fete-new],[data-fete-edit],[data-fete-imgdel],[data-mot-edit],[data-centry-open],[data-cd-exp],[data-cd-arch],[data-exmode],[data-ftheme],[data-fiche]");
+  const t = e.target.closest("[data-tab],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab],[data-qsort],[data-coptab],[data-com-edit],[data-fmtfed],[data-fmt-del],[data-type-del],[data-fete-ap],[data-fete-new],[data-fete-edit],[data-fete-imgdel],[data-mot-edit],[data-centry-open],[data-cd-exp],[data-cd-arch],[data-exmode],[data-ftheme],[data-fiche],[data-anim],[data-animvue],[data-anim-saisie]");
   if (!t || t.closest("#sheet")) return;
   if (t.dataset.dashSuivi) { const [sid, aid] = t.dataset.dashSuivi.split("|"); S.seance = sid; S.suivi = aid; S.tirOpen = null; render(); window.scrollTo(0, 0); return; }
   if (t.dataset.tab) { go(t.dataset.tab); try { history.replaceState(null, "", "#" + t.dataset.tab); } catch (_) {} return; }
@@ -5608,6 +5771,13 @@ document.addEventListener("click", (e) => {
   if (t.dataset.tcopen) { coachTir(t.dataset.tcopen); return; }
   if (t.dataset.annonce) { const n = S.annonces.find((x) => x.id === t.dataset.annonce); if (n && S.canWrite) formAnnonce(n); return; }
   if (t.dataset.partage) { const d = S.documents.find((x) => x.id === t.dataset.partage); if (d) formPartage(d); return; }
+  if (t.dataset.anim) { S.anim = t.dataset.anim; S.animVue = null; render(); window.scrollTo(0, 0); return; }
+  if (t.dataset.animvue) { S.animVue = t.dataset.animvue; render(); return; }
+  if (t.dataset.animSaisie) { const a = animCur(); if (a && S.canWrite) { const vue = S.animVue && S.animVue !== "total" ? S.animVue : a.jeux?.[0]?.id; saisieAnim(a, t.dataset.animSaisie, vue); } return; }
+  if (t.dataset.act === "anim-new") { formAnimation(); return; }
+  if (t.dataset.act === "anim-edit") { formAnimation(animCur()); return; }
+  if (t.dataset.act === "anim-back") { S.anim = null; render(); return; }
+  if (t.dataset.act === "anim-jeux") { listeJeux(); return; }
   if (t.dataset.exmode) { S.exMode = t.dataset.exmode; try { localStorage.setItem("carnet-exmode", S.exMode); } catch (e) {} render(); return; }
   if (t.dataset.ftheme) { S.fTheme = t.dataset.ftheme; render(); return; }
   if (t.dataset.fiche) { const f = S.fiches.find((x) => x.id === t.dataset.fiche); if (f) openFiche(f); return; }
@@ -5958,7 +6128,7 @@ render();
   S.db = db;
   if (user) { const w = await user.can("data.write"); if (w === false) S.canWrite = false; }
   S.seesData = user ? (user.isOwner() || user.canEdit()) : null;
-  ["clubs", "archers", "seances", "evaluations", "dossiers", "documents", "fiches", "carnets", "parametres", "attributions", "concours", "materiel", "annonces", "reponses", "mots"].forEach(subscribe);
+  ["clubs", "archers", "seances", "evaluations", "dossiers", "documents", "fiches", "animations", "carnets", "parametres", "attributions", "concours", "materiel", "annonces", "reponses", "mots"].forEach(subscribe);
   claude.use("assets").then((as) => { S.assets = as; render(); });
   render();
 })();
