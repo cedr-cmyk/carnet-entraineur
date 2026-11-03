@@ -581,7 +581,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
       if (monEq) {
         const jid = (St.anJeu || {})[a.id] && jeux.some((j) => j.id === St.anJeu[a.id]) ? St.anJeu[a.id] : jeux[0]?.id, j = jeux.find((x) => x.id === jid);
         const mb = P.filter((p) => monEq.membres.includes(p.id)).sort((x, y) => (x.nom || "").localeCompare(y.nom || "", "fr"));
-        h += `<div class="card" style="gap:8px"><b>Chef de l'équipe ${esc(monEq.nom)}</b><span class="m">${a.saisie ? "Choisis le jeu, puis touche un archer pour compter ses flèches." : "La saisie est close par ton entraîneur."}</span>
+        h += `<div class="card" style="gap:8px"><b>Chef de l'équipe ${esc(monEq.nom)}</b><span class="m">${a.saisie ? `Choisis le jeu, puis touche un archer pour compter ses flèches${a.fleches ? ` (${a.fleches} flèches chacun par jeu)` : ""}.` : "La saisie est close par ton entraîneur."}</span>
           <div class="chips">${jeux.map((x) => `<button class="chip" data-an-jeu="${a.id}|${x.id}" aria-pressed="${x.id === jid}">${esc(x.nom)}</button>`).join("")}</div>
           ${j ? `<div class="list">${mb.map((p) => `<button class="row" ${a.saisie ? `data-an-saisie="${a.id}|${p.id}|${j.id}"` : "disabled"}><span class="main"><span class="t">${esc(p.nom)}</span><span class="m">${p.sc[j.id] == null ? "Pas encore tiré" : "Touche pour corriger"}</span></span><b>${p.sc[j.id] == null ? "–" : p.sc[j.id] + " pts"}</b></button>`).join("")}</div>
             <span class="m">Total de l'équipe sur ce jeu : <b>${mb.reduce((t, p) => t + (p.sc[j.id] || 0), 0)} pts</b> · tous jeux : <b>${mb.reduce((t, p) => t + p.total, 0)} pts</b></span>` : ""}</div>`;
@@ -604,15 +604,18 @@ window.CarnetArcherUI = (API, opts = {}) => {
     el.innerHTML = `<div class="sheet-bg" data-close><form class="sheet" id="an-form"><h3>${esc(p.nom)} · ${esc(j.nom)}</h3><span class="tirline">Compte les flèches tombées dans chaque zone.</span>
       <div class="an-zones">${j.zones.map((z, i) => `<div class="an-z"><span class="main"><b>${esc(z.nom)}</b><span class="tirline">${z.points > 0 ? "+" : ""}${Number(z.points) || 0} pt${Math.abs(z.points) > 1 ? "s" : ""}</span></span>
         <button type="button" class="btn an-b" data-z="${i}" data-d="-1" aria-label="Une flèche de moins dans ${esc(z.nom)}">−</button><output class="an-c" id="anc${i}">${c[i]}</output><button type="button" class="btn an-b" data-z="${i}" data-d="1" aria-label="Une flèche de plus dans ${esc(z.nom)}">+</button></div>`).join("")}</div>
-      <p class="an-tot">Score : <b id="an-t">${anPts(j, c)}</b></p>
+      <p class="an-tot">Score : <b id="an-t">${anPts(j, c)}</b> <span class="tirline" id="an-n"></span></p>
       <div class="acts">${p.scores?.[jid] ? `<button type="button" class="btn danger left" id="an-del">Effacer</button>` : ""}<button type="button" class="btn" data-close>Annuler</button><button class="btn primary">Enregistrer</button></div></form></div>`;
     el.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", (ev) => { if (ev.target === b) el.innerHTML = ""; }));
-    el.querySelector(".an-zones").addEventListener("click", (ev) => { const b = ev.target.closest(".an-b"); if (!b) return; const i = Number(b.dataset.z); c[i] = Math.max(0, Math.min(99, c[i] + Number(b.dataset.d))); $("#anc" + i).textContent = c[i]; $("#an-t").textContent = anPts(j, c); });
+    const F = a.fleches || 0, maj = () => { const n = c.reduce((t, x) => t + x, 0); $("#an-t").textContent = anPts(j, c);
+      $("#an-n").textContent = F ? `· ${n} / ${F} flèches dans les zones` : `· ${n} flèche${n > 1 ? "s" : ""} dans les zones`; el.querySelectorAll('.an-b[data-d="1"]').forEach((b) => (b.disabled = !!F && n >= F)); };
+    el.querySelector(".an-zones").addEventListener("click", (ev) => { const b = ev.target.closest(".an-b"); if (!b) return; const i = Number(b.dataset.z), n = c.reduce((t, x) => t + x, 0); if (Number(b.dataset.d) > 0 && F && n >= F) return; c[i] = Math.max(0, Math.min(99, c[i] + Number(b.dataset.d))); $("#anc" + i).textContent = c[i]; maj(); });
+    maj();
     const send = async (compte) => {
       try { await API.animScore(who(), animId, cible, jid, compte); p.scores = { ...(p.scores || {}) }; if (compte) p.scores[jid] = compte; else delete p.scores[jid];
         el.innerHTML = ""; toast(compte ? `${p.nom} : ${anPts(j, compte)} points` : "Score effacé"); render();
         API.charger(who()).then((d) => { if (d) { St.data = d; render(); } }).catch(() => {}); }
-      catch (err) { toast("Impossible : " + (/fermee/.test(err.message) ? "la saisie est close" : err.message)); }
+      catch (err) { toast("Impossible : " + (/fermee/.test(err.message) ? "la saisie est close" : /trop de fleches/.test(err.message) ? "plus de flèches que prévu" : err.message)); }
     };
     $("#an-form").addEventListener("submit", (ev) => { ev.preventDefault(); send(c); });
     const d = $("#an-del"); if (d) d.addEventListener("click", () => send(null));

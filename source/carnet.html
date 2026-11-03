@@ -88,6 +88,7 @@ h2.sec { font-family: var(--font-display); font-weight: 600; text-transform: upp
 .ar-an { width: 100%; border-collapse: collapse; font-size: .92rem; } .ar-an th, .ar-an td { padding: 7px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; } .ar-an th { font-size: .8rem; color: var(--muted); } .ar-an tr.moi td { font-weight: 700; background: var(--sunk); }
 .an-eqs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; } .an-eq { border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; font-size: .85rem; }
 .an-eqf { border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; margin-bottom: 8px; } .an-eqchk { margin: 8px 0; } .an-pris { opacity: .6; } .an-pris small { font-size: .78rem; } .an-sans { border: 1px dashed var(--line); border-radius: 10px; padding: 8px 12px; margin: 0 0 10px; } .an-sans.ok { border-style: solid; }
+.an-ko { border-color: #b45309; } .an-warn { color: #b45309; font-weight: 600; } .an-b:disabled { opacity: .35; }
 .an-wrap { overflow-x: auto; } .an-tab { width: 100%; border-collapse: collapse; font-size: .92rem; } .an-tab th, .an-tab td { padding: 7px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; } .an-tab .n { text-align: right; }
 .an-tab th { font-size: .8rem; color: var(--muted); } .an-pod1 td { font-weight: 700; }
 .an-sc { font-size: 1.3rem; font-weight: 800; display: grid; justify-items: end; line-height: 1.1; } .an-sc small { font-size: .72rem; font-weight: 600; color: var(--muted); }
@@ -3446,7 +3447,7 @@ async function previewArcher(aid, testWrite = false) {
       annonces: S.annonces.filter((n) => annActive(n) && (!(n.clubIds || []).length || n.clubIds.some((id) => (a.clubIds || []).includes(id)))),
       animations: S.animations.filter((n) => (n.partage && (n.participants || []).includes(aid)) || animEquipes(n).some((e) => e.chefId === aid)).sort((x, y) => (y.date || "").localeCompare(x.date || "")).map((n) => {
         const mesEq = animEquipes(n).filter((e) => e.chefId === aid).flatMap((e) => e.membres);
-        return { id: n.id, nom: n.nom, date: n.date, lieu: n.lieu, jeux: n.jeux || [], classement: n.classement !== false, partage: !!n.partage, saisie: n.saisieChefs !== false,
+        return { id: n.id, nom: n.nom, date: n.date, lieu: n.lieu, jeux: n.jeux || [], classement: n.classement !== false, partage: !!n.partage, saisie: n.saisieChefs !== false, fleches: n.fleches || null,
           equipes: animEquipes(n).map((e) => ({ id: e.id, nom: e.nom, chefId: e.chefId, membres: e.membres })),
           participants: (n.participants || []).filter((pid) => n.partage || mesEq.includes(pid)).map((pid) => S.archers.find((x) => x.id === pid)).filter(Boolean).map((x) => ({ id: x.id, moi: x.id === aid, scores: n.scores?.[x.id] || {}, nom: [x.prenom, x.nom ? x.nom[0] + "." : ""].filter(Boolean).join(" ") })) };
       }),
@@ -3839,9 +3840,9 @@ function viewAnimations() {
 function viewAnimation(a) {
   const jeux = a.jeux || [], ars = animArchers(a), vue = S.animVue && (S.animVue === "total" || (S.animVue === "equipes" && animEquipes(a).length) || jeux.some((j) => j.id === S.animVue)) ? S.animVue : (jeux[0]?.id || "total");
   let h = `<div class="bar"><button class="btn ghost" data-act="anim-back">← Animations</button><span class="grow"></span>${S.canWrite ? `<button class="btn" data-act="anim-equipes">Équipes${animEquipes(a).length ? ` (${animEquipes(a).length})` : ""}</button><button class="btn" data-act="anim-edit">Modifier</button>` : ""}</div>
-    <h2 class="sec" style="margin:4px 0 2px">${esc(a.nom || "Animation")}</h2><p class="tirline" style="margin:0 0 10px">${esc([fmtDateL(a.date), a.lieu, club(a.clubId)?.nom].filter(Boolean).join(" · "))}${a.partage ? " · ouverte aux archers participants" : ""}</p>`;
+    <h2 class="sec" style="margin:4px 0 2px">${esc(a.nom || "Animation")}</h2><p class="tirline" style="margin:0 0 10px">${esc([fmtDateL(a.date), a.lieu, club(a.clubId)?.nom, a.parEquipe ? `${a.parEquipe} archers par équipe` : "", a.fleches ? `${a.fleches} flèches par archer et par jeu` : ""].filter(Boolean).join(" · "))}${a.partage ? " · ouverte aux archers participants" : ""}</p>`;
   const eqs = animEquipes(a);
-  if (eqs.length) h += `<div class="an-eqs">${eqs.map((e) => { const ch = S.archers.find((x) => x.id === e.chefId); return `<span class="an-eq"><b>${esc(e.nom)}</b> · ${e.membres.length} archer${e.membres.length > 1 ? "s" : ""}${ch ? ` · chef : ${esc(fullName(ch))}` : ""}</span>`; }).join("")}</div>
+  if (eqs.length) h += `<div class="an-eqs">${eqs.map((e) => { const ch = S.archers.find((x) => x.id === e.chefId); return `<span class="an-eq${a.parEquipe && e.membres.length !== a.parEquipe ? " an-ko" : ""}"><b>${esc(e.nom)}</b> · ${e.membres.length}${a.parEquipe ? "/" + a.parEquipe : ""} archer${e.membres.length > 1 ? "s" : ""}${ch ? ` · chef : ${esc(fullName(ch))}` : ""}</span>`; }).join("")}</div>
     ${window.CarnetArcherUI && eqs.some((e) => e.chefId) ? `<div class="bar"><span class="tirline">${a.saisieChefs === false ? "Saisie des chefs d'équipe fermée : les scores ne bougent plus." : "Les chefs d'équipe marquent les points de leur équipe depuis leur espace."}</span><span class="grow"></span>${S.canWrite ? `<button class="btn" data-act="anim-saisie-chefs">${a.saisieChefs === false ? "Rouvrir la saisie" : "Clore la saisie"}</button>` : ""}</div>` : ""}`;
   if (!jeux.length || !ars.length) return h + `<div class="empty"><h3>Animation à compléter</h3><p>Touche « Modifier » pour choisir ${!jeux.length ? "les jeux" : ""}${!jeux.length && !ars.length ? " et " : ""}${!ars.length ? "les archers participants" : ""}.</p></div>`;
   h += `<div class="chips" role="tablist" aria-label="Jeux">${jeux.map((j) => `<button class="chip" role="tab" data-animvue="${j.id}" aria-pressed="${vue === j.id}" aria-selected="${vue === j.id}">${esc(j.nom)}</button>`).join("")}${eqs.length ? `<button class="chip" role="tab" data-animvue="equipes" aria-pressed="${vue === "equipes"}" aria-selected="${vue === "equipes"}">Équipes</button>` : ""}<button class="chip" role="tab" data-animvue="total" aria-pressed="${vue === "total"}" aria-selected="${vue === "total"}">${a.classement === false ? "Total" : "Classement général"}</button></div>`;
@@ -3883,8 +3884,10 @@ function saisieAnim(a, aid, jid) {
     },
     onDelete: a.scores?.[aid]?.[jid] ? () => { const f = animCur() || a, scores = JSON.parse(JSON.stringify(f.scores || {})); if (scores[aid]) delete scores[aid][jid]; const { id, ...data } = f; save("animations", a.id, { ...data, scores, updatedAt: Date.now() }); toast("Score effacé"); } : null, deleteLabel: "Effacer ce score",
   });
-  const maj = () => { $("#an-tot").textContent = jeuScore(j, c); const n = c.reduce((t, x) => t + x, 0); $("#an-nb").textContent = `· ${n} flèche${n > 1 ? "s" : ""} dans les zones`; };
-  $("#an-zones").addEventListener("click", (e) => { const b = e.target.closest(".an-b"); if (!b) return; const i = Number(b.dataset.z); c[i] = Math.max(0, c[i] + Number(b.dataset.d)); $("#an-c" + i).textContent = c[i]; maj(); });
+  const maj = () => { $("#an-tot").textContent = jeuScore(j, c); const n = c.reduce((t, x) => t + x, 0), F = a.fleches;
+    $("#an-nb").textContent = F ? `· ${n} / ${F} flèches dans les zones${n < F ? ` (${F - n} hors zone ou à tirer)` : ""}` : `· ${n} flèche${n > 1 ? "s" : ""} dans les zones`;
+    $("#an-zones").querySelectorAll('.an-b[data-d="1"]').forEach((b) => (b.disabled = !!F && n >= F)); };
+  $("#an-zones").addEventListener("click", (e) => { const b = e.target.closest(".an-b"); if (!b) return; const i = Number(b.dataset.z), n = c.reduce((t, x) => t + x, 0); if (Number(b.dataset.d) > 0 && a.fleches && n >= a.fleches) return; c[i] = Math.max(0, c[i] + Number(b.dataset.d)); $("#an-c" + i).textContent = c[i]; maj(); });
   maj();
 }
 function formAnimation(a = null) {
@@ -3895,6 +3898,8 @@ function formAnimation(a = null) {
     <label class="f" for="an-nom">Nom<input type="text" id="an-nom" name="nom" value="${esc(a?.nom)}" placeholder="Ex. Tir de Noël 2026"></label>
     <div class="grid2"><label class="f" for="an-date">Date<input type="date" id="an-date" name="date" value="${esc(a?.date || todayISO())}"></label>
       <label class="f" for="an-lieu">Lieu<input type="text" id="an-lieu" name="lieu" value="${esc(a?.lieu)}"></label></div>
+    <div class="grid2"><label class="f" for="an-npe">Archers par équipe<input type="number" inputmode="numeric" min="1" max="50" id="an-npe" name="parEquipe" value="${esc(a?.parEquipe ?? "")}" placeholder="Ex. 4"></label>
+      <label class="f" for="an-nfl">Flèches par archer et par jeu<input type="number" inputmode="numeric" min="1" max="99" id="an-nfl" name="fleches" value="${esc(a?.fleches ?? "")}" placeholder="Ex. 6"></label></div>
     <label class="f" for="an-club">Club<select id="an-club" name="clubId"><option value="">Tous les clubs</option>${clubOptions(a?.clubId ?? (S.club !== "all" ? S.club : ""))}</select></label>
     <div class="f">Jeux<div class="checks">${jeuxOpts.map((j) => `<label><input type="checkbox" name="jeu" value="${j.id}" ${choisis.has(j.id) ? "checked" : ""}>${esc(j.nom)}</label>`).join("") || `<span class="tirline">Crée d'abord tes jeux dans « Mes jeux ».</span>`}</div></div>
     <div class="f">Archers participants <span class="tirline"><button type="button" class="btn" id="an-tous">Tout cocher</button></span><div class="checks" id="an-ars"></div></div>
@@ -3903,7 +3908,7 @@ function formAnimation(a = null) {
     onSave(fd) {
       const nom = fd.get("nom").trim(); if (!nom) { toast("Donne un nom à l'animation"); return false; }
       const ids = fd.getAll("jeu"), jeux = ids.map((id) => (a?.jeux || []).find((j) => j.id === id) || JSON.parse(JSON.stringify(lib.find((j) => j.id === id)))).filter(Boolean);
-      const data = { nom, date: fd.get("date"), lieu: fd.get("lieu").trim(), clubId: fd.get("clubId") || null, jeux, participants: fd.getAll("part"), classement: !!fd.get("classement"), partage: !!fd.get("partage"),
+      const data = { nom, date: fd.get("date"), lieu: fd.get("lieu").trim(), clubId: fd.get("clubId") || null, jeux, participants: fd.getAll("part"), classement: !!fd.get("classement"), partage: !!fd.get("partage"), parEquipe: Number(fd.get("parEquipe")) || null, fleches: Number(fd.get("fleches")) || null,
         scores: a?.scores || {}, equipes: (a?.equipes || []).map((e) => ({ ...e, membres: (e.membres || []).filter((m) => fd.getAll("part").includes(m)), chefId: fd.getAll("part").includes(e.chefId) ? e.chefId : null })), saisieChefs: a?.saisieChefs !== false, createdAt: a?.createdAt || Date.now(), updatedAt: Date.now() };
       const id = a?.id || newId("animations"); save("animations", id, data); toast(a ? "Animation enregistrée" : "Animation créée"); S.anim = id; S.animVue = null; render();
     },
@@ -3916,7 +3921,7 @@ function formAnimation(a = null) {
 }
 function formEquipes(a) {
   const ars = animArchers(a); let eqs = JSON.parse(JSON.stringify(a.equipes || []));
-  if (!eqs.length) eqs = [{ id: "e1", nom: "Équipe 1", chefId: null, membres: [] }, { id: "e2", nom: "Équipe 2", chefId: null, membres: [] }];
+  if (!eqs.length) { const n = a.parEquipe ? Math.max(1, Math.ceil(animArchers(a).length / a.parEquipe)) : 2; eqs = Array.from({ length: n }, (_, i) => ({ id: "e" + (i + 1), nom: "Équipe " + (i + 1), chefId: null, membres: [] })); }
   if (!ars.length) { toast("Choisis d'abord les archers de l'animation (Modifier)"); return; }
   const draw = () => {
     const sans = ars.filter((x) => !eqs.some((e) => e.membres.includes(x.id)));
@@ -3925,7 +3930,7 @@ function formEquipes(a) {
     $("#eq-box").innerHTML = eqs.map((e, i) => `<div class="an-eqf"><div class="an-zr" style="grid-template-columns:1fr auto"><input type="text" class="eqn" data-i="${i}" value="${esc(e.nom)}" aria-label="Nom de l'équipe"><button type="button" class="btn eq-del" data-i="${i}" aria-label="Retirer cette équipe">✕</button></div>
       <div class="checks an-eqchk">${ars.map((x) => { const autre = eqs.find((q, k) => k !== i && q.membres.includes(x.id)); return `<label class="${autre ? "an-pris" : ""}"><input type="checkbox" class="eqm" data-i="${i}" value="${x.id}" ${e.membres.includes(x.id) ? "checked" : ""}>${esc(fullName(x))}${autre ? ` <small>(${esc(autre.nom)})</small>` : ""}</label>`; }).join("")}</div>
       <label class="f">Chef d'équipe<select class="eqc" data-i="${i}"><option value="">Pas de chef</option>${ars.filter((x) => e.membres.includes(x.id)).map((x) => `<option value="${x.id}" ${x.id === e.chefId ? "selected" : ""}>${esc(fullName(x))}</option>`).join("")}</select></label>
-      <span class="tirline">${e.membres.length} archer${e.membres.length > 1 ? "s" : ""}</span></div>`).join("");
+      <span class="tirline${a.parEquipe && e.membres.length > a.parEquipe ? " an-warn" : ""}">${e.membres.length}${a.parEquipe ? " / " + a.parEquipe : ""} archer${e.membres.length > 1 ? "s" : ""}${a.parEquipe && e.membres.length > a.parEquipe ? " · une personne de trop" + (e.membres.length - a.parEquipe > 1 ? ` (${e.membres.length - a.parEquipe})` : "") : a.parEquipe && e.membres.length < a.parEquipe ? ` · il manque ${a.parEquipe - e.membres.length} archer${a.parEquipe - e.membres.length > 1 ? "s" : ""}` : ""}</span></div>`).join("");
   };
   sheet("Équipes", `<p class="tirline">Coche les archers de chaque équipe. Un archer coché dans une autre équipe y est déplacé. Le chef d'équipe voit l'animation dans son espace dès qu'il est nommé et marque les points de son équipe.</p>
     <p id="eq-sans"></p><div id="eq-box"></div><div><button type="button" class="btn" id="eq-add">+ Ajouter une équipe</button></div>`, {

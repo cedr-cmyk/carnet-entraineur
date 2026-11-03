@@ -12,6 +12,7 @@ begin
       'classement', coalesce(d.data->>'classement', 'true') <> 'false',
       'partage', coalesce(d.data->>'partage', 'false') = 'true',
       'saisie', coalesce(d.data->>'saisieChefs', 'true') <> 'false',
+      'fleches', d.data->'fleches',
       'equipes', coalesce((select jsonb_agg(jsonb_build_object('id', e->>'id', 'nom', e->>'nom', 'chefId', e->>'chefId', 'membres', coalesce(e->'membres', '[]'::jsonb)))
         from jsonb_array_elements(coalesce(d.data->'equipes', '[]'::jsonb)) e where jsonb_array_length(coalesce(e->'membres', '[]'::jsonb)) > 0), '[]'::jsonb),
       'participants', coalesce((select jsonb_agg(jsonb_build_object(
@@ -47,6 +48,8 @@ begin
     return;
   end if;
   if jsonb_typeof(p_compte) <> 'array' or jsonb_array_length(p_compte) <> n then raise exception 'score invalide'; end if;
+  if jsonb_typeof(d->'fleches') = 'number' and (select sum((v#>>'{}')::numeric) from jsonb_array_elements(p_compte) v where jsonb_typeof(v) = 'number') > (d->>'fleches')::numeric then
+    raise exception 'trop de fleches'; end if;
   for x in select * from jsonb_array_elements(p_compte) loop
     if jsonb_typeof(x) <> 'number' or (x#>>'{}')::numeric not between 0 and 99 or (x#>>'{}')::numeric <> trunc((x#>>'{}')::numeric) then raise exception 'score invalide'; end if;
   end loop;
