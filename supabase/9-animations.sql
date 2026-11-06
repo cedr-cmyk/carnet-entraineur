@@ -1,5 +1,6 @@
 -- 9. Animations (V.1.9) : espace archer pour les animations.
---   · un archer participant voit les scores et le classement d'une animation que l'entraîneur a ouverte aux archers ;
+--   · un archer participant, s'il a l'onglet Animations autorisé (Paramètres › Espace archers), voit les scores et le classement d'une animation ouverte aux archers ;
+--     cette autorisation est vérifiée ici, par le serveur, pas seulement par l'appli ;
 --   · un chef d'équipe voit l'animation dès qu'il est nommé et compte les flèches de son équipe, essai par essai.
 --     Une équipe peut refaire une partie et choisir l'essai à garder ; il compte quand l'entraîneur le valide (un seul essai = compté d'office).
 --   · les points des zones ne sont jamais envoyés aux archers : ils ne reçoivent que les noms des zones et les scores finaux.
@@ -30,12 +31,63 @@ create or replace function public.anim_points(d jsonb, x text, j text) returns n
   from (select public.anim_compte(d, x, j) as c) s
 $$;
 
+-- L'onglet Animations est-il autorisé pour cet archer ? Même calcul que l'appli (Paramètres › Espace archers) :
+-- profil personnalisé de l'archer, sinon son profil, sinon le profil par défaut, sinon les règles automatiques.
+create or replace function public.anim_autorise(p_owner uuid, p_archer text) returns boolean language plpgsql stable security definer set search_path = public as $$
+declare a jsonb; g jsonb; e jsonb; p text; prof text; r jsonb; regles jsonb; age int; nbc int; ok boolean;
+  ids text[];
+begin
+  select data into a from docs where owner = p_owner and col = 'archers' and id = p_archer;
+  if a is null then return false; end if;
+  select coalesce(data, '{}'::jsonb) into g from docs where owner = p_owner and col = 'parametres' and id = 'general';
+  g := coalesce(g, '{}'::jsonb);
+  -- profils existants : les trois de base + les profils créés (non supprimés)
+  ids := array['decouverte', 'loisir', 'competiteur'] || coalesce((select array_agg(q->>'id') from jsonb_array_elements(case when jsonb_typeof(g->'profilsPerso') = 'array' then g->'profilsPerso' else '[]'::jsonb end) q
+    where q->>'id' is not null and coalesce(q->>'supprime', 'false') <> 'true'), array[]::text[]);
+  e := coalesce(a->'espace', '{}'::jsonb);
+  p := coalesce(nullif(e->>'profil', ''), nullif(g->>'profilDefaut', ''), 'auto');
+  if p = 'perso' then
+    if jsonb_typeof(e->'modules') = 'array' then return e->'modules' ? 'animations'; end if;
+    prof := 'competiteur';
+  elsif p <> 'auto' and p = any(ids) then
+    prof := p;
+  else
+    -- règles automatiques, la première qui convient
+    regles := case when jsonb_typeof(g->'reglesAuto') = 'array' then g->'reglesAuto'
+      else jsonb_build_array(jsonb_build_object('ageMax', case when coalesce(g->>'profilAge', '') ~ '^\s*\d+(\.\d+)?\s*$' then (g->>'profilAge')::numeric else 12 end, 'profil', 'decouverte'),
+                             jsonb_build_object('concours', 'oui', 'profil', 'competiteur')) end;
+    age := case when coalesce(a->>'naissance', '') ~ '^\d{4}' then
+      (extract(year from current_date)::int + case when extract(month from current_date) >= 9 then 1 else 0 end) - substr(a->>'naissance', 1, 4)::int end;
+    select count(*) into nbc from docs c where c.owner = p_owner and c.col = 'concours'
+      and coalesce(c.data->'resultats'->p_archer->>'score', '') ~ '^\s*-?\d+([.,]\d+)?\s*$';
+    for r in select x from jsonb_array_elements(regles) x where jsonb_typeof(x) = 'object' loop
+      continue when not coalesce(r->>'profil', '') = any(ids);
+      ok := true;
+      if coalesce(r->>'club', '') <> '' and not coalesce(a->'clubIds', '[]'::jsonb) ? (r->>'club') then ok := false; end if;
+      if coalesce(r->>'ageMin', '') <> '' and not (age is not null and age >= (r->>'ageMin')::numeric) then ok := false; end if;
+      if coalesce(r->>'ageMax', '') <> '' and not (age is not null and age <= (r->>'ageMax')::numeric) then ok := false; end if;
+      if r->>'concours' = 'oui' and not nbc > 0 then ok := false; end if;
+      if r->>'concours' = 'non' and nbc > 0 then ok := false; end if;
+      if coalesce(r->>'arc', '') <> '' and not coalesce(a->'arcs', '[]'::jsonb) ? (r->>'arc') then ok := false; end if;
+      if r->>'role' = 'encadrant' and coalesce(a->>'role', 'archer') not in ('encadrant', 'les-deux') then ok := false; end if;
+      if r->>'role' = 'archer' and coalesce(a->>'role', 'archer') <> 'archer' then ok := false; end if;
+      if ok then prof := r->>'profil'; exit; end if;
+    end loop;
+    if prof is null then prof := case when coalesce(g->>'profilSinon', '') = any(ids) then g->>'profilSinon' else 'loisir' end; end if;
+  end if;
+  -- les profils de base n'ont pas « Animations » tant que l'entraîneur ne l'a pas coché
+  return coalesce(jsonb_typeof(g->'profils'->prof) = 'array' and g->'profils'->prof ? 'animations', false);
+end $$;
+revoke execute on function public.anim_autorise(uuid, text) from public, anon;
+
 create or replace function public.archer_animations(p_owner uuid, p_archer text) returns jsonb language plpgsql stable security definer set search_path = public as $$
-declare r record; e jsonb; jeux jsonb; eqs jsonb; parts jsonb; mon jsonb; ess jsonb; out jsonb := '[]'::jsonb; ouvert boolean;
+declare r record; e jsonb; jeux jsonb; eqs jsonb; parts jsonb; mon jsonb; ess jsonb; out jsonb := '[]'::jsonb; ouvert boolean; autorise boolean;
 begin
   if not exists (select 1 from acces where user_id = auth.uid() and owner = p_owner and archer_id = p_archer) then raise exception 'acces refuse'; end if;
+  -- sans l'onglet Animations autorisé, seul le chef d'équipe reçoit son animation (sa saisie, sans résultats)
+  autorise := coalesce(public.anim_autorise(p_owner, p_archer), false);
   for r in select id, data from docs where owner = p_owner and col = 'animations' order by data->>'date' desc loop
-    ouvert := coalesce(r.data->>'partage', 'false') = 'true';
+    ouvert := coalesce(r.data->>'partage', 'false') = 'true' and autorise;
     e := null;
     select q into e from jsonb_array_elements(coalesce(r.data->'equipes', '[]'::jsonb)) q where q->>'chefId' = p_archer limit 1;
     if not ((ouvert and coalesce(r.data->'participants', '[]'::jsonb) ? p_archer) or e is not null) then continue; end if;
@@ -173,6 +225,6 @@ create or replace function public.archer_peut_lire(p_name text) returns boolean 
     join docs d on d.owner = a.owner and d.col = 'documents' and d.data->>'assetId' = split_part(p_name, '/', 2)
       and (d.id = n.data->>'reglesDoc' or exists (select 1 from jsonb_array_elements(coalesce(n.data->'jeux', '[]'::jsonb)) j where j->>'regleDoc' = d.id))
     where a.user_id = auth.uid() and a.owner::text = split_part(p_name, '/', 1)
-      and ((n.data->>'partage' = 'true' and coalesce(n.data->'participants', '[]'::jsonb) ? a.archer_id)
+      and ((n.data->>'partage' = 'true' and coalesce(n.data->'participants', '[]'::jsonb) ? a.archer_id and public.anim_autorise(a.owner, a.archer_id))
         or exists (select 1 from jsonb_array_elements(coalesce(n.data->'equipes', '[]'::jsonb)) e where e->>'chefId' = a.archer_id)))
 $$;
