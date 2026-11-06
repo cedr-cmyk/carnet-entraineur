@@ -4727,7 +4727,11 @@ function formAnimation(a = null) {
   const dft = a || { parEquipe: der ? der.parEquipe : 3, fleches: der ? der.fleches : 3, regles: der ? der.regles : ANIM_REGLES_DEF, reglesDoc: der?.reglesDoc || "" };
   const lib = animJeux(), choisis = new Set((a?.jeux || []).map((j) => j.id)), parts = new Set(a?.participants || []);
   const jeuxOpts = [...lib, ...(a?.jeux || []).filter((j) => !lib.some((x) => x.id === j.id))];
-  const arsHtml = (cid) => S.archers.filter((x) => !cid || (x.clubIds || []).includes(cid)).sort(byName).map((x) => `<label><input type="checkbox" name="part" value="${x.id}" ${parts.has(x.id) ? "checked" : ""}>${esc(fullName(x))}</label>`).join("") || `<span class="tirline">Aucun archer dans ce club.</span>`;
+  // archers du club choisi + ceux sans club + ceux déjà cochés ; « Voir tous les archers » pour les autres clubs
+  let tous = false;
+  const arsHtml = (cid) => { const L = S.archers.filter((x) => tous || !cid || (x.clubIds || []).includes(cid) || !(x.clubIds || []).length || parts.has(x.id)).sort(byName), autres = cid && !tous ? S.archers.length - L.length : 0;
+    return (L.map((x) => `<label><input type="checkbox" name="part" value="${x.id}" ${parts.has(x.id) ? "checked" : ""}>${esc(fullName(x))}${!(x.clubIds || []).length ? ` <small class="tirline">(sans club)</small>` : ""}</label>`).join("") || `<span class="tirline">Aucun archer dans ce club.</span>`)
+      + (autres ? `<button type="button" class="btn ghost" id="an-voir">Voir aussi les ${autres} archer${autres > 1 ? "s" : ""} des autres clubs</button>` : ""); };
   sheet(a ? "Modifier l'animation" : "Nouvelle animation", `
     <label class="f" for="an-nom">Nom<input type="text" id="an-nom" name="nom" value="${esc(a?.nom)}" placeholder="Ex. Tir de Noël 2026"></label>
     <div class="grid2"><label class="f" for="an-date">Date<input type="date" id="an-date" name="date" value="${esc(a?.date || todayISO())}"></label>
@@ -4756,6 +4760,7 @@ function formAnimation(a = null) {
   const box = $("#an-ars"), sel = $("#an-club");
   const redraw = () => { box.querySelectorAll("input").forEach((i) => (i.checked ? parts.add(i.value) : parts.delete(i.value))); box.innerHTML = arsHtml(sel.value); };
   box.innerHTML = arsHtml(sel.value); sel.addEventListener("change", redraw);
+  box.addEventListener("click", (e) => { if (e.target.closest("#an-voir")) { box.querySelectorAll("input").forEach((i) => (i.checked ? parts.add(i.value) : parts.delete(i.value))); tous = true; box.innerHTML = arsHtml(sel.value); } });
   $("#an-tous").addEventListener("click", () => { const all = [...box.querySelectorAll("input")], on = all.some((i) => !i.checked); all.forEach((i) => (i.checked = on)); });
 }
 function formEquipes(a) {
