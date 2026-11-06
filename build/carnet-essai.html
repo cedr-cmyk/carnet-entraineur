@@ -801,7 +801,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
 <div id="toast" class="toast" hidden></div>
 <input type="file" id="file-in" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.mp4,.webm,.txt,.md,.csv,application/pdf,image/*,video/mp4,video/webm,text/plain,text/markdown,text/csv">
 
-<script>window.CARNET_VERSION = { v: "1.9.29", date: "2026-11-06", site: "1.7.4", test: true };</script>
+<script>window.CARNET_VERSION = { v: "1.9.30", date: "2026-11-06", site: "1.7.4", test: true };</script>
 <script>
 // Espace archer : l'archer (ou son parent) voit uniquement ses propres informations,
 // telles que les renvoie la base (fonction espace_archer), et remplit son carnet.
@@ -5153,7 +5153,7 @@ async function renderPdf(d, box, zoom) {
     box.innerHTML = ""; box.appendChild(frag); await Promise.all(jobs);
   } catch (e) {
     console.error(e); delete pdfCache[d.assetId];
-    msg("Impossible d'afficher la fiche ici. Utilise « Télécharger » pour l'ouvrir avec une autre application.");
+    msg(box.classList.contains("an-visuel") ? "La règle n'a pas pu s'afficher (réseau ?). Essaie « Ouvrir en grand » ou demande à l'animateur." : "Impossible d'afficher la fiche ici. Utilise « Télécharger » pour l'ouvrir avec une autre application.");
   }
 }
 function openDoc(d) {

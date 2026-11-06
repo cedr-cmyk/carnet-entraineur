@@ -4414,7 +4414,7 @@ async function renderPdf(d, box, zoom) {
     box.innerHTML = ""; box.appendChild(frag); await Promise.all(jobs);
   } catch (e) {
     console.error(e); delete pdfCache[d.assetId];
-    msg("Impossible d'afficher la fiche ici. Utilise « Télécharger » pour l'ouvrir avec une autre application.");
+    msg(box.classList.contains("an-visuel") ? "La règle n'a pas pu s'afficher (réseau ?). Essaie « Ouvrir en grand » ou demande à l'animateur." : "Impossible d'afficher la fiche ici. Utilise « Télécharger » pour l'ouvrir avec une autre application.");
   }
 }
 function openDoc(d) {

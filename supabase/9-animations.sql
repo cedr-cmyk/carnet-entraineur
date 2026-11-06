@@ -5,7 +5,8 @@
 --     Une équipe peut refaire une partie et choisir l'essai à garder ; seule la partie validée par l'entraîneur compte.
 --     Les archers de l'équipe autorisés à l'onglet Animations voient les parties et leurs flèches (sans points), en lecture.
 --   · les points des zones ne sont jamais envoyés aux archers : ils ne reçoivent que les noms des zones et les scores finaux.
---   · les règles en texte sont lisibles par ceux qui voient l'animation (les PDF de règles : script 10, à la sortie de la 1.9).
+--   · les règles (texte, PDF ou image) sont lisibles par ceux qui voient l'animation : une règle de lecture à part, réservée aux fichiers
+--     des règles d'animation, qui ne touche pas à celle des autres fichiers (pas d'accès en avance aux fichiers de la 1.8).
 -- À exécuter une fois dans Supabase › SQL Editor (relançable sans risque). Il ne demande pas les scripts 6 à 8 :
 -- il ajoute seulement des fonctions pour les animations, que le carnet actuel n'utilise pas. On peut donc le lancer dès maintenant pour les essais.
 
@@ -194,3 +195,21 @@ revoke execute on function public.archer_anim_essai(uuid, text, text, text, text
 grant execute on function public.archer_anim_essai(uuid, text, text, text, text, text, jsonb) to authenticated;
 revoke execute on function public.anim_compte(jsonb, text, text) from public, anon, authenticated; -- outil interne, appelé seulement par les fonctions ci-dessus
 revoke execute on function public.anim_points(jsonb, text, text) from public, anon, authenticated; -- outil interne, appelé seulement par les fonctions ci-dessus
+
+-- Fichiers des règles (PDF ou image) : le chef d'équipe, et les archers autorisés de l'animation, peuvent les ouvrir
+create or replace function public.anim_peut_lire(p_name text) returns boolean language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from acces a
+    join docs n on n.owner = a.owner and n.col = 'animations'
+    join docs d on d.owner = a.owner and d.col = 'documents' and d.data->>'assetId' = split_part(p_name, '/', 2) and split_part(p_name, '/', 2) <> ''
+      and (d.id = n.data->>'reglesDoc' or exists (select 1 from jsonb_array_elements(coalesce(n.data->'jeux', '[]'::jsonb)) j where j->>'regleDoc' = d.id))
+    where a.user_id = auth.uid() and a.owner::text = split_part(p_name, '/', 1)
+      and (exists (select 1 from jsonb_array_elements(coalesce(n.data->'equipes', '[]'::jsonb)) e where e->>'chefId' = a.archer_id)
+        or (public.anim_autorise(a.owner, a.archer_id)
+            and ((n.data->>'partage' = 'true' and coalesce(n.data->'participants', '[]'::jsonb) ? a.archer_id)
+              or exists (select 1 from jsonb_array_elements(coalesce(n.data->'equipes', '[]'::jsonb)) e where coalesce(e->'membres', '[]'::jsonb) ? a.archer_id)))))
+$$;
+revoke execute on function public.anim_peut_lire(text) from public, anon;
+grant execute on function public.anim_peut_lire(text) to authenticated;
+drop policy if exists "regles des animations" on storage.objects;
+create policy "regles des animations" on storage.objects for select to authenticated using (bucket_id = 'fichiers' and public.anim_peut_lire(name));
