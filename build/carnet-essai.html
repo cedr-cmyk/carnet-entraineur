@@ -891,7 +891,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     if (!shownTabs.some(([k]) => k === St.tab) && !["carnet", "evaluations"].includes(St.tab)) St.tab = "accueil";
     top.innerHTML = `<div class="top-in"><div class="brand">${window.CarnetAvatar && St.data?.archer ? "" : `<span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/></svg></span>`}
       ${window.CarnetAvatar && St.data?.archer ? window.CarnetAvatar.svg(St.data.archer, 40) : ""}
-      <h1>Espace <em>${esc(St.data?.archer ? name(St.data.archer) : name(who()))}</em></h1><span class="sub">${PREVIEW || TESTW ? "" : `<button class="btn ghost" id="ar-out">Se déconnecter</button>`}</span></div>
+      <h1>Espace <em>${esc(St.data?.archer ? name(St.data.archer) : name(who()))}</em></h1><span class="sub">${PREVIEW || TESTW ? "" : API.versCoach ? `<button class="btn" id="ar-coach">↩ Mode entraîneur</button>` : `<button class="btn ghost" id="ar-out">Se déconnecter</button>`}</span></div>
       <nav class="tabs" role="tablist">${shownTabs.map(([k, l]) => `<button class="tab" role="tab" aria-selected="${St.tab === k}" data-atab="${k}">${l}</button>`).join("")}</nav></div>`;
   }
   function render() {
@@ -1356,7 +1356,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
           <label class="f">Blason par défaut<select data-pref="tcBlason"><option value="">Le dernier utilisé</option>${window.CarnetBlasonOpts ? window.CarnetBlasonOpts(P.tcBlason || "") : ""}</select></label></div>
         <span class="tirline">Utilisés quand tu lances « 🎯 Nouveau tir compté ».</span></section>`}
       ${PREVIEW ? "" : `<section class="card"><h3 class="hub-h">Mon compte</h3>
-        <div class="bar"><button class="btn" data-act="add-code">Ajouter un autre archer (frère, sœur…)</button>${TESTW ? "" : `<button class="btn danger" id="ar-out">Se déconnecter</button>`}</div></section>`}
+        <div class="bar"><button class="btn" data-act="add-code">Ajouter un autre archer (frère, sœur…)</button>${API.versCoach && !PREVIEW && !TESTW ? `<button class="btn" id="ar-coach">↩ Mode entraîneur</button>` : ""}${TESTW ? "" : `<button class="btn danger" id="ar-out">Se déconnecter</button>`}</div></section>`}
       <span class="tirline">Ces préférences sont gardées sur cet appareil.</span>
       ${(() => { const a = window.CARNET_AUTEUR; return a?.logo ? `<div class="auteur"><span>${esc(a.titre || "Réalisé par")}</span><img src="${a.logo}" alt="${esc(a.alt || "")}" width="72" height="72" loading="lazy"></div>` : ""; })()}
       ${window.CARNET_VERSION ? `<p class="ar-ver">Appli ${esc("V." + window.CARNET_VERSION.v)}${PREVIEW && window.CARNET_VERSION.test && window.CARNET_VERSION.site !== window.CARNET_VERSION.v ? ` (test · les archers ont la ${esc("V." + window.CARNET_VERSION.site)})` : ""}</p>` : ""}</div>`;
@@ -1480,6 +1480,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     ev.stopPropagation();
     if (t.dataset.act === "close-preview") { root.remove(); return; }
     if (t.id === "ar-out") return API.deconnexion();
+    if (t.id === "ar-coach") return API.versCoach();
     if (t.dataset.atab) { St.tab = t.dataset.atab; render(); return; }
     if (t.dataset.anJeu) { const [aid, jid] = t.dataset.anJeu.split("|"); St.anJeu = { ...(St.anJeu || {}), [aid]: jid }; render(); return; }
     if (t.dataset.anSaisie) { const [aid, jid, es, cid] = t.dataset.anSaisie.split("|"); anSaisie(aid, jid, es, cid); return; }
@@ -4586,6 +4587,19 @@ function demanderCode(suite) {
     onSave(fd) { sha256(String(fd.get("code") || "")).then((h) => { if (h === prm().animCode) { S.animOuvert = h; toast("Points visibles"); render(); if (suite) suite(); } else toast("Code incorrect"); }); },
   });
 }
+// V.1.9 : l'entraîneur est aussi archer → il relie sa fiche à son compte et passe d'un mode à l'autre sur le même appareil
+let monAcces = null;
+async function chargerMonAcces() { try { monAcces = (await window.carnetAcces.moi()) || []; } catch (e) { monAcces = []; } if (S.tab === "parametres") render(); }
+function monEspaceCard() {
+  if (!window.carnetAcces?.relierMoi) return "";
+  if (monAcces === null) { monAcces = []; chargerMonAcces(); }
+  const lie = monAcces.filter((x) => S.archers.some((a) => a.id === x.archer_id));
+  return `<h2 class="sec">Mon espace archer</h2><div class="card">${lie.length
+    ? `<span class="tirline">Ton compte est relié à ta fiche archer : ${lie.map((x) => esc([x.prenom, x.nom].filter(Boolean).join(" "))).join(", ")}. Tu passes d'un mode à l'autre sur cet appareil ; le carnet se rouvre dans le dernier mode choisi.</span>
+       <div class="bar"><button class="btn primary" data-act="mode-archer">🏹 Ouvrir mon espace archer</button></div>`
+    : `<span class="tirline">Tu tires aussi ? Choisis ta fiche archer : ton compte d'entraîneur y sera relié, et tu pourras ouvrir ton espace archer (séances, carnet, animations…) sans changer de compte.</span>
+       <div class="bar"><select id="me-ar" aria-label="Ma fiche archer"><option value="">Choisis ta fiche</option>${S.archers.slice().sort(byName).map((a) => `<option value="${a.id}">${esc(fullName(a))}</option>`).join("")}</select><button class="btn" data-act="relier-moi">Relier</button></div>`}</div>`;
+}
 function animCodeCard() {
   const has = !!prm().animCode;
   return `<h2 class="sec">Animations : code des points</h2><div class="card"><span class="tirline">${has ? "Un code protège les points : sans lui, tu ne vois ni les points des zones, ni les scores, ni les classements des animations." : "Aucun code : les points des jeux et les scores sont visibles. Mets un code pour les cacher, même à toi, pendant les animations."}</span>
@@ -5355,6 +5369,7 @@ function viewData() {
   const part = { general: () => `    ${versionCard()}
     <h2 class="sec">Entraîneur</h2>
     <div class="card"><label class="f" for="pr-nom">Ton prénom ou nom (affiché en haut du carnet)<input type="text" id="pr-nom" data-prm="nom" value="${esc(p.nom)}" placeholder="Ex. Cédric" ${ro}></label></div>
+    ${monEspaceCard()}
     ${window.carnetLogout ? `<div class="card"><div class="bar"><span class="tirline">Connecté à ton compte du carnet sur cet appareil.</span><span class="grow"></span><button class="btn" data-act="logout">Se déconnecter</button></div></div>` : ""}
     <h2 class="sec">Affichage sur cet appareil</h2>
     <div class="card">
@@ -6016,6 +6031,9 @@ document.addEventListener("click", (e) => {
   if (t.dataset.act === "anim-ouvrir") { demanderCode(); return; }
   if (t.dataset.act === "anim-verrou") { S.animOuvert = null; toast("Points cachés"); render(); return; }
   if (t.dataset.act === "anim-code") { formAnimCode(); return; }
+  if (t.dataset.act === "relier-moi") { const aid = $("#me-ar")?.value; if (!aid) { toast("Choisis d'abord ta fiche archer"); return; }
+    window.carnetAcces.relierMoi(aid).then((l) => { monAcces = l || []; toast("Ta fiche archer est reliée à ton compte"); render(); }).catch((e) => toast("Impossible : " + e.message)); return; }
+  if (t.dataset.act === "mode-archer") { window.carnetAcces.basculer("archer"); return; }
   if (t.dataset.act === "anim-equipes") { formEquipes(animCur()); return; }
   if (t.dataset.act === "anim-saisie-chefs") { const a = animCur(); if (a) { const { id, ...data } = a; save("animations", a.id, { ...data, saisieChefs: a.saisieChefs === false, updatedAt: Date.now() }); toast(a.saisieChefs === false ? "Saisie rouverte aux chefs d'équipe" : "Saisie close : les scores ne bougent plus"); } return; }
   if (t.dataset.exmode) { S.exMode = t.dataset.exmode; try { localStorage.setItem("carnet-exmode", S.exMode); } catch (e) {} render(); return; }
