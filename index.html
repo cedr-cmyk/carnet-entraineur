@@ -111,6 +111,7 @@ h2.sec { font-family: var(--font-display); font-weight: 600; text-transform: upp
 .an-ko { border-color: #b45309; } .an-warn { color: #b45309; font-weight: 600; } .an-b:disabled { opacity: .35; }
 .an-team { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; margin: 10px 0; display: grid; gap: 8px; } .an-essai { border-left: 3px solid var(--line); padding-left: 10px; display: grid; gap: 6px; } .an-essai.on { border-left-color: var(--accent); }
 .an-reg { border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; margin: 0 0 10px; } .an-reg summary { cursor: pointer; font-weight: 600; } .an-reg p { margin: 6px 0; }
+.an-vis-img { display: block; max-width: 100%; height: auto; border-radius: 10px; margin: 8px 0; } .an-visuel { margin: 8px 0; max-height: 75vh; }
 .an-wrap { overflow-x: auto; } .an-tab { width: 100%; border-collapse: collapse; font-size: .92rem; } .an-tab th, .an-tab td { padding: 7px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; } .an-tab .n { text-align: right; }
 .an-tab th { font-size: .8rem; color: var(--muted); } .an-pod1 td { font-weight: 700; }
 .an-sc { font-size: 1.3rem; font-weight: 800; display: grid; justify-items: end; line-height: 1.1; } .an-sc small { font-size: .72rem; font-weight: 600; color: var(--muted); }
@@ -1402,9 +1403,10 @@ window.CarnetArcherUI = (API, opts = {}) => {
       const jeux = a.jeux || [], P = (a.participants || []).map((p) => { const sc = p.scores || {}; return { ...p, sc, total: jeux.reduce((t, j) => t + (Number(sc[j.id]) || 0), 0), joue: jeux.some((j) => sc[j.id] != null) }; });
       const moi = P.find((p) => p.moi), joues = P.filter((p) => p.joue), me = who().archer_id || St.data.archer?.id, mon = a.monEquipe;
       let h = `<h2 class="sec">${esc(a.nom || "Animation")}</h2><p class="m" style="margin:0 0 8px">${esc([a.date ? fmtLong(a.date) : "", a.lieu].filter(Boolean).join(" · "))}</p>`;
-      const regle = (txt, asset) => `${(txt || "").split(/\n+/).filter(Boolean).map((l) => `<p>${esc(l)}</p>`).join("")}${asset ? `<a class="btn" href="${BLOB}${esc(asset)}" target="_blank" rel="noopener">📄 Ouvrir la règle</a>` : ""}`;
+      const vType = (t) => (/^image\//.test(t || "") ? "img" : "pdf");
+      const regle = (txt, asset, type) => `${(txt || "").split(/\n+/).filter(Boolean).map((l) => `<p>${esc(l)}</p>`).join("")}${asset ? `${window.CarnetVisuelHtml ? window.CarnetVisuelHtml(BLOB + asset, vType(type), "Règle") : ""}<div><a class="btn" href="${BLOB}${esc(asset)}" target="_blank" rel="noopener">🔍 Ouvrir en grand</a></div>` : ""}`;
       const avecRegle = jeux.filter((j) => j.regle || j.regleAsset);
-      if (a.regles || a.reglesAsset || avecRegle.length) h += `<details class="an-reg"><summary>Les règles</summary>${a.regles || a.reglesAsset ? `<h4>Règles générales</h4>${regle(a.regles, a.reglesAsset)}` : ""}${avecRegle.map((j) => `<h4>${esc(j.nom)}</h4>${regle(j.regle, j.regleAsset)}`).join("")}</details>`;
+      if (a.regles || a.reglesAsset || avecRegle.length) h += `<details class="an-reg"><summary>Les règles</summary>${a.regles || a.reglesAsset ? `<h4>Règles générales</h4>${regle(a.regles, a.reglesAsset, a.reglesType)}` : ""}${avecRegle.map((j) => `<h4>${esc(j.nom)}</h4>${regle(j.regle, j.regleAsset, j.regleType)}`).join("")}</details>`;
       if (mon) {
         const jid = (St.anJeu || {})[a.id] && jeux.some((j) => j.id === St.anJeu[a.id]) ? St.anJeu[a.id] : jeux[0]?.id, L = mon.essais?.[jid] || [];
         const mb = (a.participants || []).filter((p) => mon.membres.includes(p.id)).sort((x, y) => (x.nom || "").localeCompare(y.nom || "", "fr"));
@@ -4602,7 +4604,18 @@ function brancherRegleDepot(selId) {
     b.disabled = false;
   });
 }
-const regleHtml = (txt, docId) => { const d = docId && S.documents.find((x) => x.id === docId); return `${(txt || "").split(/\n+/).filter(Boolean).map((l) => `<p>${esc(l)}</p>`).join("")}${d ? `<button type="button" class="btn" data-doc="${d.id}">📄 ${esc(d.titre || "Règle en PDF")}</button>` : ""}`; };
+// Règle affichée directement : l'image telle quelle, le PDF page par page (pdf.js) quand on ouvre le bloc des règles
+const visuelHtml = (url, type, titre) => type === "img" ? `<img class="an-vis-img" src="${esc(url)}" alt="${esc(titre || "Règle")}" loading="lazy">`
+  : type === "pdf" ? `<div class="an-visuel pdfbox" data-url="${esc(url)}"><p class="notice">La règle s'affiche à l'ouverture…</p></div>` : "";
+window.CarnetVisuelHtml = visuelHtml;
+async function afficherVisuels(root) {
+  for (const box of root.querySelectorAll(".an-visuel:not([data-fait])")) {
+    if (!box.clientWidth) continue;
+    box.dataset.fait = "1"; renderPdf({ assetId: box.dataset.url, _url: box.dataset.url }, box, 1);
+  }
+}
+document.addEventListener("toggle", (e) => { if (e.target.matches?.("details.an-reg") && e.target.open) afficherVisuels(e.target); }, true);
+const regleHtml = (txt, docId) => { const d = docId && S.documents.find((x) => x.id === docId); return `${(txt || "").split(/\n+/).filter(Boolean).map((l) => `<p>${esc(l)}</p>`).join("")}${d ? `${visuelHtml(blobUrl(d), kind(d.contentType), d.titre)}<div><button type="button" class="btn" data-doc="${d.id}">🔍 Ouvrir en grand</button></div>` : ""}`; };
 const animCur = () => S.animations.find((x) => x.id === S.anim);
 const jeuScore = (j, c) => (j.zones || []).reduce((t, z, i) => t + (Number(c?.[i]) || 0) * (Number(z.points) || 0), 0);
 // Essais : le chef d'équipe lance les parties ; seule la partie validée par l'entraîneur compte pour les résultats
@@ -4779,8 +4792,8 @@ function animPourArcher(n, aid) {
   const eqs = animEquipes(n), autorise = arModules(S.archers.find((x) => x.id === aid), nbConcoursOf(aid)).has("animations");
   const mon = eqs.find((e) => e.chefId === aid) || (autorise ? eqs.find((e) => e.membres.includes(aid)) : null), court = (x) => [x.prenom, x.nom ? x.nom[0] + "." : ""].filter(Boolean).join(" ");
   return { id: n.id, nom: n.nom, date: n.date, lieu: n.lieu, classement: n.classement !== false, partage: !!n.partage, saisie: n.saisieChefs !== false, fleches: n.fleches || null,
-    regles: n.regles || "", reglesAsset: S.documents.find((d) => d.id === n.reglesDoc)?.assetId || null,
-    jeux: (n.jeux || []).map((j) => ({ id: j.id, nom: j.nom, zones: (j.zones || []).map((z) => ({ nom: z.nom })), regle: j.regle || "", regleAsset: S.documents.find((d) => d.id === j.regleDoc)?.assetId || null })),
+    regles: n.regles || "", reglesAsset: S.documents.find((d) => d.id === n.reglesDoc)?.assetId || null, reglesType: S.documents.find((d) => d.id === n.reglesDoc)?.contentType || null,
+    jeux: (n.jeux || []).map((j) => ({ id: j.id, nom: j.nom, zones: (j.zones || []).map((z) => ({ nom: z.nom })), regle: j.regle || "", regleAsset: S.documents.find((d) => d.id === j.regleDoc)?.assetId || null, regleType: S.documents.find((d) => d.id === j.regleDoc)?.contentType || null })),
     equipes: eqs.map((e) => ({ id: e.id, nom: e.nom, chefId: e.chefId, membres: e.membres })),
     participants: (n.participants || []).filter((pid) => n.partage || mon?.membres.includes(pid)).map((pid) => S.archers.find((x) => x.id === pid)).filter(Boolean)
       .map((x) => ({ id: x.id, moi: x.id === aid, nom: court(x), scores: n.partage ? Object.fromEntries((n.jeux || []).map((j) => [j.id, animScore(n, x.id, j.id)])) : {} })),
@@ -5142,7 +5155,7 @@ async function renderPdf(d, box, zoom) {
   if (!box.firstChild) msg("Ouverture de la fiche…");
   try {
     await loadPdfJs();
-    if (!pdfCache[d.assetId]) pdfCache[d.assetId] = fetch(blobUrl(d)).then((r) => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); }).then((buf) => window.pdfjsLib.getDocument({ data: buf }).promise);
+    if (!pdfCache[d.assetId]) pdfCache[d.assetId] = fetch(d._url || blobUrl(d)).then((r) => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); }).then((buf) => window.pdfjsLib.getDocument({ data: buf }).promise);
     const pdf = await pdfCache[d.assetId];
     const w = Math.max(240, box.clientWidth - 2) * zoom, dpr = Math.min(window.devicePixelRatio || 1, 2.5);
     const frag = document.createDocumentFragment(), jobs = [];

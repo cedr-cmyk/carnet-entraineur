@@ -99,6 +99,7 @@ begin
     -- jeux sans les points
     select coalesce(jsonb_agg(jsonb_build_object('id', j->>'id', 'nom', j->>'nom', 'regle', coalesce(j->>'regle', ''),
         'regleAsset', (select g.data->>'assetId' from docs g where g.owner = p_owner and g.col = 'documents' and g.id = j->>'regleDoc'),
+        'regleType', (select g.data->>'contentType' from docs g where g.owner = p_owner and g.col = 'documents' and g.id = j->>'regleDoc'),
         'zones', (select coalesce(jsonb_agg(jsonb_build_object('nom', z->>'nom') order by i), '[]'::jsonb) from jsonb_array_elements(coalesce(j->'zones', '[]'::jsonb)) with ordinality t(z, i)))), '[]'::jsonb)
       into jeux from jsonb_array_elements(coalesce(r.data->'jeux', '[]'::jsonb)) j;
     select coalesce(jsonb_agg(jsonb_build_object('id', q->>'id', 'nom', q->>'nom', 'chefId', q->>'chefId', 'membres', q->'membres')), '[]'::jsonb)
@@ -121,7 +122,8 @@ begin
     out := out || jsonb_build_array(jsonb_build_object('id', r.id, 'nom', r.data->>'nom', 'date', r.data->>'date', 'lieu', r.data->>'lieu',
       'classement', coalesce(r.data->>'classement', 'true') <> 'false', 'partage', ouvert, 'saisie', coalesce(r.data->>'saisieChefs', 'true') <> 'false',
       'fleches', r.data->'fleches', 'jeux', jeux, 'regles', coalesce(r.data->>'regles', ''),
-      'reglesAsset', (select g.data->>'assetId' from docs g where g.owner = p_owner and g.col = 'documents' and g.id = r.data->>'reglesDoc'), 'equipes', eqs, 'participants', parts, 'monEquipe', mon));
+      'reglesAsset', (select g.data->>'assetId' from docs g where g.owner = p_owner and g.col = 'documents' and g.id = r.data->>'reglesDoc'),
+      'reglesType', (select g.data->>'contentType' from docs g where g.owner = p_owner and g.col = 'documents' and g.id = r.data->>'reglesDoc'), 'equipes', eqs, 'participants', parts, 'monEquipe', mon));
   end loop;
   return out;
 end $$;
