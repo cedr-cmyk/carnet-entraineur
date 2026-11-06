@@ -752,7 +752,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
 <div id="toast" class="toast" hidden></div>
 <input type="file" id="file-in" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.mp4,.webm,.txt,.md,.csv,application/pdf,image/*,video/mp4,video/webm,text/plain,text/markdown,text/csv">
 
-<script>window.CARNET_VERSION = { v: "1.8", date: "2026-10-31", site: "1.7.3", test: true };</script>
+<script>window.CARNET_VERSION = { v: "1.8", date: "2026-11-06", site: "1.7.4", test: true };</script>
 <script>
 // Espace archer : l'archer (ou son parent) voit uniquement ses propres informations,
 // telles que les renvoie la base (fonction espace_archer), et remplit son carnet.
@@ -843,7 +843,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     if (!shownTabs.some(([k]) => k === St.tab) && !["carnet", "evaluations"].includes(St.tab)) St.tab = "accueil";
     top.innerHTML = `<div class="top-in"><div class="brand">${window.CarnetAvatar && St.data?.archer ? "" : `<span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/></svg></span>`}
       ${window.CarnetAvatar && St.data?.archer ? window.CarnetAvatar.svg(St.data.archer, 40) : ""}
-      <h1>Espace <em>${esc(St.data?.archer ? name(St.data.archer) : name(who()))}</em></h1><span class="sub">${PREVIEW || TESTW ? "" : `<button class="btn ghost" id="ar-out">Se déconnecter</button>`}</span></div>
+      <h1>Espace <em>${esc(St.data?.archer ? name(St.data.archer) : name(who()))}</em></h1><span class="sub">${PREVIEW || TESTW ? "" : API.versCoach ? `<button class="btn" id="ar-coach">↩ Mode entraîneur</button>` : `<button class="btn ghost" id="ar-out">Se déconnecter</button>`}</span></div>
       <nav class="tabs" role="tablist">${shownTabs.map(([k, l]) => `<button class="tab" role="tab" aria-selected="${St.tab === k}" data-atab="${k}">${l}</button>`).join("")}</nav></div>`;
   }
   function render() {
@@ -1308,7 +1308,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
           <label class="f">Blason par défaut<select data-pref="tcBlason"><option value="">Le dernier utilisé</option>${window.CarnetBlasonOpts ? window.CarnetBlasonOpts(P.tcBlason || "") : ""}</select></label></div>
         <span class="tirline">Utilisés quand tu lances « 🎯 Nouveau tir compté ».</span></section>`}
       ${PREVIEW ? "" : `<section class="card"><h3 class="hub-h">Mon compte</h3>
-        <div class="bar"><button class="btn" data-act="add-code">Ajouter un autre archer (frère, sœur…)</button>${TESTW ? "" : `<button class="btn danger" id="ar-out">Se déconnecter</button>`}</div></section>`}
+        <div class="bar"><button class="btn" data-act="add-code">Ajouter un autre archer (frère, sœur…)</button>${API.versCoach && !PREVIEW && !TESTW ? `<button class="btn" id="ar-coach">↩ Mode entraîneur</button>` : ""}${TESTW ? "" : `<button class="btn danger" id="ar-out">Se déconnecter</button>`}</div></section>`}
       <span class="tirline">Ces préférences sont gardées sur cet appareil.</span>
       ${(() => { const a = window.CARNET_AUTEUR; return a?.logo ? `<div class="auteur"><span>${esc(a.titre || "Réalisé par")}</span><img src="${a.logo}" alt="${esc(a.alt || "")}" width="72" height="72" loading="lazy"></div>` : ""; })()}
       ${window.CARNET_VERSION ? `<p class="ar-ver">Appli ${esc("V." + window.CARNET_VERSION.v)}${PREVIEW && window.CARNET_VERSION.test && window.CARNET_VERSION.site !== window.CARNET_VERSION.v ? ` (test · les archers ont la ${esc("V." + window.CARNET_VERSION.site)})` : ""}</p>` : ""}</div>`;
@@ -1356,10 +1356,11 @@ window.CarnetArcherUI = (API, opts = {}) => {
     if (t.hasAttribute("data-pref-chrono")) { chronoStore.setLast(t.value); toast("Réglage du chrono enregistré"); }
   });
   root.addEventListener("click", async (ev) => {
-    const t = ev.target.closest("[data-atab],[data-who],[data-act],[data-saison],[data-entry],[data-eval],[data-arcombo],[data-rep],[data-artc],[data-artcp],[data-asub],[data-seance-ar],[data-mot-rep],[data-mot-arch],#ar-out"); if (!t) return;
+    const t = ev.target.closest("[data-atab],[data-who],[data-act],[data-saison],[data-entry],[data-eval],[data-arcombo],[data-rep],[data-artc],[data-artcp],[data-asub],[data-seance-ar],[data-mot-rep],[data-mot-arch],#ar-out,#ar-coach"); if (!t) return;
     ev.stopPropagation();
     if (t.dataset.act === "close-preview") { root.remove(); return; }
     if (t.id === "ar-out") return API.deconnexion();
+    if (t.id === "ar-coach") return API.versCoach();
     if (t.dataset.atab) { St.tab = t.dataset.atab; render(); return; }
     if (t.dataset.eval) { St.evalId = t.dataset.eval; if (t.dataset.asubGo) { St.tab = "entrainement"; St.sub = "evaluations"; } render(); return; }
     if (t.dataset.rep) {
@@ -1622,6 +1623,19 @@ const evalsOf = (aid) => S.evaluations.filter((e) => e.archerId === aid).sort((x
 
 const byName = (a, b) => (a.nom || "").localeCompare(b.nom || "", "fr") || (a.prenom || "").localeCompare(b.prenom || "", "fr");
 
+// V.1.7.4 : l'entraîneur est aussi archer → il relie sa fiche à son compte et passe d'un mode à l'autre sur le même appareil
+let monAcces = null;
+async function chargerMonAcces() { try { monAcces = (await window.carnetAcces.moi()) || []; } catch (e) { monAcces = []; } if (S.tab === "parametres") render(); }
+function monEspaceCard() {
+  if (!window.carnetAcces?.relierMoi) return "";
+  if (monAcces === null) { monAcces = []; chargerMonAcces(); }
+  const lie = monAcces.filter((x) => S.archers.some((a) => a.id === x.archer_id));
+  return `<h2 class="sec">Mon espace archer</h2><div class="card">${lie.length
+    ? `<span class="tirline">Ton compte est relié à ta fiche archer : ${lie.map((x) => esc([x.prenom, x.nom].filter(Boolean).join(" "))).join(", ")}. Tu passes d'un mode à l'autre sur cet appareil ; le carnet se rouvre dans le dernier mode choisi.</span>
+       <div class="bar"><button class="btn primary" data-act="mode-archer">🏹 Ouvrir mon espace archer</button></div>`
+    : `<span class="tirline">Tu tires aussi ? Choisis ta fiche archer : ton compte d'entraîneur y sera relié, et tu pourras ouvrir ton espace archer sans changer de compte.</span>
+       <div class="bar"><select id="me-ar" aria-label="Ma fiche archer"><option value="">Choisis ta fiche</option>${S.archers.slice().sort(byName).map((a) => `<option value="${a.id}">${esc(fullName(a))}</option>`).join("")}</select><button class="btn" data-act="relier-moi">Relier</button></div>`}</div>`;
+}
 function toast(msg) { const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => (t.hidden = true), 2200); }
 
 // ---------- Écriture (une à la fois par document) ----------
@@ -4634,6 +4648,7 @@ function viewData() {
   const part = { general: () => `    ${versionCard()}
     <h2 class="sec">Entraîneur</h2>
     <div class="card"><label class="f" for="pr-nom">Ton prénom ou nom (affiché en haut du carnet)<input type="text" id="pr-nom" data-prm="nom" value="${esc(p.nom)}" placeholder="Ex. Cédric" ${ro}></label></div>
+    ${monEspaceCard()}
     ${window.carnetLogout ? `<div class="card"><div class="bar"><span class="tirline">Connecté à ton compte du carnet sur cet appareil.</span><span class="grow"></span><button class="btn" data-act="logout">Se déconnecter</button></div></div>` : ""}
     <h2 class="sec">Affichage sur cet appareil</h2>
     <div class="card">
@@ -5401,6 +5416,9 @@ document.addEventListener("click", (e) => {
   if (a === "export") exportData();
   if (a === "restore") startRestore();
   if (a === "logout" && window.carnetLogout) window.carnetLogout();
+  if (a === "relier-moi") { const aid = $("#me-ar")?.value; if (!aid) { toast("Choisis d'abord ta fiche archer"); return; }
+    window.carnetAcces.relierMoi(aid).then((l) => { monAcces = l || []; toast("Ta fiche archer est reliée à ton compte"); render(); }).catch((e) => toast("Impossible : " + e.message)); return; }
+  if (a === "mode-archer") { window.carnetAcces.basculer("archer"); return; }
   if (a === "new-annonce") formAnnonce();
   if (a === "prof-reset") { const k = t.dataset.profK; setParam({ profils: { [k]: null }, profilNoms: { [k]: null } }); toast("Profil remis à l'origine"); render(); }
   if (a === "com-new") formModele();

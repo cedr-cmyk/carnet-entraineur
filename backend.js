@@ -226,6 +226,10 @@
     liste: (archerId) => rpc("acces_archer", { p_archer: archerId }),
     retirer: (userId, archerId) => rpc("retirer_acces", { p_user: userId, p_archer: archerId }),
     tous: () => rpc("acces_tous"),
+    // V.1.7.4 : l'entraîneur qui est aussi archer relie sa propre fiche à son compte, puis passe d'un mode à l'autre sur le même appareil
+    moi: () => rpc("mes_acces"),
+    relierMoi: async (archerId) => { const c = await rpc("creer_invitation", { p_archer: archerId }); await rpc("utiliser_invitation", { p_code: c }); return rpc("mes_acces"); },
+    basculer: (mode) => { ls.set("mode", mode); location.reload(); },
   };
 
   // ---------- Espace archer ----------
@@ -249,11 +253,12 @@
       });
     });
   }
-  async function archerMode(net = true) {
+  async function archerMode(net = true, coach = false) {
     let list = null;
     if (net) { try { list = await withTimeout(rpc("mes_acces")); ls.set("ar-acces", list); } catch (e) { if (!netErr(e)) throw e; } }
     if (!list) list = ls.get("ar-acces", null);
     if (!list || (!list.length && !net)) return besoinReseau("Pas de réseau. Ton espace archer a besoin d'internet la première fois ; ensuite il reste consultable sans réseau.");
+    if (!list.length && coach) { ls.set("mode", "coach"); location.reload(); return new Promise(() => {}); }
     if (!list.length) { await codeScreen(); list = await rpc("mes_acces"); ls.set("ar-acces", list); }
     await domReady();
     window.carnetArcherAPI = {
@@ -267,6 +272,7 @@
       fichiers: (a) => { filesOwner = a.owner; tellSW(); },
       ajouterCode: async (code) => { await rpc("utiliser_invitation", { p_code: code }); return rpc("mes_acces"); },
       deconnexion: () => window.carnetLogout(),
+      ...(coach ? { versCoach: () => { ls.set("mode", "coach"); location.reload(); } } : {}),
     };
     // V.1.7.1 : l'espace archer est gardé sur le téléphone pour être consulté sans réseau ; les envois disent clairement quand le réseau manque
     const API = window.carnetArcherAPI, envoi = (f) => async (...a) => { try { return await withTimeout(f(...a), 12000); } catch (e) { throw netErr(e) ? new Error("pas de réseau, réessaie quand tu auras internet") : e; } };
@@ -291,6 +297,9 @@
     }
     if (coach === null && !net) return besoinReseau("Pas de réseau. La première ouverture du carnet a besoin d'internet.");
     if (coach === false) { if (!session.offline) sb.auth.onAuthStateChange((_e, s) => { if (s) { session = s; tellSW(); } }); return archerMode(net); }
+    // entraîneur qui a choisi son espace archer (Paramètres › Mon espace archer) ; adresse ?mode=coach = retour forcé en entraîneur
+    if (/[?&]mode=coach\b/.test(location.search)) { ls.set("mode", "coach"); history.replaceState(null, "", location.pathname + location.hash); }
+    if (ls.get("mode", "coach") === "archer") { if (!session.offline) sb.auth.onAuthStateChange((_e, s) => { if (s) { session = s; tellSW(); } }); return archerMode(net, true); }
     if (!session.offline) {
       sb.auth.onAuthStateChange((_e, s) => { if (s) { session = s; tellSW(); } });
       tellSW();
@@ -301,7 +310,7 @@
       catch (e) { console.warn("hors connexion : copie locale", e); online = false; horsLigne(true); pull().then(() => { startRealtime(); horsLigne(false); }).catch(() => {}); }
     } else horsLigne(true);
   })();
-  window.carnetLogout = async () => { try { await flush(); } catch (e) {} if (Object.keys(pending).length && !confirm("Des modifications ne sont pas encore envoyées (pas de réseau). Se déconnecter quand même ?")) return; await sb.auth.signOut(); ["cache", "uid", "coach", "pending"].forEach((k) => localStorage.removeItem(LSK(k))); location.reload(); };
+  window.carnetLogout = async () => { try { await flush(); } catch (e) {} if (Object.keys(pending).length && !confirm("Des modifications ne sont pas encore envoyées (pas de réseau). Se déconnecter quand même ?")) return; await sb.auth.signOut(); ["cache", "uid", "coach", "pending", "mode", "ar-acces"].forEach((k) => localStorage.removeItem(LSK(k))); location.reload(); };
   window.claude = {
     use: async (name) => {
       await ready;
