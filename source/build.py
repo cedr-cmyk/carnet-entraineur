@@ -15,7 +15,11 @@ try: site = subprocess.run(['git', '-C', root, 'show', 'main:VERSION'], capture_
 except Exception: site = ''
 site = site or '1.7'  # avant le fichier VERSION, le site était en 1.7 (cache carnet-shell-v7)
 date = datetime.date.today().isoformat()
-def vline(test): return '<script>window.CARNET_VERSION = { v: "%s", date: "%s", site: "%s", test: %s };</script>\n' % (ver, date, site if test else ver, 'true' if test else 'false')
+# Numéro d'essai : chaque modification de la version de test (commits pas encore sur main) le fait avancer
+try: essai = int(subprocess.run(['git', '-C', root, 'rev-list', '--count', 'main..HEAD'], capture_output=True, text=True, check=True).stdout.strip() or 0)
+except Exception: essai = 0
+vtest = ver + (' · essai n°%d' % essai if essai and ver != site else '')
+def vline(test): return '<script>window.CARNET_VERSION = { v: "%s", date: "%s", site: "%s", test: %s };</script>\n' % (vtest if test else ver, date, site if test else ver, 'true' if test else 'false')
 s = s.replace('<script>\n' + ar, vline(True) + '<script>\n' + ar, 1)
 os.makedirs(os.path.join(root, 'build'), exist_ok=True)
 open(os.path.join(root, 'build/carnet-essai.html'), 'w', encoding='utf8').write(s)
@@ -25,4 +29,5 @@ open(os.path.join(root, 'build/carnet-claude.html'), 'w', encoding='utf8').write
 body = main.replace("<title>Carnet de l'entraîneur</title>\n", "", 1)
 head = open(os.path.join(root, 'source/head.html'), encoding='utf8').read()
 open(os.path.join(root, 'index.html'), 'w', encoding='utf8').write(head + body + '\n</body>\n</html>\n')
-print('ok')
+open(os.path.join(root, 'build/essai.txt'), 'w').write(vtest + '\n')
+print('ok', vtest)
