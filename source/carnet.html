@@ -3448,7 +3448,7 @@ async function previewArcher(aid, testWrite = false) {
       mots: S.mots.filter((m) => m.archerId === aid).map((m) => ({ id: m.id, date: m.date, texte: m.texte, reponse: m.reponse || "", reponseLe: m.reponseLe || null, archive: !!m.archive })),
       seances: S.seances.filter((x) => (x.presents || []).includes(aid)).map((x) => ({ id: x.id, date: x.date, heure: x.heure, groupe: x.groupe, theme: x.theme, lieu: x.lieu, clubId: x.clubId, exercices: (x.exercices || []).map((d) => docOf(d)?.titre).filter(Boolean) })),
       annonces: S.annonces.filter((n) => annActive(n) && (!(n.clubIds || []).length || n.clubIds.some((id) => (a.clubIds || []).includes(id)))),
-      animations: S.animations.filter((n) => (n.partage && (n.participants || []).includes(aid)) || animEquipes(n).some((e) => e.chefId === aid)).sort((x, y) => (y.date || "").localeCompare(x.date || "")).map((n) => animPourArcher(n, aid)),
+      animations: S.animations.filter((n) => (n.partage && (n.participants || []).includes(aid)) || animEquipes(n).some((e) => e.chefId === aid || (arModules(S.archers.find((x) => x.id === aid), nbConcoursOf(aid)).has("animations") && e.membres.includes(aid)))).sort((x, y) => (y.date || "").localeCompare(x.date || "")).map((n) => animPourArcher(n, aid)),
       documents: S.documents.filter((d) => (d.partageClubs || []).some((id) => id === "*" || (a.clubIds || []).includes(id))).map((d) => ({ id: d.id, titre: d.titre, description: d.description, assetId: d.assetId, contentType: d.contentType, nomFichier: d.nomFichier, partageLe: d.partageLe })),
       entrainements: S.seances.filter((s) => s.public && s.date >= todayISO() && s.date <= addDaysISO(todayISO(), 42) && concerne(s, a)).sort((p, q) => (p.date + (p.heure || "")).localeCompare(q.date + (q.heure || ""))).map((s) => {
         const rs = repsOf(s.id), names = (v) => rs.filter((r) => r.reponse === v).map((r) => S.archers.find((x) => x.id === r.archerId)).sort(byName).map(fullName);
@@ -3825,9 +3825,9 @@ const docOptions = (sel) => `<option value="">Aucun</option>${docsRegle().map((d
 const regleHtml = (txt, docId) => { const d = docId && S.documents.find((x) => x.id === docId); return `${(txt || "").split(/\n+/).filter(Boolean).map((l) => `<p>${esc(l)}</p>`).join("")}${d ? `<button type="button" class="btn" data-doc="${d.id}">📄 ${esc(d.titre || "Règle en PDF")}</button>` : ""}`; };
 const animCur = () => S.animations.find((x) => x.id === S.anim);
 const jeuScore = (j, c) => (j.zones || []).reduce((t, z, i) => t + (Number(c?.[i]) || 0) * (Number(z.points) || 0), 0);
-// Essais : une équipe peut refaire un jeu ; l'entraîneur choisit l'essai qui compte (un seul essai = compté d'office)
+// Essais : le chef d'équipe lance les parties ; seule la partie validée par l'entraîneur compte pour les résultats
 const animEssais = (a, eid, jid) => a.essais?.[eid]?.[jid] || [];
-const essaiRetenu = (a, eid, jid) => { const L = animEssais(a, eid, jid), r = a.retenus?.[eid]?.[jid]; return L.find((x) => x.id === r) || (L.length === 1 ? L[0] : null); };
+const essaiRetenu = (a, eid, jid) => { const L = animEssais(a, eid, jid), r = a.retenus?.[eid]?.[jid]; return L.find((x) => x.id === r) || null; };
 function animCompte(a, aid, jid) {
   const e = (a.equipes || []).find((q) => (q.membres || []).includes(aid));
   if (!e) return a.scores?.[aid]?.[jid] || null;
@@ -3930,12 +3930,12 @@ function viewAnimation(a) {
   // archers en équipe : par équipe, avec ses essais
   eqs.forEach((e) => {
     const L = animEssais(a, e.id, j.id), ret = essaiRetenu(a, e.id, j.id), mb = e.membres.map((m) => S.archers.find((y) => y.id === m)).filter(Boolean).sort(byName);
-    h += `<div class="an-team"><div class="bar"><b>${esc(e.nom)}</b><span class="tirline">${L.length > 1 ? (a.retenus?.[e.id]?.[j.id] && ret ? `${L.length} essais · essai ${L.indexOf(ret) + 1} validé${a.choix?.[e.id]?.[j.id] && a.choix[e.id][j.id] !== ret.id ? ` · <span class="an-warn">l'équipe demande maintenant l'essai ${L.findIndex((x) => x.id === a.choix[e.id][j.id]) + 1}</span>` : ""}` : `<span class="an-warn">${L.length} essais · ${a.choix?.[e.id]?.[j.id] ? `l'équipe a choisi l'essai ${L.findIndex((x) => x.id === a.choix[e.id][j.id]) + 1}, à toi de valider` : "en attente du choix de l'équipe"}</span>`) : L.length ? "1 essai" : ""}</span><span class="grow"></span>${S.canWrite ? `<button class="btn" data-anim-essai-new="${e.id}">+ Essai</button>` : ""}</div>`;
+    h += `<div class="an-team"><div class="bar"><b>${esc(e.nom)}</b><span class="tirline">${L.length > 1 ? (a.retenus?.[e.id]?.[j.id] && ret ? `${L.length} parties · partie ${L.indexOf(ret) + 1} validée${a.choix?.[e.id]?.[j.id] && a.choix[e.id][j.id] !== ret.id ? ` · <span class="an-warn">l'équipe demande maintenant la partie ${L.findIndex((x) => x.id === a.choix[e.id][j.id]) + 1}</span>` : ""}` : `<span class="an-warn">${L.length} parties · ${a.choix?.[e.id]?.[j.id] ? `l'équipe a choisi la partie ${L.findIndex((x) => x.id === a.choix[e.id][j.id]) + 1}, à toi de valider` : "en attente du choix de l'équipe"}</span>`) : L.length ? (ret ? "1 partie · validée" : `<span class="an-warn">1 partie · à toi de valider</span>`) : ""}</span><span class="grow"></span>${S.canWrite ? `<button class="btn" data-anim-essai-new="${e.id}">+ Partie</button>` : ""}</div>`;
     if (!L.length) h += `<div class="list">${mb.map((x) => { const c = a.scores?.[x.id]?.[j.id]; return row(x, `data-anim-saisie="${x.id}|${e.id}|"`, c, c ? jeuScore(j, c) : null, rang[x.id]); }).join("")}</div>`;
     L.forEach((es, k) => {
       const tot = mb.reduce((t, x) => t + (es.scores?.[x.id] ? jeuScore(j, es.scores[x.id]) : 0), 0), on = ret && ret.id === es.id;
-      h += `<div class="an-essai${on ? " on" : ""}"><div class="bar"><b>Essai ${k + 1}</b><span class="tirline">${es.le ? new Date(es.le).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : ""}${es.par === "chef" ? " · saisi par le chef" : ""}${vu ? ` · total ${tot} pts` : ""}${a.choix?.[e.id]?.[j.id] === es.id ? ` · <b>l'équipe demande à garder cet essai</b>` : ""}</span><span class="grow"></span>
-        ${S.canWrite ? `${L.length > 1 ? `<button class="btn ${on ? "primary" : ""}" data-anim-retenir="${e.id}|${es.id}">${on ? "✓ Validé, il compte" : a.choix?.[e.id]?.[j.id] === es.id ? "Valider le choix de l'équipe" : "Compter cet essai"}</button>` : `<span class="tag">compte</span>`}<button class="btn" data-anim-essai-del="${e.id}|${es.id}" aria-label="Supprimer l'essai ${k + 1}">✕</button>` : ""}</div>
+      h += `<div class="an-essai${on ? " on" : ""}"><div class="bar"><b>Partie ${k + 1}</b><span class="tirline">${es.le ? new Date(es.le).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : ""}${es.par === "chef" ? " · saisi par le chef" : ""}${vu ? ` · total ${tot} pts` : ""}${a.choix?.[e.id]?.[j.id] === es.id ? ` · <b>l'équipe demande à garder cette partie</b>` : ""}</span><span class="grow"></span>
+        ${S.canWrite ? `<button class="btn ${on ? "primary" : ""}" data-anim-retenir="${e.id}|${es.id}">${on ? "✓ Validé, il compte" : a.choix?.[e.id]?.[j.id] === es.id ? "Valider le choix de l'équipe" : L.length === 1 ? "Valider cette partie" : "Valider cette partie"}</button><button class="btn" data-anim-essai-del="${e.id}|${es.id}" aria-label="Supprimer la partie ${k + 1}">✕</button>` : ""}</div>
         <div class="list">${mb.map((x) => { const c = es.scores?.[x.id]; return row(x, `data-anim-saisie="${x.id}|${e.id}|${es.id}"`, c, c ? jeuScore(j, c) : null, on ? rang[x.id] : 0); }).join("")}</div></div>`;
     });
     h += `</div>`;
@@ -3979,14 +3979,15 @@ function ecrireScore(aid, jid, eid, essaiId, c) {
 function majEssais(fn) { const f = animCur(); if (!f) return; const { id, ...data } = JSON.parse(JSON.stringify(f)); data.essais = data.essais || {}; data.retenus = data.retenus || {}; fn(data); save("animations", f.id, { ...data, updatedAt: Date.now() }); }
 // Ce que reçoit l'espace archer (même forme que la fonction Supabase archer_animations) : jamais les points des zones
 function animPourArcher(n, aid) {
-  const eqs = animEquipes(n), mon = eqs.find((e) => e.chefId === aid), court = (x) => [x.prenom, x.nom ? x.nom[0] + "." : ""].filter(Boolean).join(" ");
+  const eqs = animEquipes(n), autorise = arModules(S.archers.find((x) => x.id === aid), nbConcoursOf(aid)).has("animations");
+  const mon = eqs.find((e) => e.chefId === aid) || (autorise ? eqs.find((e) => e.membres.includes(aid)) : null), court = (x) => [x.prenom, x.nom ? x.nom[0] + "." : ""].filter(Boolean).join(" ");
   return { id: n.id, nom: n.nom, date: n.date, lieu: n.lieu, classement: n.classement !== false, partage: !!n.partage, saisie: n.saisieChefs !== false, fleches: n.fleches || null,
     regles: n.regles || "", reglesAsset: S.documents.find((d) => d.id === n.reglesDoc)?.assetId || null,
     jeux: (n.jeux || []).map((j) => ({ id: j.id, nom: j.nom, zones: (j.zones || []).map((z) => ({ nom: z.nom })), regle: j.regle || "", regleAsset: S.documents.find((d) => d.id === j.regleDoc)?.assetId || null })),
     equipes: eqs.map((e) => ({ id: e.id, nom: e.nom, chefId: e.chefId, membres: e.membres })),
     participants: (n.participants || []).filter((pid) => n.partage || mon?.membres.includes(pid)).map((pid) => S.archers.find((x) => x.id === pid)).filter(Boolean)
       .map((x) => ({ id: x.id, moi: x.id === aid, nom: court(x), scores: n.partage ? Object.fromEntries((n.jeux || []).map((j) => [j.id, animScore(n, x.id, j.id)])) : {} })),
-    monEquipe: mon ? { id: mon.id, nom: mon.nom, membres: mon.membres, essais: Object.fromEntries((n.jeux || []).map((j) => [j.id, animEssais(n, mon.id, j.id).map((es) => ({ id: es.id, le: es.le, retenu: n.retenus?.[mon.id]?.[j.id] === es.id, choisi: n.choix?.[mon.id]?.[j.id] === es.id, scores: es.scores || {} }))])) } : null };
+    monEquipe: mon ? { id: mon.id, nom: mon.nom, membres: mon.membres, chef: mon.chefId === aid, essais: Object.fromEntries((n.jeux || []).map((j) => [j.id, animEssais(n, mon.id, j.id).map((es) => ({ id: es.id, le: es.le, retenu: n.retenus?.[mon.id]?.[j.id] === es.id, choisi: n.choix?.[mon.id]?.[j.id] === es.id, scores: es.scores || {} }))])) } : null };
 }
 function formAnimation(a = null) {
   const der = a ? null : S.animations.slice().sort((x, y) => (y.date || "").localeCompare(x.date || ""))[0];
@@ -5255,12 +5256,12 @@ document.addEventListener("click", (e) => {
   if (t.dataset.animEssaiNew) { const eid = t.dataset.animEssaiNew, jid = S.animVue && !["total", "equipes"].includes(S.animVue) ? S.animVue : animCur()?.jeux?.[0]?.id;
     majEssais((d) => { d.essais[eid] = d.essais[eid] || {}; const L = d.essais[eid][jid] = d.essais[eid][jid] || [];
       if (!L.length) { const es0 = { id: "k" + Date.now().toString(36) + "a", le: Date.now(), par: "entraineur", scores: {} }; (d.equipes.find((q) => q.id === eid)?.membres || []).forEach((m) => { if (d.scores?.[m]?.[jid]) { es0.scores[m] = d.scores[m][jid]; delete d.scores[m][jid]; } }); if (Object.keys(es0.scores).length) L.push(es0); }
-      L.push({ id: "k" + Date.now().toString(36), le: Date.now(), par: "entraineur", scores: {} }); }); toast("Nouvel essai"); return; }
+      L.push({ id: "k" + Date.now().toString(36), le: Date.now(), par: "entraineur", scores: {} }); }); toast("Nouvelle partie"); return; }
   if (t.dataset.animRetenir) { const [eid, es] = t.dataset.animRetenir.split("|"), jid = S.animVue && !["total", "equipes"].includes(S.animVue) ? S.animVue : animCur()?.jeux?.[0]?.id;
-    majEssais((d) => { d.retenus[eid] = { ...(d.retenus[eid] || {}), [jid]: es }; }); toast("Cet essai compte pour le classement"); return; }
+    majEssais((d) => { d.retenus[eid] = { ...(d.retenus[eid] || {}), [jid]: es }; }); toast("Partie validée : elle compte pour les résultats"); return; }
   if (t.dataset.animEssaiDel) { const [eid, es] = t.dataset.animEssaiDel.split("|"), jid = S.animVue && !["total", "equipes"].includes(S.animVue) ? S.animVue : animCur()?.jeux?.[0]?.id;
     if (t.dataset.confirm !== "1") { t.dataset.confirm = "1"; t.textContent = "Supprimer ?"; setTimeout(() => { if (t.isConnected) { t.dataset.confirm = ""; t.textContent = "✕"; } }, 3000); return; }
-    majEssais((d) => { d.essais[eid][jid] = (d.essais[eid]?.[jid] || []).filter((x) => x.id !== es); if (d.retenus[eid]?.[jid] === es) delete d.retenus[eid][jid]; if (d.choix?.[eid]?.[jid] === es) delete d.choix[eid][jid]; }); toast("Essai supprimé"); return; }
+    majEssais((d) => { d.essais[eid][jid] = (d.essais[eid]?.[jid] || []).filter((x) => x.id !== es); if (d.retenus[eid]?.[jid] === es) delete d.retenus[eid][jid]; if (d.choix?.[eid]?.[jid] === es) delete d.choix[eid][jid]; }); toast("Partie supprimée"); return; }
   if (t.dataset.act === "anim-new") { formAnimation(); return; }
   if (t.dataset.act === "anim-edit") { formAnimation(animCur()); return; }
   if (t.dataset.act === "anim-back") { S.anim = null; render(); return; }

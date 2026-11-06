@@ -2,7 +2,8 @@
 --   · un archer participant, s'il a l'onglet Animations autorisé (Paramètres › Espace archers), voit les scores et le classement d'une animation ouverte aux archers ;
 --     cette autorisation est vérifiée ici, par le serveur, pas seulement par l'appli ;
 --   · un chef d'équipe voit l'animation dès qu'il est nommé et compte les flèches de son équipe, essai par essai.
---     Une équipe peut refaire une partie et choisir l'essai à garder ; il compte quand l'entraîneur le valide (un seul essai = compté d'office).
+--     Une équipe peut refaire une partie et choisir l'essai à garder ; seule la partie validée par l'entraîneur compte.
+--     Les archers de l'équipe autorisés à l'onglet Animations voient les parties et leurs flèches (sans points), en lecture.
 --   · les points des zones ne sont jamais envoyés aux archers : ils ne reçoivent que les noms des zones et les scores finaux.
 --   · les règles (texte, et PDF ou image choisis dans les documents) sont lisibles par ceux qui voient l'animation.
 -- À exécuter une fois dans Supabase › SQL Editor, APRÈS les scripts 1 à 8 (relançable sans risque).
@@ -20,7 +21,6 @@ begin
   r := d->'retenus'->eid->>j;
   select s->'scores'->x into c from jsonb_array_elements(l) s where s->>'id' = r;
   if c is not null or (r is not null and exists (select 1 from jsonb_array_elements(l) s where s->>'id' = r)) then return c; end if;
-  if jsonb_array_length(l) = 1 then return l->0->'scores'->x; end if;
   return null;
 end $$;
 
@@ -90,6 +90,10 @@ begin
     ouvert := coalesce(r.data->>'partage', 'false') = 'true' and autorise;
     e := null;
     select q into e from jsonb_array_elements(coalesce(r.data->'equipes', '[]'::jsonb)) q where q->>'chefId' = p_archer limit 1;
+    -- un archer autorisé voit aussi les parties de son équipe (en lecture)
+    if e is null and autorise then
+      select q into e from jsonb_array_elements(coalesce(r.data->'equipes', '[]'::jsonb)) q where coalesce(q->'membres', '[]'::jsonb) ? p_archer limit 1;
+    end if;
     if not ((ouvert and coalesce(r.data->'participants', '[]'::jsonb) ? p_archer) or e is not null) then continue; end if;
     -- jeux sans les points
     select coalesce(jsonb_agg(jsonb_build_object('id', j->>'id', 'nom', j->>'nom', 'regle', coalesce(j->>'regle', ''),
@@ -111,7 +115,7 @@ begin
             'choisi', coalesce(r.data->'choix'->(e->>'id')->>(j->>'id') = s->>'id', false), 'scores', coalesce(s->'scores', '{}'::jsonb)) order by k), '[]'::jsonb)
           from jsonb_array_elements(coalesce(r.data->'essais'->(e->>'id')->(j->>'id'), '[]'::jsonb)) with ordinality u(s, k))), '{}'::jsonb)
         into ess from jsonb_array_elements(coalesce(r.data->'jeux', '[]'::jsonb)) j;
-      mon := jsonb_build_object('id', e->>'id', 'nom', e->>'nom', 'membres', coalesce(e->'membres', '[]'::jsonb), 'essais', ess);
+      mon := jsonb_build_object('id', e->>'id', 'nom', e->>'nom', 'membres', coalesce(e->'membres', '[]'::jsonb), 'chef', e->>'chefId' = p_archer, 'essais', ess);
     end if;
     out := out || jsonb_build_array(jsonb_build_object('id', r.id, 'nom', r.data->>'nom', 'date', r.data->>'date', 'lieu', r.data->>'lieu',
       'classement', coalesce(r.data->>'classement', 'true') <> 'false', 'partage', ouvert, 'saisie', coalesce(r.data->>'saisieChefs', 'true') <> 'false',
@@ -226,5 +230,6 @@ create or replace function public.archer_peut_lire(p_name text) returns boolean 
       and (d.id = n.data->>'reglesDoc' or exists (select 1 from jsonb_array_elements(coalesce(n.data->'jeux', '[]'::jsonb)) j where j->>'regleDoc' = d.id))
     where a.user_id = auth.uid() and a.owner::text = split_part(p_name, '/', 1)
       and ((n.data->>'partage' = 'true' and coalesce(n.data->'participants', '[]'::jsonb) ? a.archer_id and public.anim_autorise(a.owner, a.archer_id))
-        or exists (select 1 from jsonb_array_elements(coalesce(n.data->'equipes', '[]'::jsonb)) e where e->>'chefId' = a.archer_id)))
+        or exists (select 1 from jsonb_array_elements(coalesce(n.data->'equipes', '[]'::jsonb)) e where e->>'chefId' = a.archer_id)
+        or (exists (select 1 from jsonb_array_elements(coalesce(n.data->'equipes', '[]'::jsonb)) e where coalesce(e->'membres', '[]'::jsonb) ? a.archer_id) and public.anim_autorise(a.owner, a.archer_id))))
 $$;
