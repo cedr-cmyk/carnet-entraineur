@@ -3460,7 +3460,7 @@ async function previewArcher(aid, testWrite = false) {
   };
   const api = { list: [{ owner: "", archer_id: aid, prenom: a.prenom, nom: a.nom }], charger: build, fichiers() {}, ecrire: async () => {}, supprimer: async () => {}, repondre: async () => {}, ajouterCode: async () => [], deconnexion() {}, mot: async () => {},
     // chef d'équipe : nouvel essai, flèches d'un archer, suppression d'un essai (écrit seulement en mode « archer de test »)
-    animEssai: async (who, animId, jid, essaiId, cible, compte) => { if (!testWrite) return essaiId || "k-apercu"; const n = S.animations.find((x) => x.id === animId); if (!n) throw new Error("animation introuvable");
+    animEssai: async (who, animId, jid, essaiId, cible, compte) => { if (!testWrite) throw new Error("apercu"); const n = S.animations.find((x) => x.id === animId); if (!n) throw new Error("animation introuvable");
       if (n.saisieChefs === false) throw new Error("saisie fermee"); const e = animEquipes(n).find((q) => q.chefId === aid); if (!e) throw new Error("pas chef");
       const { id, ...data } = JSON.parse(JSON.stringify(n)); data.essais = data.essais || {}; data.essais[e.id] = data.essais[e.id] || {}; let L = data.essais[e.id][jid] = data.essais[e.id][jid] || [];
       if (cible === "@garder") { if (!L.some((x) => x.id === essaiId)) throw new Error("essai introuvable"); data.choix = data.choix || {}; data.choix[e.id] = { ...(data.choix[e.id] || {}), [jid]: essaiId }; await S.db.collection("animations").doc(animId).set({ ...data, updatedAt: Date.now() }); return essaiId; }

@@ -612,7 +612,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
       return h;
     }).join("");
   }
-  const anErr = (err) => toast("Impossible : " + (/fermee/.test(err.message) ? "la saisie est close" : /trop de fleches/.test(err.message) ? "plus de flèches que prévu" : /retenu/.test(err.message) ? "cette partie a été validée par ton entraîneur" : err.message));
+  const anErr = (err) => toast(/apercu/.test(err.message) ? "C'est un aperçu : rien n'est enregistré ici. Pour essayer, connecte-toi avec le code du chef d'équipe." : /archer_anim_essai|function|schema cache/i.test(err.message) ? "Impossible : la mise à jour du serveur (script 9) n'est pas encore installée." : "Impossible : " + (/fermee/.test(err.message) ? "la saisie est close" : /trop de fleches/.test(err.message) ? "plus de flèches que prévu" : /retenu/.test(err.message) ? "cette partie a été validée par ton entraîneur" : err.message));
   const anRecharger = () => API.charger(who()).then((d) => { if (d) { St.data = d; render(); } }).catch(() => {});
   async function anEssai(animId, jid) { try { await API.animEssai(who(), animId, jid, null, null, null); toast("Partie lancée : compte les flèches de chacun"); await anRecharger(); } catch (err) { anErr(err); } }
   async function anGarder(animId, jid, essaiId) { try { await API.animEssai(who(), animId, jid, essaiId, "@garder", null); toast("C'est noté : ton entraîneur va valider cette partie"); await anRecharger(); } catch (err) { anErr(err); } }

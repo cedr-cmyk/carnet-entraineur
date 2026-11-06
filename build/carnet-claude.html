@@ -1412,7 +1412,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
       return h;
     }).join("");
   }
-  const anErr = (err) => toast("Impossible : " + (/fermee/.test(err.message) ? "la saisie est close" : /trop de fleches/.test(err.message) ? "plus de flèches que prévu" : /retenu/.test(err.message) ? "cette partie a été validée par ton entraîneur" : err.message));
+  const anErr = (err) => toast(/apercu/.test(err.message) ? "C'est un aperçu : rien n'est enregistré ici. Pour essayer, connecte-toi avec le code du chef d'équipe." : /archer_anim_essai|function|schema cache/i.test(err.message) ? "Impossible : la mise à jour du serveur (script 9) n'est pas encore installée." : "Impossible : " + (/fermee/.test(err.message) ? "la saisie est close" : /trop de fleches/.test(err.message) ? "plus de flèches que prévu" : /retenu/.test(err.message) ? "cette partie a été validée par ton entraîneur" : err.message));
   const anRecharger = () => API.charger(who()).then((d) => { if (d) { St.data = d; render(); } }).catch(() => {});
   async function anEssai(animId, jid) { try { await API.animEssai(who(), animId, jid, null, null, null); toast("Partie lancée : compte les flèches de chacun"); await anRecharger(); } catch (err) { anErr(err); } }
   async function anGarder(animId, jid, essaiId) { try { await API.animEssai(who(), animId, jid, essaiId, "@garder", null); toast("C'est noté : ton entraîneur va valider cette partie"); await anRecharger(); } catch (err) { anErr(err); } }
@@ -4193,7 +4193,7 @@ async function previewArcher(aid, testWrite = false) {
   };
   const api = { list: [{ owner: "", archer_id: aid, prenom: a.prenom, nom: a.nom }], charger: build, fichiers() {}, ecrire: async () => {}, supprimer: async () => {}, repondre: async () => {}, ajouterCode: async () => [], deconnexion() {}, mot: async () => {},
     // chef d'équipe : nouvel essai, flèches d'un archer, suppression d'un essai (écrit seulement en mode « archer de test »)
-    animEssai: async (who, animId, jid, essaiId, cible, compte) => { if (!testWrite) return essaiId || "k-apercu"; const n = S.animations.find((x) => x.id === animId); if (!n) throw new Error("animation introuvable");
+    animEssai: async (who, animId, jid, essaiId, cible, compte) => { if (!testWrite) throw new Error("apercu"); const n = S.animations.find((x) => x.id === animId); if (!n) throw new Error("animation introuvable");
       if (n.saisieChefs === false) throw new Error("saisie fermee"); const e = animEquipes(n).find((q) => q.chefId === aid); if (!e) throw new Error("pas chef");
       const { id, ...data } = JSON.parse(JSON.stringify(n)); data.essais = data.essais || {}; data.essais[e.id] = data.essais[e.id] || {}; let L = data.essais[e.id][jid] = data.essais[e.id][jid] || [];
       if (cible === "@garder") { if (!L.some((x) => x.id === essaiId)) throw new Error("essai introuvable"); data.choix = data.choix || {}; data.choix[e.id] = { ...(data.choix[e.id] || {}), [jid]: essaiId }; await S.db.collection("animations").doc(animId).set({ ...data, updatedAt: Date.now() }); return essaiId; }
