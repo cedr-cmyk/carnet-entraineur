@@ -22,7 +22,7 @@ try:
   exclure = [b for b in ('main', 'test') if b != cur]
   essai = int(subprocess.run(['git', '-C', root, 'rev-list', '--count', 'HEAD', '--not'] + exclure, capture_output=True, text=True, check=True).stdout.strip() or 0)
 except Exception: essai = 0
-vtest = ver + (' · essai n°%d' % essai if essai and ver != site else '')
+vtest = ver + ('.%d' % essai if essai and ver != site else '')  # ex. 1.9.23 = 23e modification de la 1.9 en test
 def vline(test): return '<script>window.CARNET_VERSION = { v: "%s", date: "%s", site: "%s", test: %s };</script>\n' % (vtest if test else ver, date, site if test else ver, 'true' if test else 'false')
 s = s.replace('<script>\n' + ar, vline(True) + '<script>\n' + ar, 1)
 os.makedirs(os.path.join(root, 'build'), exist_ok=True)
