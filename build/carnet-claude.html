@@ -4548,14 +4548,13 @@ const ANIM_JEUX_DEF = [
   { id: "cadeaux", nom: "Les cadeaux de Noël", zones: [-1, -2, -3, 4, 5, 6, 7, 8, 9, -10, 11, 12, -13, 14, 15, 16].map((v, i) => ["Cadeau " + (i + 1), v]) },
   { id: "sapin", nom: "Le sapin", zones: [["Sapin", 10], ["Pied du sapin", 2], ["L'étoile", 8], ["Guirlande", 6], ["Les boules de Noël", 4]] },
   { id: "boules", nom: "Les boules de Noël", zones: [1, 2, 3, 4].map((n) => ["Boule " + n, 0]) },
-].map((j) => ({ ...j, zones: j.zones.map(([nom, points]) => ({ nom, points })), regle: {
-  bonhomme: "Les chiffres qui sont indiqués dans les zones peuvent rajouter des points ou vous en faire perdre… même si c'est peut-être juste pour vous perturber que je dis ça.",
-  cadeaux: "Le principe est le même que pour le bonhomme de neige.\nSauf que là, c'est multiplier ou diviser.",
-  sapin: "Le sapin en lui-même rapporte un certain nombre de points.\nToutes les flèches dans le pied du sapin vous feront gagner ___ points.\nL'étoile qui scintille au-dessus vous rapporte ??? points.\nLa très belle guirlande ne rapporte pas grand-chose…\nLes boules de Noël, là vous aurez droit à… ERREUR 404",
-}[j.id] || "" }));
-const animJeux = () => (prm().animJeux || ANIM_JEUX_DEF).map((j) => (j.regle === undefined ? { ...j, regle: ANIM_JEUX_DEF.find((d) => d.id === j.id)?.regle || "" } : j));
+].map((j) => ({ ...j, zones: j.zones.map(([nom, points]) => ({ nom, points })), regle: "" }));
+// Règles : en image ou PDF de préférence ; les textes recopiés au début (V.1.9) sont retirés d'office
+const ANIM_REGLES_ANCIENNES = ["Les chiffres qui sont indiqués dans les zones peuvent rajouter des points ou vous en faire perdre… même si c'est peut-être juste pour vous perturber que je dis ça.", "Le principe est le même que pour le bonhomme de neige.\nSauf que là, c'est multiplier ou diviser.", "Le sapin en lui-même rapporte un certain nombre de points.\nToutes les flèches dans le pied du sapin vous feront gagner ___ points.\nL'étoile qui scintille au-dessus vous rapporte ??? points.\nLa très belle guirlande ne rapporte pas grand-chose…\nLes boules de Noël, là vous aurez droit à… ERREUR 404"];
+const txtRegle = (t) => (!t || t === ANIM_REGLES_ANC || ANIM_REGLES_ANCIENNES.includes(t) ? "" : t);
+const animJeux = () => (prm().animJeux || ANIM_JEUX_DEF).map((j) => (j.regle === undefined || ANIM_REGLES_ANCIENNES.includes(j.regle) ? { ...j, regle: "" } : j));
 // Règles générales proposées pour une nouvelle animation (reprises de la dernière animation s'il y en a une)
-const ANIM_REGLES_DEF = "Trois archers par équipe.\nChaque équipe tire un total de 9 flèches.\nArc d'initiation pour tout le monde.\nLes tirs s'effectuent à 25 m ou 10 m.\nLes cordons sont positifs.\nSeul l'animateur aura autorité en la matière.\nAucune corruption ne sera permise, de quelque sorte qu'elle soit…";
+const ANIM_REGLES_ANC = "Trois archers par équipe.\nChaque équipe tire un total de 9 flèches.\nArc d'initiation pour tout le monde.\nLes tirs s'effectuent à 25 m ou 10 m.\nLes cordons sont positifs.\nSeul l'animateur aura autorité en la matière.\nAucune corruption ne sera permise, de quelque sorte qu'elle soit…";
 const docsRegle = () => S.documents.filter((d) => ["pdf", "img"].includes(kind(d.contentType))).sort((a, b) => (a.titre || "").localeCompare(b.titre || "", "fr"));
 const docOptions = (sel) => `<option value="">Aucun</option>${docsRegle().map((d) => `<option value="${d.id}" ${d.id === sel ? "selected" : ""}>${esc(d.titre || d.nomFichier)}</option>`).join("")}`;
 // Déposer la règle (PDF ou image) directement depuis le jeu ou l'animation : rangée dans Exercices › « Règles des animations »
@@ -4594,6 +4593,7 @@ async function afficherVisuels(root) {
     box.dataset.fait = "1"; renderPdf({ assetId: box.dataset.url, _url: box.dataset.url }, box, 1);
   }
 }
+document.addEventListener("error", (e) => { const t = e.target; if (t.matches?.("img.an-vis-img")) t.outerHTML = `<p class="notice">La règle n'a pas pu s'afficher (réseau ?). Demande à l'animateur.</p>`; }, true);
 document.addEventListener("toggle", (e) => { if (e.target.matches?.("details.an-reg") && e.target.open) afficherVisuels(e.target); }, true);
 const regleHtml = (txt, docId) => { const d = docId && S.documents.find((x) => x.id === docId); return `${(txt || "").split(/\n+/).filter(Boolean).map((l) => `<p>${esc(l)}</p>`).join("")}${d ? `${visuelHtml(blobUrl(d), kind(d.contentType), d.titre)}<div><button type="button" class="btn" data-doc="${d.id}">🔍 Ouvrir en grand</button></div>` : ""}`; };
 const animCur = () => S.animations.find((x) => x.id === S.anim);
@@ -4684,7 +4684,7 @@ function viewAnimation(a) {
   if (eqs.length) h += `<div class="an-eqs">${eqs.map((e) => { const ch = S.archers.find((x) => x.id === e.chefId); return `<span class="an-eq${a.parEquipe && e.membres.length !== a.parEquipe ? " an-ko" : ""}"><b>${esc(e.nom)}</b> · ${e.membres.length}${a.parEquipe ? "/" + a.parEquipe : ""} archer${e.membres.length > 1 ? "s" : ""}${ch ? ` · chef : ${esc(fullName(ch))}` : ""}</span>`; }).join("")}</div>
     ${window.CarnetArcherUI && eqs.some((e) => e.chefId) ? `<div class="bar"><span class="tirline">${a.saisieChefs === false ? "Saisie des chefs d'équipe fermée : les scores ne bougent plus." : "Les chefs d'équipe marquent les points de leur équipe depuis leur espace."}</span><span class="grow"></span>${S.canWrite ? `<button class="btn" data-act="anim-saisie-chefs">${a.saisieChefs === false ? "Rouvrir la saisie" : "Clore la saisie"}</button>` : ""}</div>` : ""}`;
   if (!jeux.length || !ars.length) return h + `<div class="empty"><h3>Animation à compléter</h3><p>Touche « Modifier » pour choisir ${!jeux.length ? "les jeux" : ""}${!jeux.length && !ars.length ? " et " : ""}${!ars.length ? "les archers participants" : ""}.</p></div>`;
-  if (a.regles || a.reglesDoc) h += `<details class="an-reg"><summary>Règles générales</summary>${regleHtml(a.regles, a.reglesDoc)}</details>`;
+  if (txtRegle(a.regles) || a.reglesDoc) h += `<details class="an-reg"><summary>Règles générales</summary>${regleHtml(txtRegle(a.regles), a.reglesDoc)}</details>`;
   h += `<div class="chips" role="tablist" aria-label="Jeux">${jeux.map((j) => `<button class="chip" role="tab" data-animvue="${j.id}" aria-pressed="${vue === j.id}" aria-selected="${vue === j.id}">${esc(j.nom)}</button>`).join("")}<button class="chip" role="tab" data-animvue="total" aria-pressed="${vue === "total"}" aria-selected="${vue === "total"}">${a.classement === false ? "Total" : "Classement général"}</button></div>`;
   const cls = a.classement !== false;
   const vu = ptsVus();
@@ -4711,7 +4711,7 @@ function viewAnimation(a) {
   }
   const j = jeux.find((x) => x.id === vue);
   h += `<p class="tirline">${(j.zones || []).map((z) => vu ? `${esc(z.nom)} ${fmtPts(Number(z.points) || 0)}` : esc(z.nom)).join(" · ")}${vu ? "" : " · 🔒 points cachés"}</p>`;
-  if (j.regle || j.regleDoc) h += `<details class="an-reg"><summary>Règle : ${esc(j.nom)}</summary>${regleHtml(j.regle, j.regleDoc)}</details>`;
+  if (txtRegle(j.regle) || j.regleDoc) h += `<details class="an-reg"><summary>Règle : ${esc(j.nom)}</summary>${regleHtml(txtRegle(j.regle), j.regleDoc)}</details>`;
   const r = cls ? animRangs(ars.filter((x) => animCompte(a, x.id, j.id)), (x) => animScore(a, x.id, j.id)) : [];
   const rang = Object.fromEntries(r.map((o) => [o.x.id, o.rang]));
   const detail = (c) => (c || []).map((n, i) => n ? `${esc(j.zones[i]?.nom || "")} ×${n}` : "").filter(Boolean).join(" · ") || "Aucune flèche dans les zones";
@@ -4772,8 +4772,8 @@ function animPourArcher(n, aid) {
   const eqs = animEquipes(n), autorise = arModules(S.archers.find((x) => x.id === aid), nbConcoursOf(aid)).has("animations");
   const mon = eqs.find((e) => e.chefId === aid) || (autorise ? eqs.find((e) => e.membres.includes(aid)) : null), court = (x) => [x.prenom, x.nom ? x.nom[0] + "." : ""].filter(Boolean).join(" ");
   return { id: n.id, nom: n.nom, date: n.date, lieu: n.lieu, classement: n.classement !== false, partage: !!n.partage, saisie: n.saisieChefs !== false, fleches: n.fleches || null,
-    regles: n.regles || "", reglesAsset: S.documents.find((d) => d.id === n.reglesDoc)?.assetId || null, reglesType: S.documents.find((d) => d.id === n.reglesDoc)?.contentType || null,
-    jeux: (n.jeux || []).map((j) => ({ id: j.id, nom: j.nom, zones: (j.zones || []).map((z) => ({ nom: z.nom })), regle: j.regle || "", regleAsset: S.documents.find((d) => d.id === j.regleDoc)?.assetId || null, regleType: S.documents.find((d) => d.id === j.regleDoc)?.contentType || null })),
+    regles: txtRegle(n.regles), reglesAsset: S.documents.find((d) => d.id === n.reglesDoc)?.assetId || null, reglesType: S.documents.find((d) => d.id === n.reglesDoc)?.contentType || null,
+    jeux: (n.jeux || []).map((j) => ({ id: j.id, nom: j.nom, zones: (j.zones || []).map((z) => ({ nom: z.nom })), regle: txtRegle(j.regle), regleAsset: S.documents.find((d) => d.id === j.regleDoc)?.assetId || null, regleType: S.documents.find((d) => d.id === j.regleDoc)?.contentType || null })),
     equipes: eqs.map((e) => ({ id: e.id, nom: e.nom, chefId: e.chefId, membres: e.membres })),
     participants: (n.participants || []).filter((pid) => n.partage || mon?.membres.includes(pid)).map((pid) => S.archers.find((x) => x.id === pid)).filter(Boolean)
       .map((x) => ({ id: x.id, moi: x.id === aid, nom: court(x), scores: n.partage ? Object.fromEntries((n.jeux || []).map((j) => [j.id, animScore(n, x.id, j.id)])) : {} })),
@@ -4781,7 +4781,7 @@ function animPourArcher(n, aid) {
 }
 function formAnimation(a = null) {
   const der = a ? null : S.animations.slice().sort((x, y) => (y.date || "").localeCompare(x.date || ""))[0];
-  const dft = a || { parEquipe: der ? der.parEquipe : 3, fleches: der ? der.fleches : 3, regles: der ? der.regles : ANIM_REGLES_DEF, reglesDoc: der?.reglesDoc || "" };
+  const dft = a || { parEquipe: der ? der.parEquipe : 3, fleches: der ? der.fleches : 3, regles: der && der.regles !== ANIM_REGLES_ANC ? der.regles : "", reglesDoc: der?.reglesDoc || "" };
   const lib = animJeux(), choisis = new Set((a?.jeux || []).map((j) => j.id)), parts = new Set(a?.participants || []);
   const jeuxOpts = [...lib, ...(a?.jeux || []).filter((j) => !lib.some((x) => x.id === j.id))];
   // archers du club choisi + ceux sans club + ceux déjà cochés ; « Voir tous les archers » pour les autres clubs
@@ -4798,7 +4798,7 @@ function formAnimation(a = null) {
     <label class="f" for="an-club">Club<select id="an-club" name="clubId"><option value="">Tous les clubs</option>${clubOptions(a?.clubId ?? (S.club !== "all" ? S.club : ""))}</select></label>
     <div class="f">Jeux<div class="checks">${jeuxOpts.map((j) => `<label><input type="checkbox" name="jeu" value="${j.id}" ${choisis.has(j.id) ? "checked" : ""}>${esc(j.nom)}</label>`).join("") || `<span class="tirline">Crée d'abord tes jeux dans « Mes jeux ».</span>`}</div></div>
     <div class="f">Archers participants <span class="tirline"><button type="button" class="btn" id="an-tous">Tout cocher</button></span><div class="checks" id="an-ars"></div></div>
-    <label class="f" for="an-reg">Règles générales (visibles par les chefs d'équipe et les participants)<textarea id="an-reg" name="regles" rows="5">${esc(dft.regles || "")}</textarea></label>
+    <label class="f" for="an-reg">Règles générales (visibles par les chefs d'équipe et les participants)<textarea id="an-reg" name="regles" rows="3" placeholder="Facultatif : une ligne de secours, par exemple « Règles en image ci-dessous, demande à l'animateur si elle ne s'affiche pas »">${esc(dft.regles === ANIM_REGLES_ANC ? "" : dft.regles || "")}</textarea></label>
     <label class="f" for="an-regd">Règles en PDF ou en image<select id="an-regd" name="reglesDoc">${docOptions(dft.reglesDoc)}</select></label>
     ${regleDepot("an-regd")}
     <label class="chk" style="display:flex;gap:8px;align-items:center;border:0"><input type="checkbox" name="classement" ${a?.classement === false ? "" : "checked"}> Afficher un classement (places et podium)</label>
@@ -4872,7 +4872,7 @@ function formJeu(j = null) {
   const zRow = (z = {}) => `<div class="an-zr"><input type="text" class="zn" value="${esc(z.nom || "")}" placeholder="Zone (ex. Tête)" aria-label="Nom de la zone"><input type="number" inputmode="numeric" class="zp" value="${esc(z.points ?? "")}" placeholder="Points" aria-label="Points"><button type="button" class="btn an-zdel" aria-label="Retirer cette zone">✕</button></div>`;
   sheet(j ? "Modifier le jeu" : "Nouveau jeu", `
     <label class="f" for="jeu-nom">Nom du jeu<input type="text" id="jeu-nom" name="nom" value="${esc(j?.nom)}" placeholder="Ex. La citrouille"></label>
-    <label class="f" for="jeu-reg">Règle du jeu (ce que lisent les archers)<textarea id="jeu-reg" name="regle" rows="4" placeholder="Ex. Les chiffres dans les zones peuvent rajouter des points… ou en faire perdre">${esc(j?.regle || "")}</textarea></label>
+    <label class="f" for="jeu-reg">Règle du jeu (ce que lisent les archers)<textarea id="jeu-reg" name="regle" rows="4" placeholder="Facultatif si tu mets la règle en image ou en PDF juste en dessous">${esc(j?.regle || "")}</textarea></label>
     <label class="f" for="jeu-regd">Règle en PDF ou en image<select id="jeu-regd" name="regleDoc">${docOptions(j?.regleDoc)}</select></label>
     ${regleDepot("jeu-regd")}
     <div class="f">Zones et points <span class="tirline">(mets un signe moins pour une zone qui fait perdre des points)</span><div id="jeu-zones">${(j?.zones?.length ? j.zones : [{}, {}]).map(zRow).join("")}</div>
