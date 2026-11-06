@@ -79,7 +79,7 @@ begin
   -- les profils de base n'ont pas « Animations » tant que l'entraîneur ne l'a pas coché
   return coalesce(jsonb_typeof(g->'profils'->prof) = 'array' and g->'profils'->prof ? 'animations', false);
 end $$;
-revoke execute on function public.anim_autorise(uuid, text) from public, anon;
+revoke execute on function public.anim_autorise(uuid, text) from public, anon, authenticated; -- outil interne, appelé seulement par les fonctions ci-dessus
 
 create or replace function public.archer_animations(p_owner uuid, p_archer text) returns jsonb language plpgsql stable security definer set search_path = public as $$
 declare r record; e jsonb; jeux jsonb; eqs jsonb; parts jsonb; mon jsonb; ess jsonb; out jsonb := '[]'::jsonb; ouvert boolean; autorise boolean;
@@ -190,5 +190,5 @@ begin
 end $$;
 revoke execute on function public.archer_anim_essai(uuid, text, text, text, text, text, jsonb) from public, anon;
 grant execute on function public.archer_anim_essai(uuid, text, text, text, text, text, jsonb) to authenticated;
-revoke execute on function public.anim_compte(jsonb, text, text) from public, anon;
-revoke execute on function public.anim_points(jsonb, text, text) from public, anon;
+revoke execute on function public.anim_compte(jsonb, text, text) from public, anon, authenticated; -- outil interne, appelé seulement par les fonctions ci-dessus
+revoke execute on function public.anim_points(jsonb, text, text) from public, anon, authenticated; -- outil interne, appelé seulement par les fonctions ci-dessus
