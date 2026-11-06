@@ -3891,7 +3891,7 @@ function viewAnimations() {
   }).join("")}</div>`;
 }
 function viewAnimation(a) {
-  const jeux = a.jeux || [], ars = animArchers(a), vue = S.animVue && (S.animVue === "total" || (S.animVue === "equipes" && animEquipes(a).length) || jeux.some((j) => j.id === S.animVue)) ? S.animVue : (jeux[0]?.id || "total");
+  let jeux = a.jeux || [], ars = animArchers(a), vue = S.animVue && (S.animVue === "total" || jeux.some((j) => j.id === S.animVue)) ? S.animVue : (jeux[0]?.id || "total");
   let h = `<div class="bar"><button class="btn ghost" data-act="anim-back">← Animations</button><span class="grow"></span>${prm().animCode ? `<button class="btn" data-act="${ptsVus() ? "anim-verrou" : "anim-ouvrir"}" aria-label="${ptsVus() ? "Reverrouiller les points" : "Voir les points"}">${ptsVus() ? "🔓" : "🔒"}</button>` : ""}${S.canWrite ? `<button class="btn" data-act="anim-equipes">Équipes${animEquipes(a).length ? ` (${animEquipes(a).length})` : ""}</button><button class="btn" data-act="anim-edit">Modifier</button>` : ""}</div>
     <h2 class="sec" style="margin:4px 0 2px">${esc(a.nom || "Animation")}</h2><p class="tirline" style="margin:0 0 10px">${esc([fmtDateL(a.date), a.lieu, club(a.clubId)?.nom, a.parEquipe ? `${a.parEquipe} archers par équipe` : "", a.fleches ? `${a.fleches} flèches par archer et par jeu` : ""].filter(Boolean).join(" · "))}${a.partage ? " · ouverte aux archers participants" : ""}</p>`;
   const eqs = animEquipes(a);
@@ -3899,9 +3899,13 @@ function viewAnimation(a) {
     ${window.CarnetArcherUI && eqs.some((e) => e.chefId) ? `<div class="bar"><span class="tirline">${a.saisieChefs === false ? "Saisie des chefs d'équipe fermée : les scores ne bougent plus." : "Les chefs d'équipe marquent les points de leur équipe depuis leur espace."}</span><span class="grow"></span>${S.canWrite ? `<button class="btn" data-act="anim-saisie-chefs">${a.saisieChefs === false ? "Rouvrir la saisie" : "Clore la saisie"}</button>` : ""}</div>` : ""}`;
   if (!jeux.length || !ars.length) return h + `<div class="empty"><h3>Animation à compléter</h3><p>Touche « Modifier » pour choisir ${!jeux.length ? "les jeux" : ""}${!jeux.length && !ars.length ? " et " : ""}${!ars.length ? "les archers participants" : ""}.</p></div>`;
   if (a.regles || a.reglesDoc) h += `<details class="an-reg"><summary>Règles générales</summary>${regleHtml(a.regles, a.reglesDoc)}</details>`;
-  h += `<div class="chips" role="tablist" aria-label="Jeux">${jeux.map((j) => `<button class="chip" role="tab" data-animvue="${j.id}" aria-pressed="${vue === j.id}" aria-selected="${vue === j.id}">${esc(j.nom)}</button>`).join("")}${eqs.length ? `<button class="chip" role="tab" data-animvue="equipes" aria-pressed="${vue === "equipes"}" aria-selected="${vue === "equipes"}">Équipes</button>` : ""}<button class="chip" role="tab" data-animvue="total" aria-pressed="${vue === "total"}" aria-selected="${vue === "total"}">${a.classement === false ? "Total" : "Classement général"}</button></div>`;
+  h += `<div class="chips" role="tablist" aria-label="Jeux">${jeux.map((j) => `<button class="chip" role="tab" data-animvue="${j.id}" aria-pressed="${vue === j.id}" aria-selected="${vue === j.id}">${esc(j.nom)}</button>`).join("")}<button class="chip" role="tab" data-animvue="total" aria-pressed="${vue === "total"}" aria-selected="${vue === "total"}">${a.classement === false ? "Total" : "Classement général"}</button></div>`;
   const cls = a.classement !== false;
   const vu = ptsVus();
+  // Total : par équipe ou individuel, du plus de points au moins
+  const tri = eqs.length && S.animTri === "equipe" ? "equipe" : "indiv";
+  if (vue === "total" && eqs.length) h += `<div class="seg" role="group" aria-label="Trier le total"><button class="btn${tri === "indiv" ? " primary" : ""}" data-animtri="indiv" aria-pressed="${tri === "indiv"}">Individuel</button><button class="btn${tri === "equipe" ? " primary" : ""}" data-animtri="equipe" aria-pressed="${tri === "equipe"}">Par équipe</button></div>`;
+  if (vue === "total" && tri === "equipe") vue = "equipes";
   if (!vu && (vue === "equipes" || vue === "total")) return h + `<div class="empty"><h3>🔒 Résultats cachés</h3><p>Les scores et les classements sont protégés par le code des points.</p><button class="btn primary" data-act="anim-ouvrir">Taper le code</button></div>`;
   if (vue === "equipes") {
     const r = cls ? animRangs(eqs, (e) => equipeTotal(a, e)) : eqs.slice().sort((x, y) => x.nom.localeCompare(y.nom, "fr")).map((x) => ({ x, v: equipeTotal(a, x) }));
@@ -5225,7 +5229,7 @@ function formSeance(s = null) {
 
 // ---------- Événements ----------
 document.addEventListener("click", (e) => {
-  const t = e.target.closest("[data-tab],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab],[data-qsort],[data-coptab],[data-com-edit],[data-fmtfed],[data-fmt-del],[data-type-del],[data-fete-ap],[data-fete-new],[data-fete-edit],[data-fete-imgdel],[data-mot-edit],[data-centry-open],[data-cd-exp],[data-cd-arch],[data-exmode],[data-ftheme],[data-fiche],[data-anim],[data-animvue],[data-anim-saisie],[data-anim-essai-new],[data-anim-retenir],[data-anim-essai-del]");
+  const t = e.target.closest("[data-tab],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab],[data-qsort],[data-coptab],[data-com-edit],[data-fmtfed],[data-fmt-del],[data-type-del],[data-fete-ap],[data-fete-new],[data-fete-edit],[data-fete-imgdel],[data-mot-edit],[data-centry-open],[data-cd-exp],[data-cd-arch],[data-exmode],[data-ftheme],[data-fiche],[data-anim],[data-animvue],[data-animtri],[data-anim-saisie],[data-anim-essai-new],[data-anim-retenir],[data-anim-essai-del]");
   if (!t || t.closest("#sheet")) return;
   if (t.dataset.dashSuivi) { const [sid, aid] = t.dataset.dashSuivi.split("|"); S.seance = sid; S.suivi = aid; S.tirOpen = null; render(); window.scrollTo(0, 0); return; }
   if (t.dataset.tab) { go(t.dataset.tab); try { history.replaceState(null, "", "#" + t.dataset.tab); } catch (_) {} return; }
@@ -5257,6 +5261,7 @@ document.addEventListener("click", (e) => {
   if (t.dataset.partage) { const d = S.documents.find((x) => x.id === t.dataset.partage); if (d) formPartage(d); return; }
   if (t.dataset.anim) { S.anim = t.dataset.anim; S.animVue = null; render(); window.scrollTo(0, 0); return; }
   if (t.dataset.animvue) { S.animVue = t.dataset.animvue; render(); return; }
+  if (t.dataset.animtri) { S.animTri = t.dataset.animtri; render(); return; }
   if (t.dataset.animSaisie) { const a = animCur(); if (a && S.canWrite) { const vue = S.animVue && !["total", "equipes"].includes(S.animVue) ? S.animVue : a.jeux?.[0]?.id; const [aid, eid, es] = t.dataset.animSaisie.split("|"); saisieAnim(a, aid, vue, eid || "", es || ""); } return; }
   if (t.dataset.animEssaiNew) { const eid = t.dataset.animEssaiNew, jid = S.animVue && !["total", "equipes"].includes(S.animVue) ? S.animVue : animCur()?.jeux?.[0]?.id;
     majEssais((d) => { d.essais[eid] = d.essais[eid] || {}; const L = d.essais[eid][jid] = d.essais[eid][jid] || [];
