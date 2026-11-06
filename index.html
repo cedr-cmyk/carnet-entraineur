@@ -4576,6 +4576,32 @@ const animJeux = () => (prm().animJeux || ANIM_JEUX_DEF).map((j) => (j.regle ===
 const ANIM_REGLES_DEF = "Trois archers par équipe.\nChaque équipe tire un total de 9 flèches.\nArc d'initiation pour tout le monde.\nLes tirs s'effectuent à 25 m ou 10 m.\nLes cordons sont positifs.\nSeul l'animateur aura autorité en la matière.\nAucune corruption ne sera permise, de quelque sorte qu'elle soit…";
 const docsRegle = () => S.documents.filter((d) => ["pdf", "img"].includes(kind(d.contentType))).sort((a, b) => (a.titre || "").localeCompare(b.titre || "", "fr"));
 const docOptions = (sel) => `<option value="">Aucun</option>${docsRegle().map((d) => `<option value="${d.id}" ${d.id === sel ? "selected" : ""}>${esc(d.titre || d.nomFichier)}</option>`).join("")}`;
+// Déposer la règle (PDF ou image) directement depuis le jeu ou l'animation : rangée dans Exercices › « Règles des animations »
+const regleDepot = (selId) => S.assets && S.canWrite ? `<div class="bar"><button type="button" class="btn" data-regle-depot="${selId}">📎 Déposer un PDF ou une image</button><span class="tirline" id="${selId}-st"></span><input type="file" hidden id="${selId}-file" accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/*"></div>` : "";
+async function dossierRegles() {
+  const nom = "Règles des animations", d = S.dossiers.find((x) => x.nom === nom && !x.parentId);
+  if (d) return d.id;
+  const id = newId("dossiers"); await save("dossiers", id, { nom, parentId: null, ordre: null, createdAt: Date.now() }); return id;
+}
+function brancherRegleDepot(selId) {
+  const b = document.querySelector(`[data-regle-depot="${selId}"]`), inp = $("#" + selId + "-file"), sel = $("#" + selId), st = $("#" + selId + "-st");
+  if (!b || !inp || !sel) return;
+  b.addEventListener("click", () => inp.click());
+  inp.addEventListener("change", async () => {
+    const f = inp.files[0]; inp.value = ""; if (!f) return;
+    const type = guessType(f);
+    if (!type || !/pdf|image/.test(type)) { toast("Choisis un PDF ou une image"); return; }
+    if (f.size > 20 * 1048576) { toast("Fichier trop lourd (20 Mo au plus)"); return; }
+    b.disabled = true; st.textContent = "Envoi…";
+    try {
+      const r = await S.assets.upload(f, { type }), id = newId("documents"), dossierId = await dossierRegles(), titre = f.name.replace(/\.[^.]+$/, "");
+      await save("documents", id, { dossierId, titre, description: "", assetId: r.id, nomFichier: f.name, contentType: r.contentType, taille: r.sizeBytes, createdAt: Date.now() });
+      sel.insertAdjacentHTML("beforeend", `<option value="${id}">${esc(titre)}</option>`); sel.value = id;
+      st.textContent = "✓ Déposé et choisi"; toast("Règle déposée : pense à enregistrer");
+    } catch (e) { st.textContent = ""; toast("Envoi impossible : " + (e?.message || "réessaie")); console.error(e); }
+    b.disabled = false;
+  });
+}
 const regleHtml = (txt, docId) => { const d = docId && S.documents.find((x) => x.id === docId); return `${(txt || "").split(/\n+/).filter(Boolean).map((l) => `<p>${esc(l)}</p>`).join("")}${d ? `<button type="button" class="btn" data-doc="${d.id}">📄 ${esc(d.titre || "Règle en PDF")}</button>` : ""}`; };
 const animCur = () => S.animations.find((x) => x.id === S.anim);
 const jeuScore = (j, c) => (j.zones || []).reduce((t, z, i) => t + (Number(c?.[i]) || 0) * (Number(z.points) || 0), 0);
@@ -4780,7 +4806,8 @@ function formAnimation(a = null) {
     <div class="f">Jeux<div class="checks">${jeuxOpts.map((j) => `<label><input type="checkbox" name="jeu" value="${j.id}" ${choisis.has(j.id) ? "checked" : ""}>${esc(j.nom)}</label>`).join("") || `<span class="tirline">Crée d'abord tes jeux dans « Mes jeux ».</span>`}</div></div>
     <div class="f">Archers participants <span class="tirline"><button type="button" class="btn" id="an-tous">Tout cocher</button></span><div class="checks" id="an-ars"></div></div>
     <label class="f" for="an-reg">Règles générales (visibles par les chefs d'équipe et les participants)<textarea id="an-reg" name="regles" rows="5">${esc(dft.regles || "")}</textarea></label>
-    <label class="f" for="an-regd">Règles en PDF ou en image (depuis tes documents)<select id="an-regd" name="reglesDoc">${docOptions(dft.reglesDoc)}</select></label>
+    <label class="f" for="an-regd">Règles en PDF ou en image<select id="an-regd" name="reglesDoc">${docOptions(dft.reglesDoc)}</select></label>
+    ${regleDepot("an-regd")}
     <label class="chk" style="display:flex;gap:8px;align-items:center;border:0"><input type="checkbox" name="classement" ${a?.classement === false ? "" : "checked"}> Afficher un classement (places et podium)</label>
     ${window.CarnetArcherUI ? `<label class="chk" style="display:flex;gap:8px;align-items:center;border:0"><input type="checkbox" name="partage" ${a?.partage ? "checked" : ""}> Ouvrir aux archers participants : ceux qui ont l'onglet Animations autorisé voient les scores de cette animation dans leur espace <span class="tirline">(les chefs d'équipe ont l'onglet d'office)</span></label>` : ""}`, {
     onSave(fd) {
@@ -4795,6 +4822,7 @@ function formAnimation(a = null) {
     },
     onDelete: a ? () => { remove("animations", a.id); S.anim = null; toast("Animation supprimée"); render(); } : null, deleteLabel: "Supprimer l'animation",
   });
+  brancherRegleDepot("an-regd");
   const box = $("#an-ars"), sel = $("#an-club");
   const redraw = () => { box.querySelectorAll("input").forEach((i) => (i.checked ? parts.add(i.value) : parts.delete(i.value))); box.innerHTML = arsHtml(sel.value); };
   box.innerHTML = arsHtml(sel.value); sel.addEventListener("change", redraw);
@@ -4852,7 +4880,8 @@ function formJeu(j = null) {
   sheet(j ? "Modifier le jeu" : "Nouveau jeu", `
     <label class="f" for="jeu-nom">Nom du jeu<input type="text" id="jeu-nom" name="nom" value="${esc(j?.nom)}" placeholder="Ex. La citrouille"></label>
     <label class="f" for="jeu-reg">Règle du jeu (ce que lisent les archers)<textarea id="jeu-reg" name="regle" rows="4" placeholder="Ex. Les chiffres dans les zones peuvent rajouter des points… ou en faire perdre">${esc(j?.regle || "")}</textarea></label>
-    <label class="f" for="jeu-regd">Règle en PDF ou en image (depuis tes documents)<select id="jeu-regd" name="regleDoc">${docOptions(j?.regleDoc)}</select></label>
+    <label class="f" for="jeu-regd">Règle en PDF ou en image<select id="jeu-regd" name="regleDoc">${docOptions(j?.regleDoc)}</select></label>
+    ${regleDepot("jeu-regd")}
     <div class="f">Zones et points <span class="tirline">(mets un signe moins pour une zone qui fait perdre des points)</span><div id="jeu-zones">${(j?.zones?.length ? j.zones : [{}, {}]).map(zRow).join("")}</div>
       <div><button type="button" class="btn" id="jeu-zadd">+ Ajouter une zone</button></div></div>`, {
     onSave(fd) {
@@ -4866,6 +4895,7 @@ function formJeu(j = null) {
     },
     onDelete: j ? () => { setParam({ animJeux: animJeux().filter((x) => x.id !== j.id) }); toast("Jeu supprimé"); setTimeout(listeJeux, 30); } : null, deleteLabel: "Supprimer le jeu",
   });
+  brancherRegleDepot("jeu-regd");
   const box = $("#jeu-zones");
   box.addEventListener("click", (e) => { const b = e.target.closest(".an-zdel"); if (b) b.parentElement.remove(); });
   $("#jeu-zadd").addEventListener("click", () => { box.insertAdjacentHTML("beforeend", zRow()); box.lastElementChild.querySelector(".zn").focus(); });
