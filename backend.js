@@ -318,7 +318,8 @@
     }
     if (coach === null && !net) return besoinReseau("Pas de réseau. La première ouverture du carnet a besoin d'internet.");
     if (coach === false) { if (!session.offline) sb.auth.onAuthStateChange((_e, s) => { if (s) { session = s; tellSW(); } }); return archerMode(net); }
-    // entraîneur qui a choisi son espace archer (Paramètres › Général › Mon espace archer)
+    // entraîneur qui a choisi son espace archer (Paramètres › Général › Mon espace archer) ; adresse ?mode=coach = retour forcé en entraîneur
+    if (/[?&]mode=coach\b/.test(location.search)) { ls.set("mode", "coach"); history.replaceState(null, "", location.pathname + location.hash); }
     if (ls.get("mode", "coach") === "archer") { if (!session.offline) sb.auth.onAuthStateChange((_e, s) => { if (s) { session = s; tellSW(); } }); return archerMode(net, true); }
     if (!session.offline) {
       sb.auth.onAuthStateChange((_e, s) => { if (s) { session = s; tellSW(); } });
