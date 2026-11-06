@@ -2950,9 +2950,10 @@ const AR_MODULES = [["seances", "Mes séances", "Le journal des séances du club
   ["courte", "Fiche de séance courte", "Smileys et « qu'as-tu appris aujourd'hui ? » (avec Mon carnet : le reste dans « Plus de détails »)", "entr"],
   ["tir", "Tir compté et courbe", "Noter son score de tir compté et suivre sa courbe de progression", "tir"], ["impacts", "Cible et « où vont les flèches »", "Placer ses flèches sur la cible volée par volée, et voir sa tendance", "tir"],
   ["concours", "Mes concours", "Résultats, courbe des scores, classements PDF", "conc"],
-  ["documents", "Documents", "Documents du club et fiches d'exercices", "outils"], ["chrono", "Chrono", "Le chrono d'entraînement", "outils"]];
-const AR_PROFILS = { decouverte: ["Découverte", ["seances", "documents", "courte"]], loisir: ["Loisir", ["seances", "carnet", "tir", "impacts", "documents", "chrono"]], competiteur: ["Compétiteur", AR_MODULES.map(([k]) => k).filter((k) => k !== "courte")] };
-const MOD_COURT = { seances: "Séances", carnet: "Carnet", courte: "Fiche courte", tir: "Tir compté", impacts: "Cible", concours: "Concours", documents: "Docs", chrono: "Chrono" };
+  ["documents", "Documents", "Documents du club et fiches d'exercices", "outils"], ["chrono", "Chrono", "Le chrono d'entraînement", "outils"],
+  ["animations", "Animations", "Scores et classements des animations ouvertes aux archers (les chefs d'équipe l'ont d'office pour leur animation)", "outils"]];
+const AR_PROFILS = { decouverte: ["Découverte", ["seances", "documents", "courte"]], loisir: ["Loisir", ["seances", "carnet", "tir", "impacts", "documents", "chrono"]], competiteur: ["Compétiteur", AR_MODULES.map(([k]) => k).filter((k) => k !== "courte" && k !== "animations")] };
+const MOD_COURT = { seances: "Séances", carnet: "Carnet", courte: "Fiche courte", tir: "Tir compté", impacts: "Cible", concours: "Concours", documents: "Docs", chrono: "Chrono", animations: "Anim." };
 // Réglages de l'entraîneur (Paramètres › Espace archers)
 const espaceCfg = () => ({ profils: prm().profils, age: prm().profilAge, defaut: prm().profilDefaut, noms: prm().profilNoms, perso: prm().profilsPerso, regles: prm().reglesAuto, sinon: prm().profilSinon, archives: saisonsArch(), fetes: prm().fetesArchers === false ? null : prm().fetes || null, fetesMessage: prm().fetesMessage !== false, fetesAnim: prm().fetesAnim !== false,
   // valeurs proposées pour un nouveau tir (Paramètres › Séances), reprises par l'espace archer
@@ -4005,7 +4006,7 @@ function formAnimation(a = null) {
     <label class="f" for="an-reg">Règles générales (visibles par les chefs d'équipe et les participants)<textarea id="an-reg" name="regles" rows="5">${esc(dft.regles || "")}</textarea></label>
     <label class="f" for="an-regd">Règles en PDF ou en image (depuis tes documents)<select id="an-regd" name="reglesDoc">${docOptions(dft.reglesDoc)}</select></label>
     <label class="chk" style="display:flex;gap:8px;align-items:center;border:0"><input type="checkbox" name="classement" ${a?.classement === false ? "" : "checked"}> Afficher un classement (places et podium)</label>
-    ${window.CarnetArcherUI ? `<label class="chk" style="display:flex;gap:8px;align-items:center;border:0"><input type="checkbox" name="partage" ${a?.partage ? "checked" : ""}> Ouvrir aux archers participants : ils voient les scores${""} de cette animation dans leur espace</label>` : ""}`, {
+    ${window.CarnetArcherUI ? `<label class="chk" style="display:flex;gap:8px;align-items:center;border:0"><input type="checkbox" name="partage" ${a?.partage ? "checked" : ""}> Ouvrir aux archers participants : ceux qui ont l'onglet Animations autorisé voient les scores de cette animation dans leur espace <span class="tirline">(les chefs d'équipe ont l'onglet d'office)</span></label>` : ""}`, {
     onSave(fd) {
       const nom = fd.get("nom").trim(); if (!nom) { toast("Donne un nom à l'animation"); return false; }
       // un jeu déjà choisi garde ses points ; sa règle suit « Mes jeux »

@@ -800,7 +800,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
 <div id="toast" class="toast" hidden></div>
 <input type="file" id="file-in" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.mp4,.webm,.txt,.md,.csv,application/pdf,image/*,video/mp4,video/webm,text/plain,text/markdown,text/csv">
 
-<script>window.CARNET_VERSION = { v: "1.9", date: "2026-11-03", site: "1.7.3", test: true };</script>
+<script>window.CARNET_VERSION = { v: "1.9", date: "2026-11-06", site: "1.7.3", test: true };</script>
 <script>
 // Espace archer : l'archer (ou son parent) voit uniquement ses propres informations,
 // telles que les renvoie la base (fonction espace_archer), et remplit son carnet.
@@ -886,7 +886,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
   }
   function header() {
     const tabs = [["accueil", "Accueil"], ["entrainement", "Entraînement"], ["concours", "Mes concours"], ["documents", "Documents"], ["animations", "Animations"], ["parametres", "Paramètres"]];
-    const m = M(), vis = { entrainement: ["seances", "carnet", "tir", "impacts", "evals"].some((k) => m.has(k)), concours: m.has("concours"), documents: m.has("documents"), animations: (St.data?.animations || []).length > 0 };
+    const m = M(), vis = { entrainement: ["seances", "carnet", "tir", "impacts", "evals"].some((k) => m.has(k)), concours: m.has("concours"), documents: m.has("documents"), animations: anVisibles(m).length > 0 };
     const shownTabs = tabs.filter(([k]) => vis[k] !== false);
     if (!shownTabs.some(([k]) => k === St.tab) && !["carnet", "evaluations"].includes(St.tab)) St.tab = "accueil";
     top.innerHTML = `<div class="top-in"><div class="brand">${window.CarnetAvatar && St.data?.archer ? "" : `<span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/></svg></span>`}
@@ -1374,8 +1374,13 @@ window.CarnetArcherUI = (API, opts = {}) => {
   const anMed = (n) => (n === 1 ? "🥇" : n === 2 ? "🥈" : n === 3 ? "🥉" : n);
   const anRang = (list, f) => { const r = list.slice().sort((x, y) => f(y) - f(x)); let k = 0; r.forEach((p, i) => { if (i === 0 || f(p) !== f(r[i - 1])) k = i + 1; p.rang = k; }); return r; };
   const anHeure = (ms) => (ms ? new Date(ms).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "");
+  // Onglet autorisé par l'entraîneur (module « animations ») ; le chef d'équipe l'a d'office, pour son équipe seulement
+  function anVisibles(m) {
+    const ok = m.has("animations");
+    return (St.data?.animations || []).filter((a) => a.monEquipe || (ok && a.partage)).map((a) => (ok ? a : { ...a, partage: false }));
+  }
   function vAnimations() {
-    const list = St.data.animations || [];
+    const list = anVisibles(M());
     if (!list.length) return `<p class="notice">Aucune animation pour l'instant.</p>`;
     return list.map((a) => {
       const jeux = a.jeux || [], P = (a.participants || []).map((p) => { const sc = p.scores || {}; return { ...p, sc, total: jeux.reduce((t, j) => t + (Number(sc[j.id]) || 0), 0), joue: jeux.some((j) => sc[j.id] != null) }; });
@@ -3676,9 +3681,10 @@ const AR_MODULES = [["seances", "Mes séances", "Le journal des séances du club
   ["courte", "Fiche de séance courte", "Smileys et « qu'as-tu appris aujourd'hui ? » (avec Mon carnet : le reste dans « Plus de détails »)", "entr"],
   ["tir", "Tir compté et courbe", "Noter son score de tir compté et suivre sa courbe de progression", "tir"], ["impacts", "Cible et « où vont les flèches »", "Placer ses flèches sur la cible volée par volée, et voir sa tendance", "tir"],
   ["concours", "Mes concours", "Résultats, courbe des scores, classements PDF", "conc"],
-  ["documents", "Documents", "Documents du club et fiches d'exercices", "outils"], ["chrono", "Chrono", "Le chrono d'entraînement", "outils"]];
-const AR_PROFILS = { decouverte: ["Découverte", ["seances", "documents", "courte"]], loisir: ["Loisir", ["seances", "carnet", "tir", "impacts", "documents", "chrono"]], competiteur: ["Compétiteur", AR_MODULES.map(([k]) => k).filter((k) => k !== "courte")] };
-const MOD_COURT = { seances: "Séances", carnet: "Carnet", courte: "Fiche courte", tir: "Tir compté", impacts: "Cible", concours: "Concours", documents: "Docs", chrono: "Chrono" };
+  ["documents", "Documents", "Documents du club et fiches d'exercices", "outils"], ["chrono", "Chrono", "Le chrono d'entraînement", "outils"],
+  ["animations", "Animations", "Scores et classements des animations ouvertes aux archers (les chefs d'équipe l'ont d'office pour leur animation)", "outils"]];
+const AR_PROFILS = { decouverte: ["Découverte", ["seances", "documents", "courte"]], loisir: ["Loisir", ["seances", "carnet", "tir", "impacts", "documents", "chrono"]], competiteur: ["Compétiteur", AR_MODULES.map(([k]) => k).filter((k) => k !== "courte" && k !== "animations")] };
+const MOD_COURT = { seances: "Séances", carnet: "Carnet", courte: "Fiche courte", tir: "Tir compté", impacts: "Cible", concours: "Concours", documents: "Docs", chrono: "Chrono", animations: "Anim." };
 // Réglages de l'entraîneur (Paramètres › Espace archers)
 const espaceCfg = () => ({ profils: prm().profils, age: prm().profilAge, defaut: prm().profilDefaut, noms: prm().profilNoms, perso: prm().profilsPerso, regles: prm().reglesAuto, sinon: prm().profilSinon, archives: saisonsArch(), fetes: prm().fetesArchers === false ? null : prm().fetes || null, fetesMessage: prm().fetesMessage !== false, fetesAnim: prm().fetesAnim !== false,
   // valeurs proposées pour un nouveau tir (Paramètres › Séances), reprises par l'espace archer
@@ -4731,7 +4737,7 @@ function formAnimation(a = null) {
     <label class="f" for="an-reg">Règles générales (visibles par les chefs d'équipe et les participants)<textarea id="an-reg" name="regles" rows="5">${esc(dft.regles || "")}</textarea></label>
     <label class="f" for="an-regd">Règles en PDF ou en image (depuis tes documents)<select id="an-regd" name="reglesDoc">${docOptions(dft.reglesDoc)}</select></label>
     <label class="chk" style="display:flex;gap:8px;align-items:center;border:0"><input type="checkbox" name="classement" ${a?.classement === false ? "" : "checked"}> Afficher un classement (places et podium)</label>
-    ${window.CarnetArcherUI ? `<label class="chk" style="display:flex;gap:8px;align-items:center;border:0"><input type="checkbox" name="partage" ${a?.partage ? "checked" : ""}> Ouvrir aux archers participants : ils voient les scores${""} de cette animation dans leur espace</label>` : ""}`, {
+    ${window.CarnetArcherUI ? `<label class="chk" style="display:flex;gap:8px;align-items:center;border:0"><input type="checkbox" name="partage" ${a?.partage ? "checked" : ""}> Ouvrir aux archers participants : ceux qui ont l'onglet Animations autorisé voient les scores de cette animation dans leur espace <span class="tirline">(les chefs d'équipe ont l'onglet d'office)</span></label>` : ""}`, {
     onSave(fd) {
       const nom = fd.get("nom").trim(); if (!nom) { toast("Donne un nom à l'animation"); return false; }
       // un jeu déjà choisi garde ses points ; sa règle suit « Mes jeux »

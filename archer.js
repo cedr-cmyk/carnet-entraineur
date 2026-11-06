@@ -82,7 +82,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
   }
   function header() {
     const tabs = [["accueil", "Accueil"], ["entrainement", "Entraînement"], ["concours", "Mes concours"], ["documents", "Documents"], ["animations", "Animations"], ["parametres", "Paramètres"]];
-    const m = M(), vis = { entrainement: ["seances", "carnet", "tir", "impacts", "evals"].some((k) => m.has(k)), concours: m.has("concours"), documents: m.has("documents"), animations: (St.data?.animations || []).length > 0 };
+    const m = M(), vis = { entrainement: ["seances", "carnet", "tir", "impacts", "evals"].some((k) => m.has(k)), concours: m.has("concours"), documents: m.has("documents"), animations: anVisibles(m).length > 0 };
     const shownTabs = tabs.filter(([k]) => vis[k] !== false);
     if (!shownTabs.some(([k]) => k === St.tab) && !["carnet", "evaluations"].includes(St.tab)) St.tab = "accueil";
     top.innerHTML = `<div class="top-in"><div class="brand">${window.CarnetAvatar && St.data?.archer ? "" : `<span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/></svg></span>`}
@@ -570,8 +570,13 @@ window.CarnetArcherUI = (API, opts = {}) => {
   const anMed = (n) => (n === 1 ? "🥇" : n === 2 ? "🥈" : n === 3 ? "🥉" : n);
   const anRang = (list, f) => { const r = list.slice().sort((x, y) => f(y) - f(x)); let k = 0; r.forEach((p, i) => { if (i === 0 || f(p) !== f(r[i - 1])) k = i + 1; p.rang = k; }); return r; };
   const anHeure = (ms) => (ms ? new Date(ms).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "");
+  // Onglet autorisé par l'entraîneur (module « animations ») ; le chef d'équipe l'a d'office, pour son équipe seulement
+  function anVisibles(m) {
+    const ok = m.has("animations");
+    return (St.data?.animations || []).filter((a) => a.monEquipe || (ok && a.partage)).map((a) => (ok ? a : { ...a, partage: false }));
+  }
   function vAnimations() {
-    const list = St.data.animations || [];
+    const list = anVisibles(M());
     if (!list.length) return `<p class="notice">Aucune animation pour l'instant.</p>`;
     return list.map((a) => {
       const jeux = a.jeux || [], P = (a.participants || []).map((p) => { const sc = p.scores || {}; return { ...p, sc, total: jeux.reduce((t, j) => t + (Number(sc[j.id]) || 0), 0), joue: jeux.some((j) => sc[j.id] != null) }; });
