@@ -16,7 +16,11 @@ except Exception: site = ''
 site = site or '1.7'  # avant le fichier VERSION, le site était en 1.7 (cache carnet-shell-v7)
 date = datetime.date.today().isoformat()
 # Numéro d'essai : chaque modification de la version de test (commits pas encore sur main) le fait avancer
-try: essai = int(subprocess.run(['git', '-C', root, 'rev-list', '--count', 'main..HEAD'], capture_output=True, text=True, check=True).stdout.strip() or 0)
+# (sur la branche d'une version, on ne compte que ses propres commits : pas ceux du site ni de la version de test précédente)
+try:
+  cur = subprocess.run(['git', '-C', root, 'rev-parse', '--abbrev-ref', 'HEAD'], capture_output=True, text=True, check=True).stdout.strip()
+  exclure = [b for b in ('main', 'test') if b != cur]
+  essai = int(subprocess.run(['git', '-C', root, 'rev-list', '--count', 'HEAD', '--not'] + exclure, capture_output=True, text=True, check=True).stdout.strip() or 0)
 except Exception: essai = 0
 vtest = ver + (' · essai n°%d' % essai if essai and ver != site else '')
 def vline(test): return '<script>window.CARNET_VERSION = { v: "%s", date: "%s", site: "%s", test: %s };</script>\n' % (vtest if test else ver, date, site if test else ver, 'true' if test else 'false')
