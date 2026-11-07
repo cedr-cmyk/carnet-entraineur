@@ -92,6 +92,31 @@ h2.sec { font-family: var(--font-display); font-weight: 600; text-transform: upp
 .an-team { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; margin: 10px 0; display: grid; gap: 8px; } .an-essai { border-left: 3px solid var(--line); padding-left: 10px; display: grid; gap: 6px; } .an-essai.on { border-left-color: var(--accent); }
 .an-reg { border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; margin: 0 0 10px; } .an-reg summary { cursor: pointer; font-weight: 600; } .an-reg p { margin: 6px 0; }
 .an-vis-img { display: block; max-width: 100%; height: auto; border-radius: 10px; margin: 8px 0; } .an-visuel { margin: 8px 0; max-height: 75vh; }
+/* Studio apparence (ordinateur) */
+body.studio-on { padding-right: 400px; }
+#studio { position: fixed; top: 0; right: 0; bottom: 0; width: 400px; z-index: 15; background: #FFFFFF; color: #0F172A; border-left: 1px solid #CBD5E1; display: flex; flex-direction: column; font-family: Inter, system-ui, sans-serif; font-size: 14px; box-shadow: -10px 0 30px -18px rgba(0,0,0,.5); color-scheme: light; }
+#studio .tirline, #studio small { color: #475569; }
+#studio .ap-in { flex: 1; overflow-y: auto; padding: 16px 18px; display: grid; gap: 16px; align-content: start; }
+#studio .ap-top { display: flex; align-items: center; justify-content: space-between; font-size: 1.1rem; }
+#studio .btn { background: #F8FAFC !important; color: #0F172A !important; border: 1px solid #CBD5E1 !important; border-radius: 8px !important; box-shadow: none !important; padding: 7px 12px; font-weight: 600; }
+#studio .btn.primary { background: #B45309 !important; color: #FFFFFF !important; border-color: #B45309 !important; }
+#studio .btn:disabled { opacity: .45; }
+#studio .ap-sec { display: grid; gap: 8px; } #studio .ap-sec > b { font-size: .95rem; }
+#studio .ap-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+#studio .ap-pre { display: flex; align-items: center; gap: 6px; min-height: 42px; border: 1px solid #CBD5E1; border-radius: 8px; background: #F8FAFC; font: inherit; font-size: 13px; font-weight: 600; text-align: left; padding: 6px 8px; color: #0F172A; }
+#studio .ap-pre span { width: 14px; height: 28px; flex: none; border: 1px solid #CBD5E1; } #studio .ap-pre span + span { margin-left: -7px; margin-right: 4px; }
+#studio .ap-col { display: flex; align-items: center; gap: 10px; } #studio .ap-col span { display: grid; } #studio .ap-col b { font-weight: 600; }
+#studio input[type=color] { width: 42px; height: 34px; padding: 2px; border: 1px solid #CBD5E1; border-radius: 6px; background: #fff; flex: none; cursor: pointer; }
+#studio .ap-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; } #studio .ap-row > span { width: 104px; font-size: 13px; color: #334155; }
+#studio .ap-opt { min-height: 30px; padding: 3px 10px; border-radius: 999px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #0F172A; font: inherit; font-size: 12px; font-weight: 600; margin: 2px 2px 2px 0; }
+#studio .ap-opt[aria-pressed="true"] { background: #0F172A; color: #FFFFFF; border-color: #0F172A; }
+#studio .ap-carte { border: 1px solid #E2E8F0; border-radius: 10px; padding: 8px 10px; display: grid; gap: 8px; background: #F8FAFC; } #studio .ap-carte.perso { border-color: #B45309; }
+#studio .ap-carte-h { display: flex; align-items: center; gap: 6px; } #studio .ap-carte-h > span { flex: 1; display: grid; }
+#studio .ap-carte-b { display: grid; gap: 6px; border-top: 1px solid #E2E8F0; padding-top: 8px; }
+#studio .ap-mini { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; } #studio .ap-mini label { display: grid; justify-items: center; gap: 2px; font-size: 11px; color: #475569; }
+#studio .ap-lisi { display: grid; gap: 4px; padding: 10px 12px; border-radius: 10px; font-size: 13px; } #studio .ap-lisi.ok { background: #ECFDF5; border: 1px solid #A7F3D0; } #studio .ap-lisi.ko { background: #FFFBEB; border: 1px solid #FCD34D; }
+#studio .ap-acts { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 12px 18px; border-top: 1px solid #E2E8F0; background: #F8FAFC; } #studio .ap-acts .tirline { flex: 1 1 100%; font-size: 12px; }
+@media (max-width: 999px) { body.studio-on { padding-right: 0; } #studio { width: 100%; } }
 .an-wrap { overflow-x: auto; } .an-tab { width: 100%; border-collapse: collapse; font-size: .92rem; } .an-tab th, .an-tab td { padding: 7px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; } .an-tab .n { text-align: right; }
 .an-tab th { font-size: .8rem; color: var(--muted); } .an-pod1 td { font-weight: 700; }
 .an-sc { font-size: 1.3rem; font-weight: 800; display: grid; justify-items: end; line-height: 1.1; } .an-sc small { font-size: .72rem; font-weight: 600; color: var(--muted); }
@@ -1087,6 +1112,7 @@ function clubChips() {
 const inClub = (clubId) => S.club === "all" || S.club === clubId;
 
 function render() {
+  if (!AP.open && typeof S !== "undefined" && S.parametres) appliquerApparence(apSaved());
   if (S.club !== "all" && !club(S.club) && S.loaded.clubs) S.club = "all";
   appliquerFete(feteActive()); appliquerAnim(feteActive() && prm().fetesAnim !== false);
   renderTabs();
@@ -3288,16 +3314,16 @@ function viewAccueil() {
     const moy = prev.length ? prev.reduce((x, y) => x + y, 0) / prev.length : null;
     return { a: S.archers.find((x) => x.id === aid), r, score: num(r.score), moy, n: prev.length };
   }).sort((p, q) => fullName(p.a).localeCompare(fullName(q.a), "fr")) : [];
-  const card = (icon, cls, label, val, sub) => `<div class="hub-stat"><div class="hub-stat-top"><span>${label}</span><i class="hub-ico ${cls}">${ICON[icon]}</i></div><b class="${cls}">${val}</b><small>${sub}</small></div>`;
+  const card = (icon, cls, label, val, sub) => `<div class="hub-stat" data-carte="${icon === "cal" ? "statSeances" : "statMateriel"}"><div class="hub-stat-top"><span>${label}</span><i class="hub-ico ${cls}">${ICON[icon]}</i></div><b class="${cls}">${val}</b><small>${sub}</small></div>`;
   let h = clubChips() + `<button class="btn primary dash-chrono" data-act="chrono">⏱ Lancer le chrono d'entraînement</button><div class="head"><span class="pill">Tableau de bord</span><h2>${prm().nom ? "Bonjour " + esc(prm().nom) : "Bonjour"}</h2><span class="m">${esc(fmtLong(today))}</span></div>${(() => { const k = feteActive(); return k ? banniereFete(k, prm().fetes, BLOB_BASE, prm().fetesMessage !== false) : ""; })()}
     <div class="hub-stats">
       ${card("cal", "c-cyan", "Séances du mois", sessM.length, `${upcoming.length ? "prochaine : " + dObj(upcoming[0].date).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" }) : "aucune prévue"}`)}
       ${card("wrench", aRep ? "c-red" : "c-green", "Matériel à réparer", aRep, `${mat.filter((m) => m.archerId).length} prêté${mat.filter((m) => m.archerId).length > 1 ? "s" : ""} sur ${mat.length}`)}
     </div>
     <div class="hub-grid">
-      <div class="card"><div class="hub-bar"><h3 class="hub-h">Séances à venir</h3><button class="btn ghost" data-tab="seances">Tout voir</button></div>
+      <div class="card" data-carte="seances"><div class="hub-bar"><h3 class="hub-h">Séances à venir</h3><button class="btn ghost" data-tab="seances">Tout voir</button></div>
         ${upcoming.length ? `<div class="list">${upcoming.map(seanceRow).join("")}</div>` : `<p class="notice">Aucune séance prévue. Crée les séances du mois depuis l'onglet Séances.</p>`}</div>
-      ${showNext || showRes ? `<div class="card">${showNext ? `<div class="hub-bar"><h3 class="hub-h">Prochain concours</h3><button class="btn ghost" data-tab="concours">Calendrier</button></div>
+      ${showNext || showRes ? `<div class="card" data-carte="concours">${showNext ? `<div class="hub-bar"><h3 class="hub-h">Prochain concours</h3><button class="btn ghost" data-tab="concours">Calendrier</button></div>
         ${nextCo ? `<button class="row" data-concours="${nextCo.id}"><span class="date"><span class="d">${dObj(nextCo.date).getDate()}</span><span class="mo">${dObj(nextCo.date).toLocaleDateString("fr-FR", { month: "short" }).replace(".", "")}</span></span><span class="main"><span class="t">${esc(cTitle(nextCo))}</span><span class="m">${cTags(nextCo)}</span></span><span class="count">${resOf(nextCo).length}<small> inscrit${resOf(nextCo).length > 1 ? "s" : ""}</small></span></button>` : `<p class="notice">Aucun concours à venir.</p>`}` : ""}
         ${showRes ? `<h3 class="hub-h" style="margin-top:6px">${lastCo ? `Derniers résultats · ${esc(cTitle(lastCo))}` : "Derniers résultats"}</h3>
         ${lastCo ? `<span class="tirline">${esc(fmtLong(lastCo.date))} · comparé à la moyenne de ses concours précédents${lastTypes.length ? " du même type" : ""}</span><div class="list">${lastRes.map(dashResRow).join("")}</div><button class="btn ghost" data-concours="${lastCo.id}">Voir le concours ›</button>` : `<p class="notice">Aucun score saisi pour l'instant.</p>`}` : ""}
@@ -3805,6 +3831,151 @@ function docRow(d, withFolder = false) {
   return `<button class="row" data-doc="${d.id}">${k === "img" ? `<img class="thumb" src="${esc(blobUrl(d))}" alt="" loading="lazy">` : `<span class="thumb">${KIND_LAB[k]}</span>`}
     <span class="main"><span class="t">${esc(d.titre || d.nomFichier)}</span><span class="m">${esc(meta || d.nomFichier)}</span></span>
     <span class="tirline">${fmtSize(d.taille || 0)}</span></button>`;
+}
+// ---------- Studio apparence (V.1.9) : l'entraîneur règle les couleurs, formes et cartes du carnet, depuis l'ordinateur ----------
+// Enregistré dans les paramètres (texte JSON, remplacé en entier) ; appliqué par une feuille de style ajoutée en fin de page.
+// Les thèmes de fête gardent la main sur les couleurs pendant leurs dates.
+const AP_PRESETS = {
+  nuit: { nom: "Nuit ambre (d'origine)", bg: "#0B0F19", surface: "#0F172A", ink: "#F3F4F6", muted: "#94A3B8", line: "#1E293B", accent: "#F59E0B", accent2: "#06B6D4", ok: "#34D399", danger: "#EF4444", coins: "arrondi", bord: "fin", onglets: "pastille", boutons: "degrade", police: "inter", densite: "normal" },
+  clair: { nom: "Clair (extérieur)", bg: "#F1F5F9", surface: "#FFFFFF", ink: "#0F172A", muted: "#475569", line: "#CBD5E1", accent: "#B45309", accent2: "#0E7490", ok: "#047857", danger: "#B91C1C", coins: "arrondi", bord: "fin", onglets: "souligne", boutons: "plein", police: "inter", densite: "normal" },
+  club: { nom: "Bleu et or", bg: "#F8FAFC", surface: "#FFFFFF", ink: "#0F172A", muted: "#475569", line: "#BFDBFE", accent: "#1D4ED8", accent2: "#A16207", ok: "#15803D", danger: "#B91C1C", coins: "carre", bord: "fin", onglets: "souligne", boutons: "plein", police: "nunito", densite: "normal" },
+  contraste: { nom: "Contraste renforcé", bg: "#000000", surface: "#0A0A0A", ink: "#FFFFFF", muted: "#E5E5E5", line: "#FFFFFF", accent: "#FFD60A", accent2: "#5EEAD4", ok: "#4ADE80", danger: "#FF8A80", coins: "arrondi", bord: "epais", onglets: "souligne", boutons: "plein", police: "atkinson", densite: "aere" },
+};
+const AP_CARTES = [
+  ["statSeances", "Accueil : « Séances du mois »", '[data-carte="statSeances"]'],
+  ["statMateriel", "Accueil : « Matériel à réparer »", '[data-carte="statMateriel"]'],
+  ["seances", "Accueil : « Séances à venir »", '[data-carte="seances"]'],
+  ["concours", "Accueil : « Prochain concours »", '[data-carte="concours"]'],
+  ["lignes", "Lignes des listes (séances, archers…)", ".row"],
+  ["etiquettes", "Étiquettes (Présent, À renouveler…)", ".tag"],
+  ["equipes", "Animations : blocs des équipes", ".an-team"],
+];
+const AP_COULEURS = [["accent", "Couleur principale", "Boutons importants, onglet choisi, chiffres"], ["accent2", "Couleur secondaire", "Deuxièmes chiffres, dégradés"], ["bg", "Fond", "Derrière tout le carnet"], ["surface", "Cartes", "Fond des cartes et des listes"], ["ink", "Texte", "Texte principal"], ["muted", "Texte gris", "Dates, détails"], ["line", "Bordures", "Contours des cartes"], ["ok", "Bonnes nouvelles", "Présent, validé"], ["danger", "Alertes", "Supprimer, à renouveler"]];
+const AP_CHOIX = [["coins", "Coins", [["carre", "Carrés"], ["arrondi", "Arrondis"], ["pilule", "Pilule"]]], ["bord", "Bordures", [["aucun", "Aucune"], ["fin", "Fines"], ["epais", "Épaisses"]]],
+  ["onglets", "Onglets", [["pastille", "Pastille"], ["souligne", "Soulignés"]]], ["boutons", "Boutons principaux", [["plein", "Pleins"], ["contour", "Contour"], ["degrade", "Dégradé"]]],
+  ["police", "Police", [["inter", "Inter"], ["atkinson", "Atkinson (très lisible)"], ["nunito", "Nunito (arrondie)"]]], ["densite", "Densité", [["compact", "Compact"], ["normal", "Normal"], ["aere", "Aéré"]]]];
+const apLum = (hex) => { const h = String(hex || "#000000").replace("#", ""); return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4))).reduce((t, c, i) => t + c * [0.2126, 0.7152, 0.0722][i], 0); };
+const apRatio = (a, b) => { const x = apLum(a), y = apLum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+const apSoft = (hex, a) => { const h = String(hex || "#000000").replace("#", ""); return `rgba(${[0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)).join(",")},${a})`; };
+const apSaved = () => { try { return JSON.parse(prm().apparenceJson || "null"); } catch (e) { return null; } };
+function apCss(a) {
+  if (!a) return "";
+  const R = { carre: { row: 4, card: 4, btn: 4, chip: 4, tag: 3, inp: 4 }, arrondi: { row: 16, card: 20, btn: 12, chip: 999, tag: 8, inp: 12 }, pilule: { row: 22, card: 26, btn: 999, chip: 999, tag: 999, inp: 999 } }[a.coins] || {};
+  const bw = { aucun: 0, fin: 1, epais: 2 }[a.bord] ?? 1, D = { compact: [8, 12, 12, 10], normal: [12, 14, 18, 16], aere: [16, 18, 24, 22] }[a.densite] || [12, 14, 18, 16];
+  const font = { inter: '"Inter", system-ui, sans-serif', atkinson: '"Atkinson Hyperlegible", system-ui, sans-serif', nunito: '"Nunito", system-ui, sans-serif' }[a.police] || '"Inter", system-ui, sans-serif';
+  const onA = apLum(a.accent) > 0.4 ? "#0B0F19" : "#FFFFFF", light = apLum(a.bg) > 0.4;
+  const btn = a.boutons === "contour" ? `background: transparent !important; color: ${a.accent} !important; border: 2px solid ${a.accent} !important; box-shadow: none !important;`
+    : a.boutons === "plein" ? `background: ${a.accent} !important; color: ${onA} !important; border-color: transparent !important; box-shadow: 0 6px 16px -10px ${apSoft(a.accent, 0.8)} !important;`
+    : `background: linear-gradient(135deg, ${a.accent}, ${a.accent2}) !important; color: ${onA} !important; border-color: transparent !important;`;
+  let c = `html:root:not([data-fete]):not([data-ap-off]) { --bg: ${a.bg}; --surface: ${a.surface}; --sunk: ${apSoft(a.line, 0.45)}; --ink: ${a.ink}; --muted: ${a.muted}; --line: ${a.line}; --line-2: ${apSoft(a.ink, 0.25)};
+  --field: ${apSoft(a.bg, 0.86)}; --field-ink: ${a.ink}; --field-muted: ${a.muted}; --accent: ${a.accent}; --accent-2: ${a.accent2}; --accent-ink: ${onA}; --cyan: ${a.accent2}; --ok: ${a.ok}; --ok-soft: ${apSoft(a.ok, 0.15)}; --danger: ${a.danger}; color-scheme: ${light ? "light" : "dark"}; }
+html:root:not([data-fete]):not([data-ap-off]) body { background: ${a.bg} !important; background-image: none !important; }
+html:root:not([data-fete]):not([data-ap-off]) .btn.primary, html:root:not([data-fete]):not([data-ap-off]) .fab, html:root:not([data-fete]):not([data-ap-off]) .seg-mode button[aria-pressed="true"] { ${btn} }
+html:root:not([data-fete]):not([data-ap-off]) .brand .logo { background: ${a.accent}; box-shadow: none; } html:root:not([data-fete]):not([data-ap-off]) .brand .logo svg { color: ${onA}; }
+html:root:not([data-fete]):not([data-ap-off]) .brand h1 em { background: linear-gradient(90deg, ${a.accent}, ${a.accent2}); -webkit-background-clip: text; background-clip: text; }
+body { --font-display: ${font}; --font-body: ${font}; --font-hand: ${font}; font-family: ${font}; }
+.row { border-radius: ${R.row}px; padding: ${D[0]}px ${D[1]}px; } .card, .hub-stat, .empty, .fold, .pt { border-radius: ${R.card}px; } .card, .hub-stat { padding: ${D[2]}px; } .wrap { gap: ${D[3]}px; }
+.btn { border-radius: ${R.btn}px; } .chip { border-radius: ${R.chip}px; } .tag { border-radius: ${R.tag}px; }
+input[type=search], input[type=text], input[type=date], input[type=time], input[type=number], input[type=email], select, textarea { border-radius: ${Math.min(R.inp, 14)}px; }
+.row, .card, .hub-stat, .fold, .pt { border-width: ${bw}px; ${bw ? "" : "border-color: transparent;"} }
+`;
+  if (a.onglets === "souligne") c += `.tab { border-radius: 0 !important; background: transparent !important; } .tab[aria-selected="true"] { background: transparent !important; box-shadow: inset 0 -3px 0 var(--accent) !important; color: var(--ink) !important; }\n`;
+  AP_CARTES.forEach(([k, , sel]) => {
+    const o = (a.cartes || {})[k]; if (!o || !Object.keys(o).length) return;
+    const coul = o.couleur || a.accent, fond = o.fond ? (o.degrade ? `linear-gradient(135deg, ${o.fond}, ${apSoft(coul, 0.35)})` : o.fond) : o.degrade ? `linear-gradient(135deg, ${a.surface}, ${apSoft(coul, 0.3)})` : "";
+    const rules = [];
+    if (fond) rules.push(`background: ${fond} !important;`);
+    if (o.bord) rules.push(`border-color: ${o.bord} !important;`);
+    if (o.bw != null) rules.push(`border-width: ${o.bw}px !important; border-style: solid !important;`);
+    if (o.r != null) rules.push(`border-radius: ${o.r}px !important;`);
+    if (o.ombre) rules.push(`box-shadow: 0 12px 26px -14px ${apSoft(coul, 0.75)} !important;`);
+    if (o.bande) rules.push(`border-left: 6px solid ${coul} !important;`);
+    if (k === "etiquettes" && o.couleur) rules.push(`color: ${coul} !important;${o.fond ? "" : ` background: ${apSoft(coul, 0.15)} !important;`}`);
+    if (rules.length) c += `${sel} { ${rules.join(" ")} }\n`;
+    if (o.couleur && k !== "etiquettes") c += `${sel} > b, ${sel} .hub-h, ${sel} .t, ${sel} .count, ${sel} .date .d { color: ${coul} !important; }\n`;
+    if (o.txt) c += `${sel} small, ${sel} .m, ${sel} .tirline, ${sel} .hub-stat-top span { color: ${o.txt} !important; }\n`;
+    if (o.taille) c += `${sel} > b, ${sel} .count, ${sel} .date .d { font-size: ${{ petit: "1.6rem", grand: "2.8rem" }[o.taille] || "inherit"} !important; }\n`;
+  });
+  return c;
+}
+let apApplique = null;
+function appliquerApparence(a) {
+  const css = apCss(a), key = css;
+  if (key === apApplique) return; apApplique = key;
+  let st = document.getElementById("apparence-css");
+  if (!st) { st = document.createElement("style"); st.id = "apparence-css"; document.head.appendChild(st); }
+  st.textContent = css;
+  if (a && a.police && a.police !== "inter" && !document.getElementById("apparence-font")) {
+    const l = document.createElement("link"); l.id = "apparence-font"; l.rel = "stylesheet"; l.href = "https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Nunito:wght@400;600;700;800&display=swap"; document.head.appendChild(l);
+  }
+}
+// ----- le panneau du studio (ordinateur uniquement), ouvert à droite pendant qu'on navigue dans le carnet
+const AP = { open: false, d: null, ouverte: null };
+const studioPossible = () => window.matchMedia("(min-width: 1000px)").matches && S.canWrite;
+function studioCard() {
+  if (!studioPossible()) return "";
+  const a = apSaved();
+  return `<h2 class="sec">Studio apparence</h2><div class="card"><span class="tirline">Couleurs, formes, police et cartes une par une. Le carnet change en direct pendant que tu navigues ; rien n'est gardé tant que tu n'as pas enregistré. Réservé à l'ordinateur.${a ? " Une apparence personnalisée est active." : ""}</span>
+    <div class="bar"><button class="btn primary" data-act="studio">🎨 Ouvrir le studio</button></div></div>`;
+}
+function ouvrirStudio() {
+  AP.open = true; AP.d = JSON.parse(JSON.stringify(apSaved() || { ...AP_PRESETS.nuit, cartes: {} })); AP.d.cartes = AP.d.cartes || {};
+  document.body.classList.add("studio-on"); dessinerStudio();
+}
+function fermerStudio() { AP.open = false; AP.d = null; document.body.classList.remove("studio-on"); const el = $("#studio"); if (el) el.remove(); apApplique = null; appliquerApparence(apSaved()); }
+function apVerdict(a) {
+  const onA = apLum(a.accent) > 0.4 ? "#0B0F19" : "#FFFFFF";
+  const t = [["Texte sur le fond", apRatio(a.ink, a.bg), 4.5], ["Texte gris sur les cartes", apRatio(a.muted, a.surface), 4.5], ["Couleur principale sur les cartes", apRatio(a.accent, a.surface), 3], ["Texte des boutons", apRatio(onA, a.accent), 4.5]];
+  const ko = t.filter(([, r, m]) => r < m);
+  return `<div class="ap-lisi ${ko.length ? "ko" : "ok"}"><b>${ko.length ? "⚠ Attention à la lisibilité" : "✓ Tout est bien lisible"}</b>${t.map(([n, r, m]) => `<span>${r < m ? "⚠" : "✓"} ${n} : ${r.toFixed(1).replace(".", ",")} (il faut ${String(m).replace(".", ",")})</span>`).join("")}</div>`;
+}
+function dessinerStudio() {
+  const a = AP.d; appliquerApparence(a);
+  let el = $("#studio"), y = el ? el.querySelector(".ap-in").scrollTop : 0;
+  if (!el) { el = document.createElement("aside"); el.id = "studio"; el.setAttribute("aria-label", "Studio apparence"); document.body.appendChild(el); brancherStudio(el); }
+  const opt = (k, v, l, on, data) => `<button type="button" class="ap-opt" ${data}="${esc(k + "|" + v)}" aria-pressed="${on}">${l}</button>`;
+  const modif = JSON.stringify(a) !== JSON.stringify(apSaved() || { ...AP_PRESETS.nuit, cartes: {} });
+  el.innerHTML = `<div class="ap-in">
+    <div class="ap-top"><b>🎨 Studio apparence</b><button type="button" class="btn ghost" data-ap-act="fermer" aria-label="Fermer le studio">✕</button></div>
+    <p class="tirline">Navigue dans le carnet (Accueil, Séances, Animations…) : il change en direct. Les thèmes de fête restent prioritaires pendant leurs dates.</p>
+    <div class="ap-sec"><b>1. Partir d'un thème</b><div class="ap-grid">${Object.entries(AP_PRESETS).map(([k, p]) => `<button type="button" class="ap-pre" data-ap-preset="${k}"><span style="background:${p.bg}"></span><span style="background:${p.accent}"></span>${esc(p.nom)}</button>`).join("")}</div></div>
+    <div class="ap-sec"><b>2. Couleurs</b>${AP_COULEURS.map(([k, n, aide]) => `<label class="ap-col"><input type="color" data-ap-col="${k}" value="${esc(a[k])}"><span><b>${n}</b><small>${aide}</small></span></label>`).join("")}</div>
+    <div class="ap-sec"><b>3. Formes et style</b>${AP_CHOIX.map(([k, n, opts]) => `<div class="ap-row"><span>${n}</span><div>${opts.map(([v, l]) => opt(k, v, l, a[k] === v, "data-ap-set")).join("")}</div></div>`).join("")}
+      <small class="tirline">La taille du texte reste réglable appareil par appareil, dans l'Affichage.</small></div>
+    <div class="ap-sec"><b>4. Cartes une par une</b><small class="tirline">Chaque carte suit les réglages généraux, sauf ce que tu lui donnes à part.</small>
+      ${AP_CARTES.map(([k, n]) => { const o = a.cartes[k] || {}, perso = Object.keys(o).length > 0, ouv = AP.ouverte === k, tag = k === "etiquettes";
+        const ch = (champ, label, vals) => `<div class="ap-row"><span>${label}</span><div>${vals.map(([v, l]) => opt(k + "|" + champ, JSON.stringify(v ?? null), l, (o[champ] ?? null) === (v ?? null), "data-ap-carte")).join("")}</div></div>`;
+        return `<div class="ap-carte ${perso ? "perso" : ""}"><div class="ap-carte-h"><span><b>${n}</b><small>${perso ? "Réglée à part" : "Réglages généraux"}</small></span>
+          ${perso ? `<button type="button" class="btn" data-ap-raz="${k}">Par défaut</button>` : ""}<button type="button" class="btn${ouv ? " primary" : ""}" data-ap-ouv="${k}" aria-expanded="${ouv}">${ouv ? "Fermer" : "Régler"}</button></div>
+          ${ouv ? `<div class="ap-carte-b"><div class="ap-mini">${[["couleur", tag ? "Texte" : "Couleur"], ["fond", "Fond"], ["bord", "Bordure"], ...(tag ? [] : [["txt", "Texte gris"]])].map(([c, l]) => `<label>${l}<input type="color" data-ap-cc="${k}|${c}" value="${esc(o[c] || (c === "fond" ? a.surface : c === "bord" ? a.line : c === "txt" ? a.muted : a.accent))}"></label>`).join("")}</div>
+            ${ch("bw", "Bordure", [[null, "Générale"], [0, "Aucune"], [1, "Fine"], [3, "Épaisse"]])}${ch("r", "Coins", [[null, "Généraux"], [0, "Droits"], [8, "Peu arrondis"], [22, "Très arrondis"]])}
+            ${tag ? "" : ch("taille", "Chiffre", [[null, "Normal"], ["petit", "Petit"], ["grand", "Grand"]]) + ch("degrade", "Fond", [[null, "Uni"], [true, "Dégradé"]]) + ch("ombre", "Ombre", [[null, "Non"], [true, "Oui"]]) + ch("bande", "Bande à gauche", [[null, "Non"], [true, "Oui"]])}</div>` : ""}</div>`; }).join("")}</div>
+    ${apVerdict(a)}
+    </div>
+    <div class="ap-acts">${modif ? `<span class="tirline">Modifications non enregistrées</span>` : `<span class="tirline">Rien à enregistrer</span>`}
+      <button type="button" class="btn" data-ap-act="origine">Thème d'origine</button><button type="button" class="btn" data-ap-act="annuler" ${modif ? "" : "disabled"}>Annuler</button><button type="button" class="btn primary" data-ap-act="enregistrer" ${modif ? "" : "disabled"}>Enregistrer</button></div>`;
+  el.querySelector(".ap-in").scrollTop = y;
+}
+function brancherStudio(el) {
+  el.addEventListener("input", (e) => {
+    const t = e.target;
+    if (t.dataset.apCol) { AP.d[t.dataset.apCol] = t.value; appliquerApparence(AP.d); clearTimeout(AP.tm); AP.tm = setTimeout(dessinerStudio, 250); }
+    if (t.dataset.apCc) { const [k, c] = t.dataset.apCc.split("|"); AP.d.cartes[k] = { ...(AP.d.cartes[k] || {}), [c]: t.value }; appliquerApparence(AP.d); clearTimeout(AP.tm); AP.tm = setTimeout(dessinerStudio, 250); }
+  });
+  el.addEventListener("click", (e) => {
+    const t = e.target.closest("button"); if (!t) return;
+    if (t.dataset.apPreset) { AP.d = { ...JSON.parse(JSON.stringify(AP_PRESETS[t.dataset.apPreset])), cartes: AP.d.cartes || {} }; delete AP.d.nom; return dessinerStudio(); }
+    if (t.dataset.apSet) { const [k, v] = t.dataset.apSet.split("|"); AP.d[k] = v; return dessinerStudio(); }
+    if (t.dataset.apCarte) { const [k, champ, v] = t.dataset.apCarte.split("|"), val = JSON.parse(v), o = { ...(AP.d.cartes[k] || {}) }; if (val === null) delete o[champ]; else o[champ] = val; AP.d.cartes[k] = o; return dessinerStudio(); }
+    if (t.dataset.apOuv) { AP.ouverte = AP.ouverte === t.dataset.apOuv ? null : t.dataset.apOuv; return dessinerStudio(); }
+    if (t.dataset.apRaz) { delete AP.d.cartes[t.dataset.apRaz]; return dessinerStudio(); }
+    const act = t.dataset.apAct;
+    if (act === "fermer") { if (JSON.stringify(AP.d) !== JSON.stringify(apSaved() || { ...AP_PRESETS.nuit, cartes: {} }) && t.dataset.confirm !== "1") { t.dataset.confirm = "1"; t.textContent = "Fermer sans enregistrer ?"; return; } return fermerStudio(); }
+    if (act === "annuler") { AP.d = JSON.parse(JSON.stringify(apSaved() || { ...AP_PRESETS.nuit, cartes: {} })); AP.d.cartes = AP.d.cartes || {}; return dessinerStudio(); }
+    if (act === "origine") { AP.d = { ...JSON.parse(JSON.stringify(AP_PRESETS.nuit)), cartes: {} }; delete AP.d.nom; return dessinerStudio(); }
+    if (act === "enregistrer") { const d = JSON.parse(JSON.stringify(AP.d)); delete d.nom; const orig = JSON.stringify({ ...AP_PRESETS.nuit, cartes: {} }); const o2 = { ...AP_PRESETS.nuit, cartes: {} }; delete o2.nom;
+      setParam({ apparenceJson: JSON.stringify(d) === JSON.stringify(o2) ? "" : JSON.stringify(d) }); toast("Apparence enregistrée : appliquée sur tous tes appareils"); return dessinerStudio(); }
+  });
 }
 // ---------- Animations (V.1.9) : jeux à zones, scores des archers, classement ----------
 // Chaque jeu = des zones de cible qui valent des points (parfois négatifs). On compte les flèches par zone, le carnet calcule.
@@ -4681,6 +4852,7 @@ function viewData() {
       <div class="f">Taille du texte${radioRow("taille", LS.get("taille", "normal"), [["normal", "Normale"], ["grand", "Grande"], ["tres-grand", "Très grande"]])}</div>
       <span class="tirline">Ces réglages ne s'appliquent qu'à cet appareil : tu peux avoir un texte plus grand sur la tablette et normal sur l'ordinateur.</span>
     </div>
+    ${studioCard()}
     ${feteCard(ro)}
     ${animCodeCard()}
 `,
@@ -5335,6 +5507,7 @@ document.addEventListener("click", (e) => {
   if (t.dataset.act === "anim-ouvrir") { demanderCode(); return; }
   if (t.dataset.act === "anim-verrou") { S.animOuvert = null; toast("Points cachés"); render(); return; }
   if (t.dataset.act === "anim-code") { formAnimCode(); return; }
+  if (t.dataset.act === "studio") { ouvrirStudio(); return; }
   if (t.dataset.act === "relier-moi") { const aid = $("#me-ar")?.value; if (!aid) { toast("Choisis d'abord ta fiche archer"); return; }
     window.carnetAcces.relierMoi(aid).then((l) => { monAcces = l || []; toast("Ta fiche archer est reliée à ton compte"); render(); }).catch((e) => toast("Impossible : " + e.message)); return; }
   if (t.dataset.act === "mode-archer") { window.carnetAcces.basculer("archer"); return; }
