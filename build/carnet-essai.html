@@ -393,7 +393,7 @@ table.cres input.score-in { font-weight: 800; font-size: 1.05rem; }
 .chk { display: inline-flex; align-items: center; gap: 6px; font-size: .8rem; font-weight: 700; color: var(--muted); padding-right: 6px; border-right: 1px solid var(--line); }
 .chk input { width: 22px; height: 22px; accent-color: var(--ok); }
 .ar-tri { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: end; } .ar-tri label.f { min-width: 140px; flex: 1 1 140px; } .ar-tri .tirline { flex: 1 1 100%; display: flex; align-items: center; gap: 6px; }
-.tag.ar-app { background: var(--ok-soft); color: var(--ok); }
+.tag.ar-app { background: var(--ok-soft); color: var(--ok); } .tag.ar-lic { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
 /* Onglet Paramètres poussé à droite, séparé des onglets de travail */
 .tab[data-tab="parametres"] { margin-left: auto; }
 /* ===== Habillage ArcherHub : nuit, ambre et cyan ===== */
@@ -754,7 +754,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
 <div id="toast" class="toast" hidden></div>
 <input type="file" id="file-in" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.mp4,.webm,.txt,.md,.csv,application/pdf,image/*,video/mp4,video/webm,text/plain,text/markdown,text/csv">
 
-<script>window.CARNET_VERSION = { v: "1.8.38", date: "2026-11-07", site: "1.7.4", test: true };</script>
+<script>window.CARNET_VERSION = { v: "1.8.39", date: "2026-11-07", site: "1.7.4", test: true };</script>
 <script>
 // Espace archer : l'archer (ou son parent) voit uniquement ses propres informations,
 // telles que les renvoie la base (fonction espace_archer), et remplit son carnet.
@@ -3994,7 +3994,13 @@ function progressScores(a) {
 
 // ---------- Archers ----------
 // Liste des archers : tri et filtres (nom, catégorie, arc, club, fédération, accès à l'appli) ; toujours par ordre alphabétique à l'intérieur d'un groupe
-const AR_TRIS = [["nom", "Nom"], ["prenom", "Prénom"], ["categorie", "Catégorie"], ["arc", "Arc"], ["club", "Club"], ["appli", "Accès à l'appli"]];
+const AR_TRIS = [["nom", "Nom"], ["prenom", "Prénom"], ["licence", "Saison de licence"], ["categorie", "Catégorie"], ["arc", "Arc"], ["club", "Club"], ["appli", "Accès à l'appli"]];
+// Saisons de licence (septembre → août) : « 2026-2027 »
+const saisonLib = (fin) => `${fin - 1}-${fin}`;
+const saisonCour = () => saisonLib(saisonOfDate(todayISO()));
+const saisonPrec = () => saisonLib(saisonOfDate(todayISO()) - 1);
+const derniereLicence = (a) => (a.saisonsLicence || []).slice().sort().pop() || "";
+const LIC_FILTRES = () => [["cour", `Licencié en ${saisonCour()}`], ["prec", `Saison dernière seulement (${saisonPrec()})`], ["aucune", "Aucune saison renseignée"]];
 const accesEtat = (a) => { const x = accTous?.[a.id]; return !accTous ? "" : x?.comptes ? "active" : x?.codes ? "code" : "aucun"; };
 const ACCES_LIB = { active: "Appli activée", code: "Code envoyé, pas encore activée", aucun: "Pas encore d'accès" };
 const catPrincipale = (a) => { const f = (a.federations || [])[0]; return f ? catOf(a, f) || "Sans catégorie" : "Sans catégorie"; };
@@ -4003,7 +4009,8 @@ function viewArchers() {
   if (window.carnetAcces?.tous && accTous === null) loadAccTous();
   const q = S.q.trim().toLowerCase(), tri = LS.get("arTri", "nom"), F = (() => { try { return JSON.parse(LS.get("arFiltres", "{}")) || {}; } catch (e) { return {}; } })();
   const base = S.archers.filter((a) => (S.club === "all" || (a.clubIds || []).includes(S.club)) && (!q || fullName(a).toLowerCase().includes(q)));
-  const ok = (a) => (!F.arc || (a.arcs || []).includes(F.arc)) && (!F.cat || catPrincipale(a) === F.cat) && (!F.fed || (a.federations || []).includes(F.fed)) && (!F.appli || accesEtat(a) === F.appli);
+  const licOk = (a) => !F.lic || (F.lic === "cour" ? (a.saisonsLicence || []).includes(saisonCour()) : F.lic === "prec" ? !(a.saisonsLicence || []).includes(saisonCour()) && (a.saisonsLicence || []).includes(saisonPrec()) : !(a.saisonsLicence || []).length);
+  const ok = (a) => licOk(a) && (!F.arc || (a.arcs || []).includes(F.arc)) && (!F.cat || catPrincipale(a) === F.cat) && (!F.fed || (a.federations || []).includes(F.fed)) && (!F.appli || accesEtat(a) === F.appli);
   const parPrenom = (x, y) => (x.prenom || "").localeCompare(y.prenom || "", "fr") || (x.nom || "").localeCompare(y.nom || "", "fr");
   const list = base.filter(ok).sort(tri === "prenom" ? parPrenom : byName);
   const actifs = list.filter((a) => a.actif !== false && roleOf(a) !== "encadrant"), staff = list.filter((a) => a.actif !== false && roleOf(a) === "encadrant"), inactifs = list.filter((a) => a.actif === false);
@@ -4015,18 +4022,19 @@ function viewArchers() {
     + `<input type="search" id="search" placeholder="Rechercher un archer" value="${esc(S.q)}" aria-label="Rechercher un archer">`;
   if (!S.archers.length) return h + `<div class="empty"><h3>Aucun archer</h3><p>Ajoute les archers que tu suis, avec leur club, leur type d'arc et leur catégorie.</p><button class="btn primary" data-act="new-archer">Ajouter un archer</button></div>`;
   h += `<div class="ar-tri"><label class="f">Trier par<select data-artri aria-label="Trier par">${AR_TRIS.map(([k, l]) => `<option value="${k}" ${tri === k ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+    <label class="f">Licence<select data-arfil="lic"><option value="">Toutes</option>${LIC_FILTRES().map(([k, l]) => `<option value="${k}" ${F.lic === k ? "selected" : ""}>${esc(l)}</option>`).join("")}</select></label>
     <label class="f">Arc<select data-arfil="arc">${opts(arcs, F.arc, "Tous les arcs")}</select></label>
     <label class="f">Catégorie<select data-arfil="cat">${opts(cats, F.cat, "Toutes")}</select></label>
     <label class="f">Fédération<select data-arfil="fed">${opts(FEDS, F.fed, "Toutes")}</select></label>
     ${accTous ? `<label class="f">Appli<select data-arfil="appli"><option value="">Tous</option>${Object.entries(ACCES_LIB).map(([k, l]) => `<option value="${k}" ${F.appli === k ? "selected" : ""}>${l}</option>`).join("")}</select></label>` : ""}
     <span class="tirline">${actifs.length + staff.length} archer${actifs.length + staff.length > 1 ? "s" : ""}${nbF ? ` · ${nbF} filtre${nbF > 1 ? "s" : ""} <button type="button" class="btn ghost" data-act="ar-filtres-raz">Tout afficher</button>` : ""}</span></div>`;
-  const row = (a) => `<button class="row" data-archer="${a.id}"><span class="row-av">${avatarSvg(a, 44)}</span><span class="main"><span class="t">${esc(fullName(a))} ${pretTag(a.id)}${accesEtat(a) === "active" ? ` <span class="tag ar-app">📱 appli</span>` : accesEtat(a) === "code" ? ` <span class="tag">code envoyé</span>` : ""}</span>
+  const row = (a) => `<button class="row" data-archer="${a.id}"><span class="row-av">${avatarSvg(a, 44)}</span><span class="main"><span class="t">${esc(fullName(a))} ${pretTag(a.id)}${(a.saisonsLicence || []).length && !(a.saisonsLicence || []).includes(saisonCour()) ? ` <span class="tag ar-lic">licence ${esc(derniereLicence(a))}</span>` : ""}${accesEtat(a) === "active" ? ` <span class="tag ar-app">📱 appli</span>` : accesEtat(a) === "code" ? ` <span class="tag">code envoyé</span>` : ""}</span>
       <span class="m">${esc(roleOf(a) === "encadrant" ? (a.clubIds || []).map(clubName).join(", ") + " · encadrant / animateur" : archerMeta(a) + (roleOf(a) === "les-deux" ? " · encadre aussi" : ""))}</span></span><span class="count" aria-hidden="true">›</span></button>`;
-  const cle = { categorie: catPrincipale, arc: (a) => (a.arcs || [])[0] || "Sans arc", club: (a) => (a.clubIds || []).map(clubName).join(", ") || "Sans club", appli: (a) => ACCES_LIB[accesEtat(a)] || "Accès inconnu" }[tri];
+  const cle = { licence: (a) => (a.saisonsLicence || []).includes(saisonCour()) ? `Licenciés ${saisonCour()}` : derniereLicence(a) ? `Dernière licence : ${derniereLicence(a)}` : "Saison de licence non renseignée", categorie: catPrincipale, arc: (a) => (a.arcs || [])[0] || "Sans arc", club: (a) => (a.clubIds || []).map(clubName).join(", ") || "Sans club", appli: (a) => ACCES_LIB[accesEtat(a)] || "Accès inconnu" }[tri];
   if (!actifs.length) h += `<p class="notice">Aucun archer ne correspond.</p>`;
   else if (!cle) h += `<div class="list">${actifs.map(row).join("")}</div>`;
   else { const g = new Map(); actifs.forEach((a) => { const k = cle(a); if (!g.has(k)) g.set(k, []); g.get(k).push(a); });
-    [...g.entries()].sort(([a], [b]) => a.localeCompare(b, "fr", { numeric: true })).forEach(([k, l]) => { h += `<h2 class="sec">${esc(k)} · ${l.length}</h2><div class="list">${l.map(row).join("")}</div>`; }); }
+    [...g.entries()].sort(([a], [b]) => { const rg = (x) => (tri !== "licence" ? 0 : x.startsWith("Licenciés") ? 0 : x.startsWith("Dernière") ? 1 : 2); return rg(a) - rg(b) || (tri === "licence" ? b.localeCompare(a, "fr", { numeric: true }) : a.localeCompare(b, "fr", { numeric: true })); }).forEach(([k, l]) => { h += `<h2 class="sec">${esc(k)} · ${l.length}</h2><div class="list">${l.map(row).join("")}</div>`; }); }
   if (staff.length) h += `<h2 class="sec">Encadrants et animateurs</h2><div class="list">${staff.map(row).join("")}</div>`;
   if (inactifs.length) h += `<h2 class="sec">Archers inactifs</h2><div class="list">${inactifs.map(row).join("")}</div>`;
   return h;
@@ -5195,6 +5203,8 @@ function formArcher(a = null, presetClub = null) {
       <label class="f" for="f-ucat">Catégorie<select id="f-ucat" name="categorieUfolep">${ucatOptions(ucatSel)}</select></label>
       <label class="f" for="f-ulic">N° de licence<input type="text" id="f-ulic" name="licUFOLEP" value="${esc(lic.UFOLEP)}"></label>
       <label class="f" for="f-vis">Viseur<select id="f-vis" name="viseur"><option value="">Non renseigné</option><option value="avec" ${a?.viseur === "avec" ? "selected" : ""}>Avec viseur</option><option value="sans" ${a?.viseur === "sans" ? "selected" : ""}>Sans viseur</option></select></label></div></fieldset>
+    <div class="f">Saison(s) de licence<div class="checks">${[...new Set([saisonPrec(), saisonCour(), saisonLib(saisonOfDate(todayISO()) + 1), ...(a?.saisonsLicence || [])])].sort().map((x) => `<label><input type="checkbox" name="saisonLic" value="${x}" ${(a?.saisonsLicence || (a ? [] : [saisonCour()])).includes(x) ? "checked" : ""}>${x}</label>`).join("")}</div>
+      <span class="tirline">Coche les saisons où l'archer est licencié : la liste des archers peut ensuite montrer ceux qui n'ont pas encore renouvelé.</span></div>
     <label class="f" for="f-role">Rôle au club<select id="f-role" name="role">${ROLES.map(([k, l]) => `<option value="${k}" ${roleOf(a) === k ? "selected" : ""}>${l}</option>`).join("")}</select></label>
     ${a ? `<label class="f" style="display:flex;gap:8px;align-items:center;color:var(--ink)"><input type="checkbox" name="inactif" ${a.actif === false ? "checked" : ""} style="accent-color:var(--accent)"> Archer inactif (n'apparaît plus au pointage)</label>` : ""}`,
     {
@@ -5207,6 +5217,7 @@ function formArcher(a = null, presetClub = null) {
           naissance: fd.get("naissance") || "", sexe: fd.get("sexe") || "", viseur: fe.includes("UFOLEP") ? fd.get("viseur") || "" : "",
           categorie: fe.includes("FFTA") ? fd.get("categorie") : "", categorieUfolep: fe.includes("UFOLEP") ? fd.get("categorieUfolep").trim() : "",
           licences: { FFTA: fe.includes("FFTA") ? fd.get("licFFTA").trim() : "", UFOLEP: fe.includes("UFOLEP") ? fd.get("licUFOLEP").trim() : "" },
+          saisonsLicence: fd.getAll("saisonLic").sort(),
           actif: !fd.get("inactif"), role: fd.get("role") || "archer", notes: a?.notes || "", createdAt: a?.createdAt || Date.now() };
         save("archers", a?.id || newId("archers"), data); toast(a ? "Archer enregistré" : "Archer ajouté");
       },
