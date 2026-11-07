@@ -7,6 +7,7 @@
 --   · les points des zones ne sont jamais envoyés aux archers : ils ne reçoivent que les noms des zones et les scores finaux.
 --   · les règles (texte, PDF ou image) sont lisibles par ceux qui voient l'animation : une règle de lecture à part, réservée aux fichiers
 --     des règles d'animation, qui ne touche pas à celle des autres fichiers (pas d'accès en avance aux fichiers de la 1.8).
+--   · les thèmes de fête (et leurs images) arrivent dans l'espace des archers, même avant les scripts 6 et 8.
 -- À exécuter une fois dans Supabase › SQL Editor (relançable sans risque). Il ne demande pas les scripts 6 à 8 :
 -- il ajoute seulement des fonctions pour les animations, que le carnet actuel n'utilise pas. On peut donc le lancer dès maintenant pour les essais.
 
@@ -213,3 +214,27 @@ revoke execute on function public.anim_peut_lire(text) from public, anon;
 grant execute on function public.anim_peut_lire(text) to authenticated;
 drop policy if exists "regles des animations" on storage.objects;
 create policy "regles des animations" on storage.objects for select to authenticated using (bucket_id = 'fichiers' and public.anim_peut_lire(name));
+
+-- Thèmes de fête dans l'espace archer (V.1.9, aussi pour les essais avant les scripts 6 et 8) :
+-- les réglages des thèmes (dont ceux créés par l'entraîneur : Octobre rose, Movember, Mars bleu…) et la lecture de leurs images.
+create or replace function public.archer_fetes(p_owner uuid, p_archer text) returns jsonb language sql stable security definer set search_path = public as $$
+  select case when not exists (select 1 from acces where user_id = auth.uid() and owner = p_owner and archer_id = p_archer) then null else
+    coalesce((select jsonb_build_object('fetes', case when data->'fetesArchers' = 'false'::jsonb then null else data->'fetes' end,
+        'fetesMessage', coalesce(data->'fetesMessage', 'true'::jsonb) <> 'false'::jsonb, 'fetesAnim', coalesce(data->'fetesAnim', 'true'::jsonb) <> 'false'::jsonb)
+      from docs where owner = p_owner and col = 'parametres' and id = 'general'), '{}'::jsonb) end
+$$;
+revoke execute on function public.archer_fetes(uuid, text) from public, anon;
+grant execute on function public.archer_fetes(uuid, text) to authenticated;
+
+create or replace function public.theme_peut_lire(p_name text) returns boolean language sql stable security definer set search_path = public as $$
+  select split_part(p_name, '/', 2) <> '' and exists (
+    select 1 from acces a
+    join docs p on p.owner = a.owner and p.col = 'parametres' and p.id = 'general'
+    where a.user_id = auth.uid() and a.owner::text = split_part(p_name, '/', 1) and coalesce(p.data->>'fetesArchers', 'true') <> 'false'
+      and (split_part(p_name, '/', 2) in (coalesce(p.data#>>'{fetes,noel,image,assetId}', ''), coalesce(p.data#>>'{fetes,fetes,image,assetId}', ''))
+        or (jsonb_typeof(p.data#>'{fetes,perso}') = 'array' and exists (select 1 from jsonb_array_elements(p.data#>'{fetes,perso}') t where t#>>'{image,assetId}' = split_part(p_name, '/', 2)))))
+$$;
+revoke execute on function public.theme_peut_lire(text) from public, anon;
+grant execute on function public.theme_peut_lire(text) to authenticated;
+drop policy if exists "images des themes" on storage.objects;
+create policy "images des themes" on storage.objects for select to authenticated using (bucket_id = 'fichiers' and public.theme_peut_lire(name));

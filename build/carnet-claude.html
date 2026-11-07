@@ -703,6 +703,12 @@ table.qvq td, table.qvq th { white-space: nowrap; } .qvq-f { display: flex; gap:
 :root[data-fete="perso"] .hub-h::before { content: var(--perso-ic, "★") " "; }
 :root[data-fete="perso"][data-fete-anim] body::after { opacity: .5; background-image: radial-gradient(circle, color-mix(in srgb, var(--perso) 60%, #fff) 1.6px, transparent 2.2px), radial-gradient(circle, rgba(255,255,255,.55) 1px, transparent 1.6px), radial-gradient(circle, color-mix(in srgb, var(--perso) 80%, #fff) 2.2px, transparent 2.8px); }
 :root[data-fete="perso"][data-theme="light"][data-fete-anim] body::after { opacity: .8; background-image: radial-gradient(circle, color-mix(in srgb, var(--perso) 45%, transparent) 1.6px, transparent 2.2px), radial-gradient(circle, color-mix(in srgb, var(--perso) 30%, transparent) 1px, transparent 1.6px); }
+/* thèmes créés (Octobre rose, Movember, Mars bleu…) : pas de guirlande ni de neige, un ruban à la couleur du thème qui brille doucement */
+:root[data-fete="perso"] .top::after { height: 5px; background: linear-gradient(90deg, var(--perso), color-mix(in srgb, var(--perso) 35%, #fff), var(--perso)) 0 0 / 200% 100%; }
+:root[data-fete="perso"][data-fete-anim] .top::after { animation: perso-ruban 7s linear infinite; }
+@keyframes perso-ruban { to { background-position: 200% 0; } }
+:root[data-fete="perso"] body::after, :root[data-fete="perso"][data-fete-anim] body::after { display: none; }
+:root[data-fete="perso"] body, :root[data-fete="perso"] .ar-preview { background-image: none; }
 .fete-ban.perso { background: radial-gradient(500px 160px at 75% 0, color-mix(in srgb, var(--perso) 70%, #fff 0%), transparent 70%), linear-gradient(135deg, color-mix(in srgb, var(--perso) 55%, #050814), color-mix(in srgb, var(--perso) 85%, #000)); border-color: color-mix(in srgb, var(--perso) 60%, transparent); }
 .fete-ban.perso::after { background: linear-gradient(transparent, color-mix(in srgb, var(--perso) 25%, #fff) 7px, color-mix(in srgb, var(--perso) 40%, #fff)); }
 .fete-sw.perso { background: linear-gradient(135deg, var(--sw), color-mix(in srgb, var(--sw) 55%, #000)); color: #fff; }
@@ -5567,7 +5573,7 @@ function feteCard(ro) {
       ${ap != null ? `<p class="notice fete-ap" style="margin:0">Aperçu sur cet appareil seulement : ${ap ? esc(feteNom(ap, p.fetes)) : "thème habituel"}. Les archers ne voient rien. <button class="btn" data-fete-ap="stop">Arrêter l'aperçu</button></p>` : ""}
       <label class="fete-on"><input type="checkbox" data-fete-opt="fetesArchers" ${arch ? "checked" : ""} ${ro}> Aussi dans l'espace des archers <span class="tirline">(chacun garde son avatar)</span></label>
       <label class="fete-on"><input type="checkbox" data-fete-opt="fetesMessage" ${msg ? "checked" : ""} ${ro}> Message de fête sur la bannière de l'accueil <span class="tirline">(« Joyeux Noël ! », « Bonne année ! »)</span></label>
-      <label class="fete-on"><input type="checkbox" data-fete-opt="fetesAnim" ${p.fetesAnim !== false ? "checked" : ""} ${ro}> Animation : neige qui tombe et guirlande qui scintille <span class="tirline">(coupée d'office sur les appareils réglés pour limiter les animations)</span></label>
+      <label class="fete-on"><input type="checkbox" data-fete-opt="fetesAnim" ${p.fetesAnim !== false ? "checked" : ""} ${ro}> Animation : neige et guirlande pour les fêtes de fin d'année, ruban qui brille pour les autres thèmes <span class="tirline">(coupée d'office sur les appareils réglés pour limiter les animations)</span></label>
       <span class="tirline">Ta propre image : une bannière large (par exemple 1600 × 400 pixels), faite avec Canva ou une autre appli, enregistrée en PNG ou JPG. Elle remplace le dessin du thème sur l'accueil, pour toi et les archers ; le message de fête n'est alors pas ajouté, ton image porte son propre texte.</span>
       <span class="tirline">Le réglage clair ou sombre de chaque appareil reste valable. L'icône de l'appli sur l'écran d'accueil du téléphone ne change pas.</span>
     </div>`;

@@ -282,6 +282,8 @@
         const d = await rpc("espace_archer", { p_owner: a.owner, p_archer: a.archer_id });
         // Animations ouvertes aux archers (V.1.9, script 9) : si le script n'est pas encore installé, l'onglet reste simplement caché
         try { if (d) d.animations = await rpc("archer_animations", { p_owner: a.owner, p_archer: a.archer_id }); } catch (e) { if (d) d.animations = []; }
+        // Thèmes de fête (V.1.9, script 9) : si l'espace ne les donne pas encore (avant le script 6), on les demande à part
+        try { if (d && !(d.reglagesEspace && "fetes" in d.reglagesEspace)) { const f = await rpc("archer_fetes", { p_owner: a.owner, p_archer: a.archer_id }); if (f) d.reglagesEspace = { ...(d.reglagesEspace || {}), ...f }; } } catch (e) {}
         return d;
       },
       ecrire: (a, id, data) => rpc("archer_ecrire_entree", { p_owner: a.owner, p_archer: a.archer_id, p_id: id, p_data: data }),
