@@ -5601,7 +5601,7 @@ function feteCard(ro) {
 function viewData() {
   const p = prm(), ro = S.canWrite ? "" : "disabled";
   const nEnt = S.carnets.length;
-  const PT = [["general", "Général"], ["seances", "Séances"], ["concours", "Concours"], ["archers", "Espace archers"], ["donnees", "Données"]], pt = PT.some(([k]) => k === S.pTab) ? S.pTab : LS.get("ptab", "general");
+  const PT = [["general", "Général"], ["themes", "Thèmes et apparence"], ["seances", "Séances"], ["concours", "Concours"], ["archers", "Espace archers"], ["donnees", "Données"]], pt = PT.some(([k]) => k === S.pTab) ? S.pTab : LS.get("ptab", "general");
   const part = { general: () => `    ${versionCard()}
     <h2 class="sec">Entraîneur</h2>
     <div class="card"><label class="f" for="pr-nom">Ton prénom ou nom (affiché en haut du carnet)<input type="text" id="pr-nom" data-prm="nom" value="${esc(p.nom)}" placeholder="Ex. Cédric" ${ro}></label></div>
@@ -5613,9 +5613,11 @@ function viewData() {
       <div class="f">Taille du texte${radioRow("taille", LS.get("taille", "normal"), [["normal", "Normale"], ["grand", "Grande"], ["tres-grand", "Très grande"]])}</div>
       <span class="tirline">Ces réglages ne s'appliquent qu'à cet appareil : tu peux avoir un texte plus grand sur la tablette et normal sur l'ordinateur.</span>
     </div>
-    ${studioCard()}
-    ${feteCard(ro)}
     ${animCodeCard()}
+`,
+    themes: () => `    <p class="tirline" style="margin:0">Les thèmes de fête et ceux que tu crées (Octobre rose, Movember, Mars bleu…), et sur l'ordinateur le studio pour régler l'apparence du carnet.</p>
+    ${feteCard(ro)}
+    ${studioCard()}
 `,
     seances: () => `    <h2 class="sec">Nouveau tir : valeurs proposées</h2>
     ${FEDS.map((f) => { const q = prmFed(f), k = `fed.${f}.`; return `<div class="card"><h3 style="margin:0;font-family:var(--font-display);text-transform:uppercase;font-weight:800"><span class="tag fed" style="font-size:.9rem">${f}</span></h3>
