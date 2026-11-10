@@ -4847,7 +4847,9 @@ const estOrdi = () => matchMedia("(pointer: fine)").matches && innerWidth >= 100
 let maintEtat = null;
 async function chargerMaint() { maintEtat = { charge: true }; try { maintEtat = (await window.carnetMaintenance.etat()) || { actif: false }; } catch (e) { maintEtat = { erreur: e.message }; } if (S.tab === "parametres") render(); }
 function maintenanceCard() {
-  if (!window.carnetMaintenance || !estOrdi()) return "";
+  if (!window.carnetMaintenance) return "";
+  // sur téléphone et tablette : seulement l'aperçu (l'interrupteur reste sur l'ordinateur)
+  if (!estOrdi()) return monAcces.length ? `<h2 class="sec">Maintenance</h2><div class="card"><span class="tirline">Le mode maintenance s'allume depuis l'ordinateur. Ici, tu peux voir l'écran qu'auront tes archers pendant une mise à jour.</span><div class="bar" style="margin-top:8px"><button class="btn" data-act="maint-apercu">👁 Voir comme un archer</button></div></div>` : "";
   if (!maintEtat) chargerMaint();
   const m = maintEtat || { charge: true }, h = m.depuis ? new Date(m.depuis).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "";
   return `<h2 class="sec">Maintenance</h2><div class="card">${m.charge ? `<span class="tirline">Lecture de l'état…</span>`

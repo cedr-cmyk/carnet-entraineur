@@ -834,7 +834,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
 <div id="toast" class="toast" hidden></div>
 <input type="file" id="file-in" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.mp4,.webm,.txt,.md,.csv,application/pdf,image/*,video/mp4,video/webm,text/plain,text/markdown,text/csv">
 
-<script>window.CARNET_VERSION = { v: "1.9.42", date: "2026-11-10", site: "1.7.4", test: true };</script>
+<script>window.CARNET_VERSION = { v: "1.9.44", date: "2026-11-10", site: "1.7.4", test: true };</script>
 <script>
 // Espace archer : l'archer (ou son parent) voit uniquement ses propres informations,
 // telles que les renvoie la base (fonction espace_archer), et remplit son carnet.
@@ -4851,7 +4851,9 @@ const estOrdi = () => matchMedia("(pointer: fine)").matches && innerWidth >= 100
 let maintEtat = null;
 async function chargerMaint() { maintEtat = { charge: true }; try { maintEtat = (await window.carnetMaintenance.etat()) || { actif: false }; } catch (e) { maintEtat = { erreur: e.message }; } if (S.tab === "parametres") render(); }
 function maintenanceCard() {
-  if (!window.carnetMaintenance || !estOrdi()) return "";
+  if (!window.carnetMaintenance) return "";
+  // sur téléphone et tablette : seulement l'aperçu (l'interrupteur reste sur l'ordinateur)
+  if (!estOrdi()) return monAcces.length ? `<h2 class="sec">Maintenance</h2><div class="card"><span class="tirline">Le mode maintenance s'allume depuis l'ordinateur. Ici, tu peux voir l'écran qu'auront tes archers pendant une mise à jour.</span><div class="bar" style="margin-top:8px"><button class="btn" data-act="maint-apercu">👁 Voir comme un archer</button></div></div>` : "";
   if (!maintEtat) chargerMaint();
   const m = maintEtat || { charge: true }, h = m.depuis ? new Date(m.depuis).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "";
   return `<h2 class="sec">Maintenance</h2><div class="card">${m.charge ? `<span class="tirline">Lecture de l'état…</span>`
