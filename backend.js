@@ -30,6 +30,8 @@
       pt.style.cssText = "position:fixed;left:10px;bottom:calc(10px + env(safe-area-inset-bottom, 0px));z-index:4;pointer-events:none;padding:4px 8px;border-radius:999px;background:#78350F;color:#fff;font:600 .85rem system-ui,sans-serif;opacity:.85";
       document.body.append(pt); bandeau._pt = pt;
     }
+    bandeau.style.background = qui === "maintenance" ? "#1E3A8A" : "#78350F"; if (bandeau._pt) bandeau._pt.style.background = bandeau.style.background;
+    if (qui === "maintenance") { bandeau.innerHTML = `<span>🛠 Mise à jour du carnet en cours : en attendant, tu es hors ligne. Tu vois tes dernières données, et ce que tu notes est gardé sur ce téléphone : ça partira tout seul à la fin de la mise à jour.</span>`; return; }
     bandeau.innerHTML = `<span>📴 Hors connexion : ${qui === "archer" ? "tu vois tes dernières données gardées sur ce téléphone. Ce que tu notes est gardé ici et partira dès que le réseau revient." : "tu travailles sur la copie gardée sur cet appareil. Tes modifications partiront dès que le réseau revient."}</span>${qui === "archer" ? `<button type="button" style="font:inherit;padding:4px 12px;border-radius:999px;border:1px solid #fff;background:transparent;color:#fff">Réessayer</button>` : ""}`;
     bandeau.querySelector("button")?.addEventListener("click", () => location.reload());
   }
@@ -225,6 +227,8 @@
 
   // ---------- Accès des archers (côté entraîneur) ----------
   const rpc = async (fn, args) => { const r = await sb.rpc(fn, args); if (r.error) throw new Error(r.error.message); return r.data; };
+  // Mode maintenance (V.1.7.7) : l'entraîneur met l'appli en pause pendant une mise à jour (script maintenance.sql)
+  window.carnetMaintenance = { etat: () => rpc("etat_maintenance"), basculer: (on) => rpc("basculer_maintenance", { p_actif: !!on }) };
   window.carnetAcces = {
     inviter: (archerId) => rpc("creer_invitation", { p_archer: archerId }),
     liste: (archerId) => rpc("acces_archer", { p_archer: archerId }),
@@ -256,7 +260,7 @@
       });
     });
   }
-  async function archerMode(net = true, coach = false) {
+  async function archerMode(net = true, coach = false, maint = false) {
     let list = null;
     if (net) { try { list = await withTimeout(rpc("mes_acces")); ls.set("ar-acces", list); } catch (e) { if (!netErr(e)) throw e; } }
     if (!list) list = ls.get("ar-acces", null);
@@ -289,22 +293,31 @@
     const fusion = (a, d) => { if (!d || !Array.isArray(d.entrees)) return d; Object.values(ls.get(kAtt, {})).filter((w) => w.a.owner === a.owner && w.a.archer_id === a.archer_id).forEach((w) => { const i = d.entrees.findIndex((x) => x.id === w.id), e = { ...(i >= 0 ? d.entrees[i] : {}), ...w.data, id: w.id }; if (i >= 0) d.entrees[i] = e; else d.entrees.push(e); }); return d; };
     let envoiEnCours = false;
     async function viderAttente() {
-      if (envoiEnCours || !Object.keys(ls.get(kAtt, {})).length) return; envoiEnCours = true;
+      if (maint || envoiEnCours || !Object.keys(ls.get(kAtt, {})).length) return; envoiEnCours = true;
       try { for (const [cle, w] of Object.entries(ls.get(kAtt, {}))) { await ecrireNet(w.a, w.id, w.data); const r = ls.get(kAtt, {}); delete r[cle]; ls.set(kAtt, r); } }
       catch (e) { console.warn("envoi en attente : réessai au retour du réseau", e); } finally { envoiEnCours = false; }
     }
+    const garder = (a, id, data) => {
+      const att = ls.get(kAtt, {}); att[`${a.owner}:${a.archer_id}:${id}`] = { a: { owner: a.owner, archer_id: a.archer_id }, id, data, at: Date.now() }; ls.set(kAtt, att);
+      const k = `ar-espace:${a.owner}:${a.archer_id}`, d = ls.get(k, null); if (d) ls.set(k, fusion(a, d));
+      return { enAttente: true };
+    };
     API.ecrire = async (a, id, data) => {
+      if (maint) return garder(a, id, data);
       try { const r = await ecrireNet(a, id, data); viderAttente(); return r; }
       catch (e) {
         if (!/pas de réseau/.test(e.message)) throw e;
-        const att = ls.get(kAtt, {}); att[`${a.owner}:${a.archer_id}:${id}`] = { a: { owner: a.owner, archer_id: a.archer_id }, id, data, at: Date.now() }; ls.set(kAtt, att);
-        const k = `ar-espace:${a.owner}:${a.archer_id}`, d = ls.get(k, null); if (d) ls.set(k, fusion(a, d));
-        horsLigne(true, "archer"); return { enAttente: true };
+        horsLigne(true, "archer"); return garder(a, id, data);
       }
     };
     API.charger = async (a) => { const d = fusion(a, await chargerNet(a)); viderAttente(); return d; };
     API.enAttente = () => Object.keys(ls.get(kAtt, {})).length;
     addEventListener("online", () => viderAttente());
+    if (maint) {
+      // Mode maintenance : l'espace s'ouvre hors connexion sur la copie du téléphone ; l'appli regarde chaque minute si la mise à jour est finie
+      API.charger = async (a) => { const d = ls.get(`ar-espace:${a.owner}:${a.archer_id}`, null); if (!d) return besoinReseau("Le carnet est en cours de mise à jour. Reviens dans un petit moment."); horsLigne(true, "maintenance"); return fusion(a, d); };
+      const veille = setInterval(async () => { try { const e = await withTimeout(rpc("etat_maintenance"), 6000); if (!e?.actif) { clearInterval(veille); location.reload(); } } catch (err) { /* pas de réseau : on réessaie dans une minute */ } }, 60000);
+    }
     window.CarnetArcherUI(window.carnetArcherAPI);
     return new Promise(() => {}); // l'application de l'entraîneur ne démarre pas
   }
@@ -318,7 +331,7 @@
       try { coach = await withTimeout(rpc("est_coach"), 4000); ls.set("coach", coach); } catch (e) { console.warn(e); if (netErr(e)) net = false; }
     }
     if (coach === null && !net) return besoinReseau("Pas de réseau. La première ouverture du carnet a besoin d'internet.");
-    if (coach === false) { if (!session.offline) sb.auth.onAuthStateChange((_e, s) => { if (s) { session = s; tellSW(); } }); return archerMode(net); }
+    if (coach === false) { if (!session.offline) sb.auth.onAuthStateChange((_e, s) => { if (s) { session = s; tellSW(); } }); let maint = false; if (net) { try { maint = !!(await withTimeout(rpc("etat_maintenance"), 4000))?.actif; } catch (e) { /* script pas encore installé ou pas de réseau */ } } return archerMode(net, false, maint); }
     // entraîneur qui a choisi son espace archer (Paramètres › Mon espace archer) ; adresse ?mode=coach = retour forcé en entraîneur
     if (/[?&]mode=coach\b/.test(location.search)) { ls.set("mode", "coach"); history.replaceState(null, "", location.pathname + location.hash); }
     if (ls.get("mode", "coach") === "archer") { if (!session.offline) sb.auth.onAuthStateChange((_e, s) => { if (s) { session = s; tellSW(); } }); return archerMode(net, true); }
