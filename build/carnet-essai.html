@@ -1231,7 +1231,7 @@ function maintenanceCard() {
   const m = maintEtat || { charge: true }, h = m.depuis ? new Date(m.depuis).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "";
   return `<h2 class="sec">Maintenance</h2><div class="card">${m.charge ? `<span class="tirline">Lecture de l'état…</span>`
     : m.erreur ? `<span class="tirline">Pour utiliser le mode maintenance, lance d'abord une fois le script <b>maintenance.sql</b> dans Supabase.</span>`
-    : `<div class="bar"><span class="tirline">${m.actif ? `🛠 <b>Maintenance en cours${h ? " depuis " + h : ""}</b> : les archers ouvrent l'appli hors ligne avec un message. Toi, tu travailles normalement.` : "Pendant une mise à jour, mets l'appli en maintenance : les archers l'ouvrent hors ligne avec un message, et ce qu'ils notent part à la fin. Toi, tu continues normalement."}</span><span class="grow"></span><button class="btn ${m.actif ? "primary" : ""}" data-act="maint">${m.actif ? "Terminer la maintenance" : "Mettre en maintenance"}</button></div>
+    : `<div class="bar"><span class="tirline">${m.actif ? `🛠 <b>Maintenance en cours${h ? " depuis " + h : ""}</b> : les archers ouvrent l'appli hors ligne avec un message. Toi, tu travailles normalement.` : "Pendant une mise à jour, mets l'appli en maintenance : les archers l'ouvrent hors ligne avec un message, et ce qu'ils notent part à la fin. Toi, tu continues normalement."}</span><span class="grow"></span>${monAcces.length ? `<button class="btn" data-act="maint-apercu" title="Ouvre ton espace archer comme le voient les archers pendant la maintenance">👁 Voir comme un archer</button>` : ""}<button class="btn ${m.actif ? "primary" : ""}" data-act="maint">${m.actif ? "Terminer la maintenance" : "Mettre en maintenance"}</button></div>
     <span class="tirline">Un archer qui a déjà l'appli ouverte passe en maintenance à sa prochaine ouverture. À la fin, son appli se remet en ligne toute seule dans la minute.</span>`}</div>`;
 }
 function monEspaceCard() {
@@ -4473,6 +4473,7 @@ document.addEventListener("click", (e) => {
   if (a === "relier-moi") { const aid = $("#me-ar")?.value; if (!aid) { toast("Choisis d'abord ta fiche archer"); return; }
     window.carnetAcces.relierMoi(aid).then((l) => { monAcces = l || []; toast("Ta fiche archer est reliée à ton compte"); render(); }).catch((e) => toast("Impossible : " + e.message)); return; }
   if (a === "mode-archer") { window.carnetAcces.basculer("archer"); return; }
+  if (a === "maint-apercu") { try { sessionStorage.setItem("apercu-maint", "1"); } catch (e) { /* rien */ } window.carnetAcces.basculer("archer"); return; }
   if (a === "new-annonce") formAnnonce();
   if (a === "chrono") openChrono(coachChronoStore);
   if (a === "new-partage") formPartage();

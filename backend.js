@@ -277,7 +277,7 @@
       fichiers: (a) => { filesOwner = a.owner; tellSW(); },
       ajouterCode: async (code) => { await rpc("utiliser_invitation", { p_code: code }); return rpc("mes_acces"); },
       deconnexion: () => window.carnetLogout(),
-      ...(coach ? { versCoach: () => { ls.set("mode", "coach"); location.reload(); } } : {}),
+      ...(coach ? { versCoach: () => { try { sessionStorage.removeItem("apercu-maint"); } catch (e) { /* rien */ } ls.set("mode", "coach"); location.reload(); } } : {}),
     };
     // V.1.7.1 : l'espace archer est gardé sur le téléphone pour être consulté sans réseau ; les envois disent clairement quand le réseau manque
     const API = window.carnetArcherAPI, envoi = (f) => async (...a) => { try { return await withTimeout(f(...a), 12000); } catch (e) { throw netErr(e) ? new Error("pas de réseau, réessaie quand tu auras internet") : e; } };
@@ -315,8 +315,10 @@
     addEventListener("online", () => viderAttente());
     if (maint) {
       // Mode maintenance : l'espace s'ouvre hors connexion sur la copie du téléphone ; l'appli regarde chaque minute si la mise à jour est finie
-      API.charger = async (a) => { const d = ls.get(`ar-espace:${a.owner}:${a.archer_id}`, null); if (!d) return besoinReseau("Le carnet est en cours de mise à jour. Reviens dans un petit moment."); horsLigne(true, "maintenance"); return fusion(a, d); };
-      const veille = setInterval(async () => { try { const e = await withTimeout(rpc("etat_maintenance"), 6000); if (!e?.actif) { clearInterval(veille); location.reload(); } } catch (err) { /* pas de réseau : on réessaie dans une minute */ } }, 60000);
+      API.charger = async (a) => { let d = ls.get(`ar-espace:${a.owner}:${a.archer_id}`, null); if (!d && coach) d = await chargerNet(a).catch(() => null); if (!d) return besoinReseau("Le carnet est en cours de mise à jour. Reviens dans un petit moment."); horsLigne(true, "maintenance"); return fusion(a, d); };
+      // aperçu de l'entraîneur : on reste en maintenance jusqu'au retour en mode entraîneur
+      if (coach) setTimeout(() => { const t = document.querySelector("#toast"); if (t) { t.textContent = "Aperçu : voici ce que voient tes archers pendant la maintenance"; t.hidden = false; setTimeout(() => (t.hidden = true), 4000); } }, 1500);
+      else { const veille = setInterval(async () => { try { const e = await withTimeout(rpc("etat_maintenance"), 6000); if (!e?.actif) { clearInterval(veille); location.reload(); } } catch (err) { /* pas de réseau : on réessaie dans une minute */ } }, 60000); }
     }
     window.CarnetArcherUI(window.carnetArcherAPI);
     return new Promise(() => {}); // l'application de l'entraîneur ne démarre pas
@@ -334,7 +336,7 @@
     if (coach === false) { if (!session.offline) sb.auth.onAuthStateChange((_e, s) => { if (s) { session = s; tellSW(); } }); let maint = false; if (net) { try { maint = !!(await withTimeout(rpc("etat_maintenance"), 4000))?.actif; } catch (e) { /* script pas encore installé ou pas de réseau */ } } return archerMode(net, false, maint); }
     // entraîneur qui a choisi son espace archer (Paramètres › Mon espace archer) ; adresse ?mode=coach = retour forcé en entraîneur
     if (/[?&]mode=coach\b/.test(location.search)) { ls.set("mode", "coach"); history.replaceState(null, "", location.pathname + location.hash); }
-    if (ls.get("mode", "coach") === "archer") { if (!session.offline) sb.auth.onAuthStateChange((_e, s) => { if (s) { session = s; tellSW(); } }); return archerMode(net, true); }
+    if (ls.get("mode", "coach") === "archer") { if (!session.offline) sb.auth.onAuthStateChange((_e, s) => { if (s) { session = s; tellSW(); } }); let apercu = false; try { apercu = sessionStorage.getItem("apercu-maint") === "1"; } catch (e) { /* rien */ } return archerMode(net, true, apercu); }
     if (!session.offline) {
       sb.auth.onAuthStateChange((_e, s) => { if (s) { session = s; tellSW(); } });
       tellSW();
