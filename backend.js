@@ -30,7 +30,7 @@
       pt.style.cssText = "position:fixed;left:10px;bottom:calc(10px + env(safe-area-inset-bottom, 0px));z-index:4;pointer-events:none;padding:4px 8px;border-radius:999px;background:#78350F;color:#fff;font:600 .85rem system-ui,sans-serif;opacity:.85";
       document.body.append(pt); bandeau._pt = pt;
     }
-    bandeau.innerHTML = `<span>📴 Hors connexion : ${qui === "archer" ? "tu vois tes dernières données gardées sur ce téléphone. Pour noter une séance, il faut le réseau." : "tu travailles sur la copie gardée sur cet appareil. Tes modifications partiront dès que le réseau revient."}</span>${qui === "archer" ? `<button type="button" style="font:inherit;padding:4px 12px;border-radius:999px;border:1px solid #fff;background:transparent;color:#fff">Réessayer</button>` : ""}`;
+    bandeau.innerHTML = `<span>📴 Hors connexion : ${qui === "archer" ? "tu vois tes dernières données gardées sur ce téléphone. Ce que tu notes est gardé ici et partira dès que le réseau revient." : "tu travailles sur la copie gardée sur cet appareil. Tes modifications partiront dès que le réseau revient."}</span>${qui === "archer" ? `<button type="button" style="font:inherit;padding:4px 12px;border-radius:999px;border:1px solid #fff;background:transparent;color:#fff">Réessayer</button>` : ""}`;
     bandeau.querySelector("button")?.addEventListener("click", () => location.reload());
   }
   async function besoinReseau(msg) {
@@ -287,6 +287,27 @@
       catch (e) { const d = ls.get(k, null); if (d) { horsLigne(true, "archer"); return d; } throw netErr(e) ? new Error("Pas de réseau. Ouvre ton espace une fois avec internet : il sera ensuite gardé sur ce téléphone.") : e; }
     };
     ["ecrire", "supprimer", "repondre", "avatar", "mot", "ajouterCode"].forEach((n) => { if (API[n]) API[n] = envoi(API[n]); });
+    // Hors connexion : une séance ou un tir noté sans réseau est gardé sur le téléphone, apparaît tout de suite dans le carnet, et part tout seul dès que le réseau revient
+    const ecrireNet = API.ecrire, chargerNet = API.charger, kAtt = "ar-attente";
+    const fusion = (a, d) => { if (!d || !Array.isArray(d.entrees)) return d; Object.values(ls.get(kAtt, {})).filter((w) => w.a.owner === a.owner && w.a.archer_id === a.archer_id).forEach((w) => { const i = d.entrees.findIndex((x) => x.id === w.id), e = { ...(i >= 0 ? d.entrees[i] : {}), ...w.data, id: w.id }; if (i >= 0) d.entrees[i] = e; else d.entrees.push(e); }); return d; };
+    let envoiEnCours = false;
+    async function viderAttente() {
+      if (envoiEnCours || !Object.keys(ls.get(kAtt, {})).length) return; envoiEnCours = true;
+      try { for (const [cle, w] of Object.entries(ls.get(kAtt, {}))) { await ecrireNet(w.a, w.id, w.data); const r = ls.get(kAtt, {}); delete r[cle]; ls.set(kAtt, r); } }
+      catch (e) { console.warn("envoi en attente : réessai au retour du réseau", e); } finally { envoiEnCours = false; }
+    }
+    API.ecrire = async (a, id, data) => {
+      try { const r = await ecrireNet(a, id, data); viderAttente(); return r; }
+      catch (e) {
+        if (!/pas de réseau/.test(e.message)) throw e;
+        const att = ls.get(kAtt, {}); att[`${a.owner}:${a.archer_id}:${id}`] = { a: { owner: a.owner, archer_id: a.archer_id }, id, data, at: Date.now() }; ls.set(kAtt, att);
+        const k = `ar-espace:${a.owner}:${a.archer_id}`, d = ls.get(k, null); if (d) ls.set(k, fusion(a, d));
+        horsLigne(true, "archer"); return { enAttente: true };
+      }
+    };
+    API.charger = async (a) => { const d = fusion(a, await chargerNet(a)); viderAttente(); return d; };
+    API.enAttente = () => Object.keys(ls.get(kAtt, {})).length;
+    addEventListener("online", () => viderAttente());
     window.CarnetArcherUI(window.carnetArcherAPI);
     return new Promise(() => {}); // l'application de l'entraîneur ne démarre pas
   }

@@ -942,7 +942,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     const ent = St.data.entrainements, prenom = St.data.archer?.prenom || "";
     const tousMots = motsListe(), mots = tousMots.filter((x) => !x.archive), motsArch = tousMots.filter((x) => x.archive);
     const nouv = nouveautes();
-    const m = M(), q = [TC() ? `<button class="btn primary ar-big" data-act="tc-new">🎯 Nouveau tir compté</button>` : "", window.CarnetChrono && m.has("chrono") ? `<button class="btn ar-big" data-act="chrono">⏱ Chrono</button>` : ""].filter(Boolean);
+    const m = M(), q = [TC() ? `<button class="btn primary ar-big" data-act="tc-new">${tirEnCours() ? "🎯 Reprendre mon tir en cours" : "🎯 Nouveau tir compté"}</button>` : "", window.CarnetChrono && m.has("chrono") ? `<button class="btn ar-big" data-act="chrono">⏱ Chrono</button>` : ""].filter(Boolean);
     const RE = St.data.reglagesEspace || {}, fk = window.CarnetFete ? window.CarnetFete.jour(RE.fetes) : "";
     let h = fk ? `<div class="ar-fete">${window.CarnetFete.banniere(fk, RE.fetes, BLOB, RE.fetesMessage !== false)}</div>` : "";
     h += q.length ? `<div class="ar-quick${q.length === 1 ? " one" : ""}">${q.join("")}</div>` : "";
@@ -1006,7 +1006,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     const tot = VOL.map(([k, l]) => [l, list.reduce((n, e) => n + volOf(e, k), 0)]), all = tot.reduce((n, [, v]) => n + v, 0);
     const notes = list.map((e) => num(e.note)).filter((v) => v != null), moy = notes.length ? (notes.reduce((a, b) => a + b, 0) / notes.length).toFixed(1).replace(".", ",") : "—";
     const c = St.data.carnets.find((x) => x.saison === key), o = c?.objectifs || {};
-    let h = `<div class="bar"><button class="btn" data-saison="-1" aria-label="Saison précédente">‹</button><b>Saison ${end - 1}-${end}</b><button class="btn" data-saison="1" aria-label="Saison suivante">›</button><span class="grow"></span>${TC() ? `<button class="btn" data-act="tc-new">🎯 Tir compté</button>` : ""}${M().has("carnet") ? `<button class="btn primary" data-act="new">+ Noter une séance</button>` : ""}</div>
+    let h = `<div class="bar"><button class="btn" data-saison="-1" aria-label="Saison précédente">‹</button><b>Saison ${end - 1}-${end}</b><button class="btn" data-saison="1" aria-label="Saison suivante">›</button><span class="grow"></span>${TC() ? `<button class="btn" data-act="tc-new">${tirEnCours() ? "🎯 Reprendre mon tir" : "🎯 Tir compté"}</button>` : ""}${M().has("carnet") ? `<button class="btn primary" data-act="new">+ Noter une séance</button>` : ""}</div>
       <div class="hub-stats"><div class="hub-stat"><div class="hub-stat-top"><span>Flèches de la saison</span></div><b class="c-gold">${all.toLocaleString("fr-FR")}</b><small>${tot.filter(([, v]) => v).map(([l, v]) => `${l} ${v}`).join(" · ") || "aucune pour l'instant"}</small></div>
       <div class="hub-stat"><div class="hub-stat-top"><span>Séances notées</span></div><b class="c-cyan">${list.length}</b><small>ressenti moyen ${moy} / 10</small></div></div>`;
     if (archivee(end)) h += `<p class="notice">🔒 Saison archivée par ton entraîneur : tu peux tout relire, mais plus rien modifier.</p>`;
@@ -1076,10 +1076,15 @@ window.CarnetArcherUI = (API, opts = {}) => {
     });
     svg.addEventListener("pointercancel", hide);
   }
+  // Tir sur la cible en cours : gardé sur le téléphone à chaque flèche (appli fermée, retour, coupure…) jusqu'à ce qu'il soit enregistré
+  const cleTir = (id) => `ar-tir-en-cours:${location.pathname}:${who()?.owner}:${who()?.archer_id}:${id || "nouveau"}`;
+  const tirEnCours = (id) => { const b = lsGet(cleTir(id), null); return b && Array.isArray(b.volees) && b.volees.flat().length ? b : null; };
+  const oublierTir = (id) => { try { localStorage.removeItem(cleTir(id)); } catch (e) { /* stockage indisponible */ } };
   function cibleSheet(init, onDone) {
-    const C = window.CarnetCible;
-    const T = init.prev ? JSON.parse(JSON.stringify(init.prev)) : { distance: init.distance, blason: init.blason || "Trispot 40 cm CL", fpv: init.fpv || 3, nbVolees: init.nbVolees || 10, volees: [], impacts: [] };
-    T.distance = init.distance || T.distance; if (init.blason) T.blason = init.blason;
+    const C = window.CarnetCible, brouillon = tirEnCours(init.id);
+    if (brouillon) setTimeout(() => toast(`Tir en cours repris : ${brouillon.volees.flat().length} flèches déjà notées`), 50);
+    const T = brouillon ? brouillon : init.prev ? JSON.parse(JSON.stringify(init.prev)) : { distance: init.distance, blason: init.blason || "Trispot 40 cm CL", fpv: init.fpv || 3, nbVolees: init.nbVolees || 10, volees: [], impacts: [] };
+    if (!brouillon) { T.distance = init.distance || T.distance; if (init.blason) T.blason = init.blason; }
     const layer = document.createElement("div"); layer.className = "sheet-bg ar-tgt-layer"; document.body.appendChild(layer);
     const total = () => T.volees.flat().reduce((a, k) => a + kv(k), 0), shot = () => T.volees.flat().length, plan = () => T.fpv * T.nbVolees;
     const full = () => shot() >= plan();
@@ -1104,6 +1109,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     // un champ qui perd le focus pendant le remplacement relance draw : on le rejoue après, pas en plein milieu
     function draw() { if (drawing) { again = true; return; } drawing = true; try { drawNow(); } finally { drawing = false; } if (again) { again = false; draw(); } }
     function drawNow() {
+      if (shot()) lsSet(cleTir(init.id), T); else oublierTir(init.id);
       const n = shot(), vcur = T.volees.length && T.volees[T.volees.length - 1].length < T.fpv ? T.volees.length : Math.min(T.volees.length + 1, T.nbVolees);
       const keys = ["X", "10", "9", "8", "7", "6", "5", "4", "3", "2", "1", "M"], face = C.face(T), minV = 11 - face.zones;
       const cls = (k) => (["X", "10", "9"].includes(k) ? "y" : ["8", "7"].includes(k) ? "r" : ["6", "5"].includes(k) ? "b" : ["4", "3"].includes(k) ? "k" : k === "M" ? "m" : "w");
@@ -1123,7 +1129,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
         <div class="tgt-bar"><span style="width:${Math.min(100, (n / plan()) * 100)}%"></span></div>
         ${full() && C.bilan ? C.bilan(T, (St.data?.entrees || []).filter((x) => x.id !== init.id)) : ""}
         ${C.carte(T, "data-vv", view ?? curIdx())}${C.groupe({ ...T, impacts: view === "all" ? T.impacts : T.impacts.filter((p) => p.v === (view ?? curIdx())) })}
-        <div class="acts"><button type="button" class="btn" id="tg-no">Annuler</button><button type="button" class="btn primary" id="tg-ok">Valider le tir</button></div></div>`;
+        <div class="acts">${shot() ? `<button type="button" class="btn danger left" id="tg-del">Effacer le tir</button>` : `<button type="button" class="btn" id="tg-no">Annuler</button>`}<button type="button" class="btn primary" id="tg-ok">${shot() && !full() ? "Enregistrer et quitter" : "Valider le tir"}</button></div></div>`;
       bindTarget(layer.querySelector("svg.tgt"), (x, y) => add(C.scoreAt(C.face(T), Math.hypot(x, y)), { x, y }), (x, y) => C.scoreAt(C.face(T), Math.hypot(x, y)));
       layer.querySelectorAll("[data-k]").forEach((b) => b.addEventListener("click", () => add(b.dataset.k)));
       layer.querySelectorAll("[data-vv]").forEach((b) => b.addEventListener("click", () => { const x = b.dataset.vv; view = x === "cur" ? null : x === "all" ? "all" : Number(x) === curIdx() ? null : Number(x); draw(); }));
@@ -1133,7 +1139,8 @@ window.CarnetArcherUI = (API, opts = {}) => {
       if ($("#tg-b")) $("#tg-b").onchange = (ev) => { T.blason = ev.target.value; T.volees.forEach((v, vi) => { T.impacts.filter((p) => p.v === vi).forEach((p) => { const i = v.indexOf(p.k); const nk = C.scoreAt(C.face(T), Math.hypot(p.x, p.y)); if (i >= 0) v[i] = nk; p.k = nk; }); }); draw(); };
       if ($("#tg-f")) $("#tg-f").onchange = (ev) => { if (shot()) { toast("Change le nombre de flèches par volée avant de commencer"); ev.target.value = T.fpv; return; } T.fpv = +ev.target.value; T.nbVolees = T.fpv === 6 ? 6 : 10; draw(); };
       if ($("#tg-v")) $("#tg-v").onchange = (ev) => { T.nbVolees = Math.max(Math.ceil(shot() / T.fpv) || 1, Math.min(40, +ev.target.value || 1)); draw(); };
-      $("#tg-no").onclick = () => layer.remove();
+      if ($("#tg-no")) $("#tg-no").onclick = () => layer.remove();
+      const td = $("#tg-del"); if (td) td.onclick = () => { if (!td.dataset.ok) { td.dataset.ok = 1; td.textContent = "Effacer vraiment ?"; return; } T.volees = []; T.impacts = []; oublierTir(init.id); layer.remove(); onDone(T); };
       $("#tg-ok").onclick = () => { layer.remove(); onDone(T); };
     }
     draw();
@@ -1188,9 +1195,9 @@ window.CarnetArcherUI = (API, opts = {}) => {
       const others = St.data.entrees.slice(), bil = window.CarnetCible?.bilan ? window.CarnetCible.bilan(t, others) : "";
       if (PREVIEW) { toast("Aperçu : l'archer enregistrera ce tir, pas toi"); return; }
       const id = "a_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-      try { await API.ecrire(who(), id, data); } catch (err) { toast("Enregistrement impossible : " + err.message); return; }
-      const el = $("#sheet");
-      el.innerHTML = `<div class="sheet-bg" data-close><div class="sheet" role="dialog" aria-label="Bilan du tir"><h3>Tir enregistré dans ton carnet</h3>${bil}
+      let res; try { res = await API.ecrire(who(), id, data); } catch (err) { toast("Enregistrement impossible : " + err.message + ". Ton tir reste gardé sur le téléphone."); return; }
+      oublierTir(); const el = $("#sheet");
+      el.innerHTML = `<div class="sheet-bg" data-close><div class="sheet" role="dialog" aria-label="Bilan du tir"><h3>Tir enregistré dans ton carnet</h3>${res?.enAttente ? `<p class="notice">📴 Pas de réseau : ton tir est gardé sur ce téléphone et partira tout seul dès que le réseau revient.</p>` : ""}${bil}
         <span class="tirline">Ajoute ton ressenti si tu veux : touche la ligne « Tir compté » du jour dans « Mon carnet ».</span>
         <div class="acts"><button type="button" class="btn primary" data-close>Fermer</button></div></div></div>`;
       el.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", (ev) => { if (ev.target === b) el.innerHTML = ""; }));
@@ -1242,7 +1249,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
           <label class="f" style="font-weight:500">Flèches<input type="number" inputmode="numeric" min="0" name="compte" id="ar-tcn" value="${esc(d.compte)}" placeholder="${d.auto?.compte ? "+" + d.auto.compte : "ex. 30"}"></label>
           <label class="f" style="font-weight:500">Score<input type="number" inputmode="numeric" min="0" name="scoreCompte" id="ar-tcs" value="${esc(d.scoreCompte)}" placeholder="${esc(d.auto?.scoreCompte ?? "")}"></label></div>
         <span class="tirline" id="ar-tcm"></span>
-        ${window.CarnetCible && M().has("impacts") ? `<button type="button" class="btn primary" id="ar-cible">🎯 ${d.tcTir ? "Voir / modifier mon tir sur la cible" : "Saisir mon tir sur la cible"}</button>` : ""}
+        ${window.CarnetCible && M().has("impacts") ? `<button type="button" class="btn primary" id="ar-cible">🎯 ${tirEnCours(e?.id) ? "Reprendre mon tir en cours" : d.tcTir ? "Voir / modifier mon tir sur la cible" : "Saisir mon tir sur la cible"}</button>` : ""}
         <input type="hidden" name="tcTir" id="ar-tctir" value="${esc(d.tcTir ? JSON.stringify(d.tcTir) : "")}"></div>
       <input type="hidden" name="scoreCompet" value="${esc(d.scoreCompet)}">`}
       <div class="f">Objectif atteint<div class="radio">${[["", "Je ne sais pas"], ["O", "Oui"], ["N", "Non"]].map(([v, l]) => `<label><input type="radio" name="atteint" value="${v}" ${(d.atteint || "") === v ? "checked" : ""}> ${l}</label>`).join("")}</div></div>
@@ -1277,7 +1284,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
       ["objectif", "atteint", "note", "emotion", "commentaire", "scoreCompte", "scoreCompet", "tcDistance", "tcBlason", ...VOL.map(([k]) => k)].forEach((k) => (data[k] = String(fd.get(k) ?? "").trim()));
       try { const tj = fd.get("tcTir"); if (tj) data.tcTir = JSON.parse(tj); } catch (err) { /* tir illisible : ignoré */ }
       const id = e?.id || "a_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-      try { await API.ecrire(who(), id, data); el.innerHTML = ""; toast("Enregistré dans ton carnet"); St.saison = saisonOf(date); load(); } catch (err) { toast("Enregistrement impossible : " + err.message); }
+      try { const r = await API.ecrire(who(), id, data); oublierTir(e?.id); el.innerHTML = ""; toast(r?.enAttente ? "Gardé sur ton téléphone : ça partira dès que le réseau revient" : "Enregistré dans ton carnet"); St.saison = saisonOf(date); load(); } catch (err) { toast("Enregistrement impossible : " + err.message); }
     });
   }
   // ---------- Concours ----------
