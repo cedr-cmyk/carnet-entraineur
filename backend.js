@@ -20,11 +20,15 @@
   let bandeau = null;
   async function horsLigne(on, qui = "coach") {
     await domReady();
-    if (!on) { if (bandeau) { bandeau.remove(); bandeau = null; } return; }
+    if (!on) { if (bandeau) { bandeau._pt?.remove(); bandeau.remove(); bandeau = null; } return; }
     if (!bandeau) {
       bandeau = document.createElement("div"); bandeau.id = "hors-ligne"; bandeau.setAttribute("role", "status");
-      bandeau.style.cssText = "position:sticky;top:0;z-index:60;display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;padding:8px 14px;background:#78350F;color:#fff;font:600 .9rem/1.3 system-ui,sans-serif;text-align:center";
+      bandeau.style.cssText = "position:relative;z-index:4;display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;padding:8px 14px;background:#78350F;color:#fff;font:600 .9rem/1.3 system-ui,sans-serif;text-align:center";
       document.body.prepend(bandeau);
+      // le bandeau défile avec la page (il ne cache plus le bouton retour ni la cible) ; ce petit repère reste visible en bas à gauche, sans bloquer le doigt
+      const pt = document.createElement("div"); pt.id = "hors-ligne-pt"; pt.textContent = "📴"; pt.title = "Hors connexion";
+      pt.style.cssText = "position:fixed;left:10px;bottom:calc(10px + env(safe-area-inset-bottom, 0px));z-index:4;pointer-events:none;padding:4px 8px;border-radius:999px;background:#78350F;color:#fff;font:600 .85rem system-ui,sans-serif;opacity:.85";
+      document.body.append(pt); bandeau._pt = pt;
     }
     bandeau.innerHTML = `<span>📴 Hors connexion : ${qui === "archer" ? "tu vois tes dernières données gardées sur ce téléphone. Pour noter une séance, il faut le réseau." : "tu travailles sur la copie gardée sur cet appareil. Tes modifications partiront dès que le réseau revient."}</span>${qui === "archer" ? `<button type="button" style="font:inherit;padding:4px 12px;border-radius:999px;border:1px solid #fff;background:transparent;color:#fff">Réessayer</button>` : ""}`;
     bandeau.querySelector("button")?.addEventListener("click", () => location.reload());
