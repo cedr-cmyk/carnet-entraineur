@@ -1631,6 +1631,19 @@ const byName = (a, b) => (a.nom || "").localeCompare(b.nom || "", "fr") || (a.pr
 // V.1.7.4 : l'entraîneur est aussi archer → il relie sa fiche à son compte et passe d'un mode à l'autre sur le même appareil
 let monAcces = null;
 async function chargerMonAcces() { try { monAcces = (await window.carnetAcces.moi()) || []; } catch (e) { monAcces = []; } if (S.tab === "parametres") render(); }
+// V.1.7.7 : mode maintenance, seulement sur ordinateur (souris et grand écran) : les archers passent hors ligne pendant une mise à jour
+const estOrdi = () => matchMedia("(pointer: fine)").matches && innerWidth >= 1000;
+let maintEtat = null;
+async function chargerMaint() { maintEtat = { charge: true }; try { maintEtat = (await window.carnetMaintenance.etat()) || { actif: false }; } catch (e) { maintEtat = { erreur: e.message }; } if (S.tab === "parametres") render(); }
+function maintenanceCard() {
+  if (!window.carnetMaintenance || !estOrdi()) return "";
+  if (!maintEtat) chargerMaint();
+  const m = maintEtat || { charge: true }, h = m.depuis ? new Date(m.depuis).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "";
+  return `<h2 class="sec">Maintenance</h2><div class="card">${m.charge ? `<span class="tirline">Lecture de l'état…</span>`
+    : m.erreur ? `<span class="tirline">Pour utiliser le mode maintenance, lance d'abord une fois le script <b>maintenance.sql</b> dans Supabase.</span>`
+    : `<div class="bar"><span class="tirline">${m.actif ? `🛠 <b>Maintenance en cours${h ? " depuis " + h : ""}</b> : les archers ouvrent l'appli hors ligne avec un message. Toi, tu travailles normalement.` : "Pendant une mise à jour, mets l'appli en maintenance : les archers l'ouvrent hors ligne avec un message, et ce qu'ils notent part à la fin. Toi, tu continues normalement."}</span><span class="grow"></span><button class="btn ${m.actif ? "primary" : ""}" data-act="maint">${m.actif ? "Terminer la maintenance" : "Mettre en maintenance"}</button></div>
+    <span class="tirline">Un archer qui a déjà l'appli ouverte passe en maintenance à sa prochaine ouverture. À la fin, son appli se remet en ligne toute seule dans la minute.</span>`}</div>`;
+}
 function monEspaceCard() {
   if (!window.carnetAcces?.relierMoi) return "";
   if (monAcces === null) { monAcces = []; chargerMonAcces(); }
@@ -4685,6 +4698,7 @@ function viewData() {
     <h2 class="sec">Entraîneur</h2>
     <div class="card"><label class="f" for="pr-nom">Ton prénom ou nom (affiché en haut du carnet)<input type="text" id="pr-nom" data-prm="nom" value="${esc(p.nom)}" placeholder="Ex. Cédric" ${ro}></label></div>
     ${monEspaceCard()}
+    ${maintenanceCard()}
     ${window.carnetLogout ? `<div class="card"><div class="bar"><span class="tirline">Connecté à ton compte du carnet sur cet appareil.</span><span class="grow"></span><button class="btn" data-act="logout">Se déconnecter</button></div></div>` : ""}
     <h2 class="sec">Affichage sur cet appareil</h2>
     <div class="card">
@@ -5456,6 +5470,7 @@ document.addEventListener("click", (e) => {
   if (a === "export") exportData();
   if (a === "restore") startRestore();
   if (a === "logout" && window.carnetLogout) window.carnetLogout();
+  if (a === "maint" && window.carnetMaintenance) { const on = !maintEtat?.actif; window.carnetMaintenance.basculer(on).then((e) => { maintEtat = e || { actif: on }; toast(on ? "Appli en maintenance pour les archers" : "Maintenance terminée : les archers repassent en ligne"); render(); }).catch((err) => toast("Impossible : " + err.message)); }
   if (a === "relier-moi") { const aid = $("#me-ar")?.value; if (!aid) { toast("Choisis d'abord ta fiche archer"); return; }
     window.carnetAcces.relierMoi(aid).then((l) => { monAcces = l || []; toast("Ta fiche archer est reliée à ton compte"); render(); }).catch((e) => toast("Impossible : " + e.message)); return; }
   if (a === "mode-archer") { window.carnetAcces.basculer("archer"); return; }
