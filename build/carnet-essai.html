@@ -564,6 +564,11 @@ svg.chart .szl { stroke: var(--line-2, var(--line)); stroke-dasharray: 3 3; }
 .hum { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .hum-b { border: 2px solid var(--line); background: var(--sunk); border-radius: 16px; padding: 10px 4px; display: grid; justify-items: center; gap: 4px; cursor: pointer; color: var(--ink); min-height: 76px; }
 .hum-b span { font-size: 2.2rem; line-height: 1; } .hum-b[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.ar-cpt { display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 4px; margin-top: 4px; }
+.ar-cpt button { min-height: 40px; border-radius: 10px; border: 1px solid var(--line); background: var(--sunk); color: var(--ink); font: inherit; font-weight: 700; cursor: pointer; touch-action: manipulation; }
+.ar-cpt button:active { transform: scale(.95); }
+.ar-cpt .ar-cpt-v { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+.ar-cpt-pas { font-size: .85rem; color: var(--muted); font-weight: 500; margin: 2px 0 6px; } .ar-cpt-pas select { width: auto; display: inline-block; padding: 2px 6px; min-height: 0; }
 .ar-more { border: 1px solid var(--line); border-radius: 14px; padding: 4px 12px 10px; display: grid; gap: 10px; } .ar-more > summary { cursor: pointer; padding: 8px 0; font-weight: 700; color: var(--ink); }
 .esp-theme { display: grid; gap: 6px; } .esp-th { font-size: .78rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .rg-card { gap: 10px; } .rg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; } .rg-to { max-width: 320px; }
@@ -754,7 +759,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
 <div id="toast" class="toast" hidden></div>
 <input type="file" id="file-in" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.mp4,.webm,.txt,.md,.csv,application/pdf,image/*,video/mp4,video/webm,text/plain,text/markdown,text/csv">
 
-<script>window.CARNET_VERSION = { v: "1.8.48", date: "2026-11-10", site: "1.7.4", test: true };</script>
+<script>window.CARNET_VERSION = { v: "1.8.50", date: "2026-11-11", site: "1.7.4", test: true };</script>
 <script>
 // Espace archer : l'archer (ou son parent) voit uniquement ses propres informations,
 // telles que les renvoie la base (fonction espace_archer), et remplit son carnet.
@@ -1255,6 +1260,29 @@ window.CarnetArcherUI = (API, opts = {}) => {
         $("#ar-cible").textContent = n ? "🎯 Voir / modifier mon tir sur la cible" : "🎯 Saisir mon tir sur la cible"; tcm();
       });
     });
+    // Compteur de flèches : pendant la séance, un appui après chaque volée au lieu de compter le total à la fin.
+    // Les chiffres sont gardés sur le téléphone tant que la séance n'est pas enregistrée (appli fermée, retour…).
+    const cleVol = cleTir((e?.id || "nouveau") + ":vol");
+    {
+      const f = $("#ar-form"), brou = lsGet(cleVol, null) || {}, champs = VOL.map(([k]) => f.elements[k]).filter((i) => i && !i.readOnly);
+      let pas = lsGet("ar-volee", 6), repris = false;
+      champs.forEach((i) => { if (brou[i.name] && !i.value) { i.value = brou[i.name]; repris = true; } });
+      const garde = () => { const b = {}; champs.forEach((i) => { if (Number(i.value) > 0) b[i.name] = i.value; }); if (Object.keys(b).length) lsSet(cleVol, b); else try { localStorage.removeItem(cleVol); } catch (err) { /* rien */ } };
+      champs.forEach((i) => {
+        const z = document.createElement("div"); z.className = "ar-cpt";
+        z.innerHTML = `<button type="button" data-d="-1" aria-label="Enlever une flèche">−1</button><button type="button" data-d="1" aria-label="Ajouter une flèche">+1</button><button type="button" data-d="v" class="ar-cpt-v" aria-label="Ajouter une volée">+${pas}</button>`;
+        z.addEventListener("click", (ev) => { const b = ev.target.closest("button"); if (!b) return; const n = Math.max(0, (Number(i.value) || 0) + (b.dataset.d === "v" ? pas : Number(b.dataset.d))); i.value = n || ""; garde(); try { navigator.vibrate?.(15); } catch (err) { /* rien */ } });
+        i.after(z); i.addEventListener("input", garde);
+      });
+      if (champs.length) {
+        const s = document.createElement("div"); s.className = "ar-cpt-pas";
+        const txt = () => `Une volée = <select aria-label="Flèches par volée">${[3, 4, 5, 6].map((n) => `<option ${n === pas ? "selected" : ""}>${n}</option>`).join("")}</select> flèches. Après chaque volée, touche « +${pas} » sous le bon type de tir.`;
+        s.innerHTML = txt();
+        s.addEventListener("change", (ev) => { pas = Number(ev.target.value) || 6; lsSet("ar-volee", pas); s.innerHTML = txt(); f.querySelectorAll(".ar-cpt-v").forEach((b) => (b.textContent = "+" + pas)); });
+        champs[0].closest(".grid5").before(s);
+        if (repris) { const det = champs[0].closest("details"); if (det) det.open = true; setTimeout(() => toast("Tes flèches de la séance en cours sont reprises"), 50); }
+      }
+    }
     const del = $("#ar-del");
     if (del) del.onclick = async () => { if (!del.dataset.ok) { del.dataset.ok = 1; del.textContent = "Confirmer la suppression"; return; } if (PREVIEW) { toast("Aperçu : l'archer pourra supprimer ici"); return; } try { await API.supprimer(who(), e.id); el.innerHTML = ""; toast(e.objectif === "Tir compté" ? "Tir supprimé" : "Séance supprimée"); load(); } catch (err) { toast(err.message); } };
     // Effacer seulement le tir compté d'une séance (la séance, les flèches et le ressenti restent)
@@ -1268,7 +1296,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
       ["objectif", "atteint", "note", "emotion", "commentaire", "scoreCompte", "scoreCompet", "tcDistance", "tcBlason", ...VOL.map(([k]) => k)].forEach((k) => (data[k] = String(fd.get(k) ?? "").trim()));
       try { const tj = fd.get("tcTir"); if (tj) data.tcTir = JSON.parse(tj); } catch (err) { /* tir illisible : ignoré */ }
       const id = e?.id || "a_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-      try { const r = await API.ecrire(who(), id, data); oublierTir(e?.id); el.innerHTML = ""; toast(r?.enAttente ? "Gardé sur ton téléphone : ça partira dès que le réseau revient" : "Enregistré dans ton carnet"); St.saison = saisonOf(date); load(); } catch (err) { toast("Enregistrement impossible : " + err.message); }
+      try { const r = await API.ecrire(who(), id, data); oublierTir(e?.id); try { localStorage.removeItem(cleVol); } catch (err) { /* rien */ } el.innerHTML = ""; toast(r?.enAttente ? "Gardé sur ton téléphone : ça partira dès que le réseau revient" : "Enregistré dans ton carnet"); St.saison = saisonOf(date); load(); } catch (err) { toast("Enregistrement impossible : " + err.message); }
     });
   }
   // ---------- Concours ----------
