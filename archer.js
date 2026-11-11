@@ -497,6 +497,29 @@ window.CarnetArcherUI = (API, opts = {}) => {
         $("#ar-cible").textContent = n ? "🎯 Voir / modifier mon tir sur la cible" : "🎯 Saisir mon tir sur la cible"; tcm();
       });
     });
+    // Compteur de flèches : pendant la séance, un appui après chaque volée au lieu de compter le total à la fin.
+    // Les chiffres sont gardés sur le téléphone tant que la séance n'est pas enregistrée (appli fermée, retour…).
+    const cleVol = cleTir((e?.id || "nouveau") + ":vol");
+    {
+      const f = $("#ar-form"), brou = lsGet(cleVol, null) || {}, champs = VOL.map(([k]) => f.elements[k]).filter((i) => i && !i.readOnly);
+      let pas = lsGet("ar-volee", 6), repris = false;
+      champs.forEach((i) => { if (brou[i.name] && !i.value) { i.value = brou[i.name]; repris = true; } });
+      const garde = () => { const b = {}; champs.forEach((i) => { if (Number(i.value) > 0) b[i.name] = i.value; }); if (Object.keys(b).length) lsSet(cleVol, b); else try { localStorage.removeItem(cleVol); } catch (err) { /* rien */ } };
+      champs.forEach((i) => {
+        const z = document.createElement("div"); z.className = "ar-cpt";
+        z.innerHTML = `<button type="button" data-d="-1" aria-label="Enlever une flèche">−1</button><button type="button" data-d="1" aria-label="Ajouter une flèche">+1</button><button type="button" data-d="v" class="ar-cpt-v" aria-label="Ajouter une volée">+${pas}</button>`;
+        z.addEventListener("click", (ev) => { const b = ev.target.closest("button"); if (!b) return; const n = Math.max(0, (Number(i.value) || 0) + (b.dataset.d === "v" ? pas : Number(b.dataset.d))); i.value = n || ""; garde(); try { navigator.vibrate?.(15); } catch (err) { /* rien */ } });
+        i.after(z); i.addEventListener("input", garde);
+      });
+      if (champs.length) {
+        const s = document.createElement("div"); s.className = "ar-cpt-pas";
+        const txt = () => `Une volée = <select aria-label="Flèches par volée">${[3, 4, 5, 6].map((n) => `<option ${n === pas ? "selected" : ""}>${n}</option>`).join("")}</select> flèches. Après chaque volée, touche « +${pas} » sous le bon type de tir.`;
+        s.innerHTML = txt();
+        s.addEventListener("change", (ev) => { pas = Number(ev.target.value) || 6; lsSet("ar-volee", pas); s.innerHTML = txt(); f.querySelectorAll(".ar-cpt-v").forEach((b) => (b.textContent = "+" + pas)); });
+        champs[0].closest(".grid5").before(s);
+        if (repris) { const det = champs[0].closest("details"); if (det) det.open = true; setTimeout(() => toast("Tes flèches de la séance en cours sont reprises"), 50); }
+      }
+    }
     const del = $("#ar-del");
     if (del) del.onclick = async () => { if (!del.dataset.ok) { del.dataset.ok = 1; del.textContent = "Confirmer la suppression"; return; } if (PREVIEW) { toast("Aperçu : l'archer pourra supprimer ici"); return; } try { await API.supprimer(who(), e.id); el.innerHTML = ""; toast(e.objectif === "Tir compté" ? "Tir supprimé" : "Séance supprimée"); load(); } catch (err) { toast(err.message); } };
     // Effacer seulement le tir compté d'une séance (la séance, les flèches et le ressenti restent)
@@ -510,7 +533,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
       ["objectif", "atteint", "note", "emotion", "commentaire", "scoreCompte", "scoreCompet", "tcDistance", "tcBlason", ...VOL.map(([k]) => k)].forEach((k) => (data[k] = String(fd.get(k) ?? "").trim()));
       try { const tj = fd.get("tcTir"); if (tj) data.tcTir = JSON.parse(tj); } catch (err) { /* tir illisible : ignoré */ }
       const id = e?.id || "a_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-      try { const r = await API.ecrire(who(), id, data); oublierTir(e?.id); el.innerHTML = ""; toast(r?.enAttente ? "Gardé sur ton téléphone : ça partira dès que le réseau revient" : "Enregistré dans ton carnet"); St.saison = saisonOf(date); load(); } catch (err) { toast("Enregistrement impossible : " + err.message); }
+      try { const r = await API.ecrire(who(), id, data); oublierTir(e?.id); try { localStorage.removeItem(cleVol); } catch (err) { /* rien */ } el.innerHTML = ""; toast(r?.enAttente ? "Gardé sur ton téléphone : ça partira dès que le réseau revient" : "Enregistré dans ton carnet"); St.saison = saisonOf(date); load(); } catch (err) { toast("Enregistrement impossible : " + err.message); }
     });
   }
   // ---------- Concours ----------

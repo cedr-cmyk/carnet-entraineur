@@ -564,6 +564,11 @@ svg.chart .szl { stroke: var(--line-2, var(--line)); stroke-dasharray: 3 3; }
 .hum { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .hum-b { border: 2px solid var(--line); background: var(--sunk); border-radius: 16px; padding: 10px 4px; display: grid; justify-items: center; gap: 4px; cursor: pointer; color: var(--ink); min-height: 76px; }
 .hum-b span { font-size: 2.2rem; line-height: 1; } .hum-b[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.ar-cpt { display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 4px; margin-top: 4px; }
+.ar-cpt button { min-height: 40px; border-radius: 10px; border: 1px solid var(--line); background: var(--sunk); color: var(--ink); font: inherit; font-weight: 700; cursor: pointer; touch-action: manipulation; }
+.ar-cpt button:active { transform: scale(.95); }
+.ar-cpt .ar-cpt-v { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+.ar-cpt-pas { font-size: .85rem; color: var(--muted); font-weight: 500; margin: 2px 0 6px; } .ar-cpt-pas select { width: auto; display: inline-block; padding: 2px 6px; min-height: 0; }
 .ar-more { border: 1px solid var(--line); border-radius: 14px; padding: 4px 12px 10px; display: grid; gap: 10px; } .ar-more > summary { cursor: pointer; padding: 8px 0; font-weight: 700; color: var(--ink); }
 .esp-theme { display: grid; gap: 6px; } .esp-th { font-size: .78rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .rg-card { gap: 10px; } .rg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; } .rg-to { max-width: 320px; }
