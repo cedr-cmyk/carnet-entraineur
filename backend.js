@@ -381,3 +381,36 @@
     },
   };
 })();
+
+// Bouton retour du téléphone (V.1.7.10) : au lieu de quitter l'appli, il ferme la fenêtre ouverte (feuille, cible, chrono…),
+// sinon revient à la page précédente (« ← … »), sinon à l'accueil. À l'accueil, il faut appuyer deux fois pour quitter.
+(() => {
+  if (window.__carnetRetour) return; window.__carnetRetour = true;
+  const garde = () => { try { history.pushState({ carnetGarde: Date.now() }, ""); } catch (e) { /* rien */ } };
+  const visible = (x) => !!x && x.getClientRects().length > 0;
+  const msg = (t) => { const el = document.querySelector("#toast"); if (!el) return; el.textContent = t; el.hidden = false; clearTimeout(msg.h); msg.h = setTimeout(() => (el.hidden = true), 2400); };
+  function reculer() {
+    const ch = [...document.querySelectorAll(".chrono")].filter(visible).pop();
+    if (ch) {
+      const x = ch.querySelector('[data-ch="close"]'), arret = !!ch.querySelector('[data-ch="set"]');
+      if (x && !arret) { msg("Chrono en cours : touche ✕ pour l'arrêter"); return true; }
+      if (x) x.click(); else ch.remove(); return true;
+    }
+    const bg = [...document.querySelectorAll(".sheet-bg")].filter(visible).pop();
+    if (bg) { const non = bg.querySelector("#tg-no") || [...bg.querySelectorAll(".acts [data-close]")].pop(); if (non) non.click(); else bg.remove(); return true; }
+    const pv = [...document.querySelectorAll(".ar-preview")].filter(visible).pop();
+    if (pv) { const b = [...pv.querySelectorAll("button")].find((x) => /Fermer|Quitter|Retour/i.test(x.textContent)); if (b) b.click(); else pv.remove(); return true; }
+    const back = [...document.querySelectorAll('[data-act="back"]')].find(visible);
+    if (back) { back.click(); return true; }
+    const tabs = [...document.querySelectorAll("[data-atab], #tabs [data-tab]")].filter(visible);
+    if (tabs.length && tabs[0].getAttribute("aria-selected") !== "true") { tabs[0].click(); scrollTo(0, 0); return true; }
+    return false;
+  }
+  addEventListener("popstate", () => {
+    if (reculer()) { garde(); return; }
+    // à l'accueil : on laisse le prochain appui quitter l'appli, et on se remet en garde après quelques secondes
+    msg("Appuie encore sur retour pour quitter l'appli");
+    setTimeout(() => { if (!history.state?.carnetGarde) garde(); }, 2500);
+  });
+  if (!history.state?.carnetGarde) garde();
+})();
