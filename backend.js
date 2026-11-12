@@ -81,7 +81,7 @@
       const go = async (create) => {
         const email = f.email.value.trim(), password = f.pw.value; if (!email || password.length < 6) { m.textContent = "E-mail et mot de passe (6 caractères minimum)"; return; }
         m.textContent = "…";
-        const r = create ? await sb.auth.signUp({ email, password }) : await sb.auth.signInWithPassword({ email, password });
+        const r = create ? await sb.auth.signUp({ email, password, options: { emailRedirectTo: location.origin + location.pathname } }) /* le lien de confirmation ramène sur le carnet */ : await sb.auth.signInWithPassword({ email, password });
         if (r.error) { m.textContent = r.error.message.includes("Invalid login") ? "E-mail ou mot de passe incorrect" : r.error.message; return; }
         if (!r.data.session) { m.textContent = "Compte créé : ouvre le lien reçu par e-mail pour le confirmer, puis reconnecte-toi ici."; return; }
         el.remove(); resolve(r.data.session);
