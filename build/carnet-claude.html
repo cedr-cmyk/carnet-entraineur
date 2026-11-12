@@ -62,6 +62,8 @@ button { cursor: pointer; }
 .tabs { display: flex; gap: 4px; overflow-x: auto; }
 .tab { border: 0; background: none; padding: 10px 14px; font-family: var(--font-display); font-weight: 600; font-size: 1.1rem; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); border-bottom: 3px solid transparent; }
 .tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.bulle { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; margin-left: 6px; border-radius: 999px; background: #DC2626; color: #fff; font: 700 .72rem/1 var(--font-body); vertical-align: middle; }
+.nouv-a-voir .lnk { font-weight: 600; }
 .tab .n { font-family: var(--font-body); font-size: .75rem; font-weight: 600; color: var(--muted); margin-left: 4px; }
 
 main { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 16px 96px; }
@@ -835,7 +837,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
 <div id="toast" class="toast" hidden></div>
 <input type="file" id="file-in" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.mp4,.webm,.txt,.md,.csv,application/pdf,image/*,video/mp4,video/webm,text/plain,text/markdown,text/csv">
 
-<script>window.CARNET_VERSION = { v: "1.9", date: "2026-11-11", site: "1.9", test: false };</script>
+<script>window.CARNET_VERSION = { v: "1.9", date: "2026-11-12", site: "1.9", test: false };</script>
 <script>
 // Espace archer : l'archer (ou son parent) voit uniquement ses propres informations,
 // telles que les renvoie la base (fonction espace_archer), et remplit son carnet.
@@ -1875,9 +1877,28 @@ function go(tab) { S.tab = tab; S.anim = null; S.quick = false; S.concoursId = n
 try { const h = location.hash.slice(1); if (TABS.some((t) => t[0] === h)) S.tab = h; } catch (e) {}
 try { const c = localStorage.getItem("club"); if (c) S.club = c; } catch (e) {}
 
+// V.1.9 : séances notées par les archers que l'entraîneur n'a pas encore regardées (bulle rouge sur l'onglet et la liste des archers).
+// « Regardée » = l'entraîneur a ouvert la fiche de l'archer. Mémorisé dans les paramètres (vaut sur tous ses appareils).
+let nouvCache = { at: 0, entries: [], enCours: false };
+async function chargerNouv() {
+  if (!S.db || nouvCache.enCours || Date.now() - nouvCache.at < 60000) return;
+  nouvCache.enCours = true;
+  try {
+    const snap = await S.db.collection("carnetEntrees").where("saisiParArcher", "==", true).get();
+    nouvCache = { at: Date.now(), entries: snap.docs.map((d) => ({ id: d.id, ...d.data() })), enCours: false };
+    if (!vuMap()._debut) setParam({ vuSeancesJson: JSON.stringify({ ...vuMap(), _debut: Date.now() - 14 * 864e5 }) });
+    if (S.tab === "archers" && !S.archer && !S.seance) render(); else renderTabs();
+  } catch (e) { nouvCache.enCours = false; console.error(e); }
+}
+const vuMap = () => { try { return JSON.parse(prm().vuSeancesJson || "{}") || {}; } catch (e) { return {}; } };
+function nouvDe(aid) { const vu = vuMap(), dep = vu[aid] || vu._debut || Date.now() - 14 * 864e5; return nouvCache.entries.filter((e) => e.archerId === aid && e.saisiParArcher && (e.majArcher || e.createdAt || 0) > dep).length; }
+const bulleNouv = (aid) => { const n = nouvDe(aid); return n ? ` <span class="bulle" title="${n} séance${n > 1 ? "s" : ""} ou tir${n > 1 ? "s" : ""} noté${n > 1 ? "s" : ""} que tu n'as pas encore regardé${n > 1 ? "s" : ""}">${n}</span>` : ""; };
+const nouvTotal = () => S.archers.filter((a) => a.actif !== false).reduce((t, a) => t + nouvDe(a.id), 0);
+function marquerVu(aid) { if (!nouvDe(aid)) return; const vu = vuMap(); vu[aid] = Date.now(); setParam({ vuSeancesJson: JSON.stringify(vu) }); }
 function renderTabs() {
+  chargerNouv();
   const counts = { seances: S.seances.length, archers: S.archers.length, clubs: S.clubs.length, exos: S.documents.length, concours: S.concours.filter((c) => (c.dateFin || c.date) >= todayISO()).length };
-  $("#tabs").innerHTML = TABS.map(([k, l]) => `<button class="tab" role="tab" aria-selected="${S.tab === k && !S.seance && !S.archer}" data-tab="${k}">${l}${counts[k] ? `<span class="n">${counts[k]}</span>` : ""}</button>`).join("");
+  $("#tabs").innerHTML = TABS.map(([k, l]) => `<button class="tab" role="tab" aria-selected="${S.tab === k && !S.seance && !S.archer}" data-tab="${k}">${l}${counts[k] ? `<span class="n">${counts[k]}</span>` : ""}${k === "archers" && nouvTotal() ? `<span class="bulle" title="Séances notées par tes archers, pas encore regardées">${nouvTotal()}</span>` : ""}</button>`).join("");
 }
 
 function clubChips() {
@@ -4236,6 +4257,8 @@ function viewArchers() {
   const nbF = Object.values(F).filter(Boolean).length;
   let h = clubChips() + (S.clubs.length ? `<div class="bar"><span class="grow"></span><button class="btn" data-act="print-batch">Imprimer des fiches à l'avance</button></div>` : "")
     + `<input type="search" id="search" placeholder="Rechercher un archer" value="${esc(S.q)}" aria-label="Rechercher un archer">`;
+  const aVoir = S.archers.filter((a) => a.actif !== false && nouvDe(a.id)).sort(byName);
+  if (aVoir.length) h += `<div class="notice nouv-a-voir">🔔 <b>Séances à regarder</b> : ${aVoir.map((a) => `<button class="lnk" data-archer="${a.id}">${esc(fullName(a))}</button>${bulleNouv(a.id)}`).join(" · ")}</div>`;
   if (!S.archers.length) return h + `<div class="empty"><h3>Aucun archer</h3><p>Ajoute les archers que tu suis, avec leur club, leur type d'arc et leur catégorie.</p><button class="btn primary" data-act="new-archer">Ajouter un archer</button></div>`;
   h += `<div class="ar-tri"><label class="f">Trier par<select data-artri aria-label="Trier par">${AR_TRIS.map(([k, l]) => `<option value="${k}" ${tri === k ? "selected" : ""}>${l}</option>`).join("")}</select></label>
     <label class="f">Licence<select data-arfil="lic"><option value="">Toutes</option>${LIC_FILTRES().map(([k, l]) => `<option value="${k}" ${F.lic === k ? "selected" : ""}>${esc(l)}</option>`).join("")}</select></label>
@@ -4244,7 +4267,7 @@ function viewArchers() {
     <label class="f">Fédération<select data-arfil="fed">${opts(FEDS, F.fed, "Toutes")}</select></label>
     ${accTous ? `<label class="f">Appli<select data-arfil="appli"><option value="">Tous</option>${Object.entries(ACCES_LIB).map(([k, l]) => `<option value="${k}" ${F.appli === k ? "selected" : ""}>${l}</option>`).join("")}</select></label>` : ""}
     <span class="tirline">${actifs.length + staff.length} archer${actifs.length + staff.length > 1 ? "s" : ""}${nbF ? ` · ${nbF} filtre${nbF > 1 ? "s" : ""} <button type="button" class="btn ghost" data-act="ar-filtres-raz">Tout afficher</button>` : ""}</span></div>`;
-  const row = (a) => `<button class="row" data-archer="${a.id}"><span class="row-av">${avatarSvg(a, 44)}</span><span class="main"><span class="t">${esc(fullName(a))} ${pretTag(a.id)}${(a.saisonsLicence || []).length && !(a.saisonsLicence || []).includes(saisonCour()) ? ` <span class="tag ar-lic">licence ${esc(derniereLicence(a))}</span>` : ""}${accesEtat(a) === "active" ? ` <span class="tag ar-app">📱 appli</span>` : accesEtat(a) === "code" ? ` <span class="tag">code envoyé</span>` : ""}</span>
+  const row = (a) => `<button class="row" data-archer="${a.id}"><span class="row-av">${avatarSvg(a, 44)}</span><span class="main"><span class="t">${esc(fullName(a))}${bulleNouv(a.id)} ${pretTag(a.id)}${(a.saisonsLicence || []).length && !(a.saisonsLicence || []).includes(saisonCour()) ? ` <span class="tag ar-lic">licence ${esc(derniereLicence(a))}</span>` : ""}${accesEtat(a) === "active" ? ` <span class="tag ar-app">📱 appli</span>` : accesEtat(a) === "code" ? ` <span class="tag">code envoyé</span>` : ""}</span>
       <span class="m">${esc(roleOf(a) === "encadrant" ? (a.clubIds || []).map(clubName).join(", ") + " · encadrant / animateur" : archerMeta(a) + (roleOf(a) === "les-deux" ? " · encadre aussi" : ""))}</span></span><span class="count" aria-hidden="true">›</span></button>`;
   const cle = { licence: (a) => (a.saisonsLicence || []).includes(saisonCour()) ? `Licenciés ${saisonCour()}` : derniereLicence(a) ? `Dernière licence : ${derniereLicence(a)}` : "Saison de licence non renseignée", categorie: catPrincipale, arc: (a) => (a.arcs || [])[0] || "Sans arc", club: (a) => (a.clubIds || []).map(clubName).join(", ") || "Sans club", appli: (a) => ACCES_LIB[accesEtat(a)] || "Accès inconnu" }[tri];
   if (!actifs.length) h += `<p class="notice">Aucun archer ne correspond.</p>`;
@@ -6470,7 +6493,7 @@ document.addEventListener("click", (e) => {
   if (t.dataset.act === "new-archer-club") { formArcher(null, t.dataset.club); return; }
   if (t.dataset.club && t.classList.contains("chip")) { S.club = t.dataset.club; try { localStorage.setItem("club", S.club); } catch (_) {} render(); return; }
   if (t.dataset.seance) { S.seance = t.dataset.seance; S.from = S.archer ? "archer" : null; render(); window.scrollTo(0, 0); return; }
-  if (t.dataset.archer) { S.archer = t.dataset.archer; render(); window.scrollTo(0, 0); return; }
+  if (t.dataset.archer) { S.archer = t.dataset.archer; marquerVu(S.archer); render(); window.scrollTo(0, 0); return; }
   if (t.dataset.clubEdit) { formClub(club(t.dataset.clubEdit)); return; }
   const a = t.dataset.act;
   if (a === "back" && S.suivi) { if (S.from === "archer-suivi") { S.seance = null; S.from = null; } S.suivi = null; S.tirOpen = null; render(); window.scrollTo(0, 0); return; }
