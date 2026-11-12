@@ -841,7 +841,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
 <div id="toast" class="toast" hidden></div>
 <input type="file" id="file-in" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.mp4,.webm,.txt,.md,.csv,application/pdf,image/*,video/mp4,video/webm,text/plain,text/markdown,text/csv">
 
-<script>window.CARNET_VERSION = { v: "1.9.52", date: "2026-11-12", site: "1.7.4", test: true };</script>
+<script>window.CARNET_VERSION = { v: "1.9.54", date: "2026-11-12", site: "1.7.4", test: true };</script>
 <script>
 // Espace archer : l'archer (ou son parent) voit uniquement ses propres informations,
 // telles que les renvoie la base (fonction espace_archer), et remplit son carnet.
@@ -4584,14 +4584,12 @@ function viewArcher() {
   const a = S.archers.find((x) => x.id === S.archer);
   if (!a) { S.archer = null; return viewArchers(); }
   const evs = evalsOf(a.id);
-  return `<div class="bar"><button class="btn ghost" data-act="back">← Archers</button><span class="grow"></span><button class="btn primary" data-act="open-carnet">Carnet d'entraînement</button>${S.canWrite ? `<button class="btn" data-act="new-eval">+ Évaluation technique</button><button class="btn" data-act="edit-archer">Modifier</button>` : ""}</div>
-    <div class="head"><span class="m">${esc((a.clubIds || []).map(clubName).join(", "))}${a.actif === false ? " · inactif" : ""}</span><div class="av-head">${S.canWrite ? `<button type="button" class="av-btn" data-act="avatar" aria-label="Changer l'avatar de ${esc(fullName(a))}">${avatarSvg(a, 64)}<span class="av-edit" aria-hidden="true">✎</span></button>` : avatarSvg(a, 64)}<h2>${esc(fullName(a))}</h2></div>
-      <span class="m">${esc([a.naissance ? `${ageSaison(a)} ans en ${saisonLabel()}` : "", a.sexe === "F" ? "Femme" : a.sexe === "H" ? "Homme" : "", (a.arcs || []).join(", ") || "Type d'arc non renseigné"].filter(Boolean).join(" · "))}</span>
-      <span class="clubline">${(a.federations || []).map((f) => {
-        const cat = catOf(a, f), lic = (a.licences || {})[f];
-        return `<span>${fedTags([f])} ${esc([cat, lic ? "licence " + lic : ""].filter(Boolean).join(" · "))}</span>`;
-      }).join("") || "Fédération non renseignée"}</span></div>
-    ${(() => {
+  // V.1.9 : la fiche est rangée en rubriques (une seule visible à la fois) au lieu de tout empiler sur une page
+  const nHist = S.seances.filter((s) => hasSuivi(s, a.id)).length;
+  const FT = [["suivi", "Suivi"], ["seances", "Séances" + (nHist ? ` <span class="n">${nHist}</span>` : "")], ["concours", "Concours et scores"], ["technique", "Technique" + (evs.length ? ` <span class="n">${evs.length}</span>` : "")], ["espace", "Espace et matériel"]];
+  const ft = FT.some(([k]) => k === S.fTab) ? S.fTab : "suivi";
+  const part = {
+    suivi: () => `    ${(() => {
       const todo = S.attributions.filter((x) => x.archerId === a.id && !x.fait).sort((p, q) => {
         const dp = S.seances.find((y) => y.id === p.seanceId)?.date || "9999", dq = S.seances.find((y) => y.id === q.seanceId)?.date || "9999"; return dp.localeCompare(dq);
       });
@@ -4604,22 +4602,9 @@ function viewArcher() {
       }).join("")}</div>`;
     })()}
     ${(() => { const ms = pretsOf(a.id); return ms.length ? `<div class="notice" style="font-family:var(--font-body)">Matériel prêté : ${ms.map((m) => `${esc(matShort(m))} (${[tailleTxt(m), m.puissance ? m.puissance + " lbs" : "", m.modele, clubName(m.clubId)].filter(Boolean).map(esc).join(", ")})`).join(" · ")}</div>` : ""; })()}
-    ${window.CarnetArcherUI ? `<div class="bar"><span class="grow"></span><button class="btn" data-act="ar-preview">Aperçu de son espace archer</button>${window.CARNET_TEST ? `<button class="btn primary" data-act="ar-test">Jouer l'archer (test)</button>` : ""}</div>` : ""}
-    ${roleOf(a) === "encadrant" ? "" : espaceCard(a)}
-    ${window.carnetAcces && S.canWrite ? `<h2 class="sec">Espace de l'archer</h2><div class="card" id="acc-box"><span class="tirline">Chargement des accès…</span></div>` : ""}
-    ${equipCard(a)}
-    ${archerConcours(a)}
-    ${progressScores(a)}
-    ${evs.length >= 2 ? (() => {
-      const pts = evs.slice().reverse().map((e) => { const st = evalStats(e); return { label: dObj(e.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }), y: st.total ? Math.round((st.ac / st.total) * 100) : 0, tip: `${fmtLong(e.date)} : ${st.ac} acquis, ${st.ec} en cours, ${st.na} non acquis` }; });
-      return `<h2 class="sec">Progression technique</h2><div class="card"><span class="tirline">Part des critères acquis à chaque évaluation</span>${lineChart(pts, { min: 0, max: 100, unit: " %" })}</div>`;
-    })() : ""}
-    ${evs.length ? `<h2 class="sec">Évaluations techniques</h2><div class="list">${evs.map((e) => {
-      const st = evalStats(e);
-      return `<button class="row" data-eval="${e.id}"><span class="main" style="display:grid;gap:6px"><span class="t">${esc(fmtLong(e.date))}</span>
-        ${sbar(st)}${legend(st)}</span><span class="count" aria-hidden="true">›</span></button>`;
-    }).join("")}</div>` : ""}
-    ${(() => {
+    <div class="card"><label class="f" for="archer-notes">Notes techniques et objectifs</label>
+      <textarea id="archer-notes" placeholder="Points à travailler, réglages, objectifs de la saison…" ${S.canWrite ? "" : "readonly"}>${esc(a.notes || "")}</textarea></div>`,
+    seances: () => `    ${(() => {
       const hist = S.seances.filter((s) => hasSuivi(s, a.id)).sort((x, y) => y.date.localeCompare(x.date));
       if (!hist.length) return "";
       return `<h2 class="sec">Suivi et scores par séance</h2><div class="list">${hist.map((s) => {
@@ -4630,9 +4615,33 @@ function viewArcher() {
           ${v.tirs.map((t) => `<span class="tirline" style="display:block">${esc(tirSum(t))}</span>`).join("")}</span>
           <span class="count" aria-hidden="true">›</span></button>`;
       }).join("")}</div>`;
-    })()}
-    <div class="card"><label class="f" for="archer-notes">Notes techniques et objectifs</label>
-      <textarea id="archer-notes" placeholder="Points à travailler, réglages, objectifs de la saison…" ${S.canWrite ? "" : "readonly"}>${esc(a.notes || "")}</textarea></div>`;
+    })()}` || "",
+    concours: () => `    ${archerConcours(a)}
+    ${progressScores(a)}`,
+    technique: () => `    ${evs.length >= 2 ? (() => {
+      const pts = evs.slice().reverse().map((e) => { const st = evalStats(e); return { label: dObj(e.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }), y: st.total ? Math.round((st.ac / st.total) * 100) : 0, tip: `${fmtLong(e.date)} : ${st.ac} acquis, ${st.ec} en cours, ${st.na} non acquis` }; });
+      return `<h2 class="sec">Progression technique</h2><div class="card"><span class="tirline">Part des critères acquis à chaque évaluation</span>${lineChart(pts, { min: 0, max: 100, unit: " %" })}</div>`;
+    })() : ""}
+    ${evs.length ? `<h2 class="sec">Évaluations techniques</h2><div class="list">${evs.map((e) => {
+      const st = evalStats(e);
+      return `<button class="row" data-eval="${e.id}"><span class="main" style="display:grid;gap:6px"><span class="t">${esc(fmtLong(e.date))}</span>
+        ${sbar(st)}${legend(st)}</span><span class="count" aria-hidden="true">›</span></button>`;
+    }).join("")}</div>` : ""}`,
+    espace: () => `    ${window.CarnetArcherUI ? `<div class="bar"><span class="grow"></span><button class="btn" data-act="ar-preview">Aperçu de son espace archer</button>${window.CARNET_TEST ? `<button class="btn primary" data-act="ar-test">Jouer l'archer (test)</button>` : ""}</div>` : ""}
+    ${roleOf(a) === "encadrant" ? "" : espaceCard(a)}
+    ${window.carnetAcces && S.canWrite ? `<h2 class="sec">Espace de l'archer</h2><div class="card" id="acc-box"><span class="tirline">Chargement des accès…</span></div>` : ""}
+    ${equipCard(a)}`,
+  };
+  const corps = part[ft]().trim() || `<p class="empty">Rien pour l'instant dans cette rubrique.</p>`;
+  return `<div class="bar"><button class="btn ghost" data-act="back">← Archers</button><span class="grow"></span><button class="btn primary" data-act="open-carnet">Carnet d'entraînement</button>${S.canWrite ? `<button class="btn" data-act="new-eval">+ Évaluation technique</button><button class="btn" data-act="edit-archer">Modifier</button>` : ""}</div>
+    <div class="head"><span class="m">${esc((a.clubIds || []).map(clubName).join(", "))}${a.actif === false ? " · inactif" : ""}</span><div class="av-head">${S.canWrite ? `<button type="button" class="av-btn" data-act="avatar" aria-label="Changer l'avatar de ${esc(fullName(a))}">${avatarSvg(a, 64)}<span class="av-edit" aria-hidden="true">✎</span></button>` : avatarSvg(a, 64)}<h2>${esc(fullName(a))}</h2></div>
+      <span class="m">${esc([a.naissance ? `${ageSaison(a)} ans en ${saisonLabel()}` : "", a.sexe === "F" ? "Femme" : a.sexe === "H" ? "Homme" : "", (a.arcs || []).join(", ") || "Type d'arc non renseigné"].filter(Boolean).join(" · "))}</span>
+      <span class="clubline">${(a.federations || []).map((f) => {
+        const cat = catOf(a, f), lic = (a.licences || {})[f];
+        return `<span>${fedTags([f])} ${esc([cat, lic ? "licence " + lic : ""].filter(Boolean).join(" · "))}</span>`;
+      }).join("") || "Fédération non renseignée"}</span></div>
+    <div class="seg-mode ptabs ftabs" role="tablist" aria-label="Rubriques de la fiche">${FT.map(([k, l]) => `<button role="tab" data-ftab="${k}" aria-pressed="${ft === k}" aria-selected="${ft === k}">${l}</button>`).join("")}</div>
+    ${corps}`;
 }
 
 // ---------- Clubs ----------
@@ -6314,7 +6323,7 @@ function formSeance(s = null) {
 
 // ---------- Événements ----------
 document.addEventListener("click", (e) => {
-  const t = e.target.closest("[data-tab],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab],[data-qsort],[data-coptab],[data-com-edit],[data-fmtfed],[data-fmt-del],[data-type-del],[data-fete-ap],[data-fete-new],[data-fete-edit],[data-fete-imgdel],[data-mot-edit],[data-centry-open],[data-cd-exp],[data-cd-arch],[data-exmode],[data-ftheme],[data-fiche],[data-anim],[data-animvue],[data-animtri],[data-anim-saisie],[data-anim-essai-new],[data-anim-retenir],[data-anim-essai-del]");
+  const t = e.target.closest("[data-tab],[data-ftab],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab],[data-qsort],[data-coptab],[data-com-edit],[data-fmtfed],[data-fmt-del],[data-type-del],[data-fete-ap],[data-fete-new],[data-fete-edit],[data-fete-imgdel],[data-mot-edit],[data-centry-open],[data-cd-exp],[data-cd-arch],[data-exmode],[data-ftheme],[data-fiche],[data-anim],[data-animvue],[data-animtri],[data-anim-saisie],[data-anim-essai-new],[data-anim-retenir],[data-anim-essai-del]");
   if (!t || t.closest("#sheet")) return;
   if (t.dataset.dashSuivi) { const [sid, aid] = t.dataset.dashSuivi.split("|"); S.seance = sid; S.suivi = aid; S.tirOpen = null; render(); window.scrollTo(0, 0); return; }
   if (t.dataset.tab) { go(t.dataset.tab); try { history.replaceState(null, "", "#" + t.dataset.tab); } catch (_) {} return; }
@@ -6497,7 +6506,8 @@ document.addEventListener("click", (e) => {
   if (t.dataset.act === "new-archer-club") { formArcher(null, t.dataset.club); return; }
   if (t.dataset.club && t.classList.contains("chip")) { S.club = t.dataset.club; try { localStorage.setItem("club", S.club); } catch (_) {} render(); return; }
   if (t.dataset.seance) { S.seance = t.dataset.seance; S.from = S.archer ? "archer" : null; render(); window.scrollTo(0, 0); return; }
-  if (t.dataset.archer) { S.archer = t.dataset.archer; marquerVu(S.archer); render(); window.scrollTo(0, 0); return; }
+  if (t.dataset.ftab) { S.fTab = t.dataset.ftab; render(); return; }
+  if (t.dataset.archer) { if (S.archer !== t.dataset.archer) S.fTab = "suivi"; S.archer = t.dataset.archer; marquerVu(S.archer); render(); window.scrollTo(0, 0); return; }
   if (t.dataset.clubEdit) { formClub(club(t.dataset.clubEdit)); return; }
   const a = t.dataset.act;
   if (a === "back" && S.suivi) { if (S.from === "archer-suivi") { S.seance = null; S.from = null; } S.suivi = null; S.tirOpen = null; render(); window.scrollTo(0, 0); return; }
