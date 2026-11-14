@@ -633,6 +633,8 @@ svg.chart .szl { stroke: var(--line-2, var(--line)); stroke-dasharray: 3 3; }
 .hum { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .hum-b { border: 2px solid var(--line); background: var(--sunk); border-radius: 16px; padding: 10px 4px; display: grid; justify-items: center; gap: 4px; cursor: pointer; color: var(--ink); min-height: 76px; }
 .hum-b span { font-size: 2.2rem; line-height: 1; } .hum-b[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.ar-pts { font-size: 1.75rem; font-weight: 800; color: var(--accent); } .ar-pts small { font-size: .8rem; font-weight: 600; color: var(--muted); }
+.ar-pts-big { font-family: var(--font-display); font-size: 2.6rem; font-weight: 800; color: var(--accent); line-height: 1.1; margin: 4px 0 10px; } .ar-pts-big small { font-size: 1rem; color: var(--muted); } .ar-pts-big span { display: block; font-size: .9rem; font-weight: 600; color: var(--muted); }
 .ar-cpt { display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 4px; margin-top: 4px; }
 .ar-cpt button { min-height: 40px; border-radius: 10px; border: 1px solid var(--line); background: var(--sunk); color: var(--ink); font: inherit; font-weight: 700; cursor: pointer; touch-action: manipulation; }
 .ar-cpt button:active { transform: scale(.95); }
@@ -857,7 +859,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
 <div id="toast" class="toast" hidden></div>
 <input type="file" id="file-in" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.mp4,.webm,.txt,.md,.csv,application/pdf,image/*,video/mp4,video/webm,text/plain,text/markdown,text/csv">
 
-<script>window.CARNET_VERSION = { v: "1.9", date: "2026-11-12", site: "1.9", test: false };</script>
+<script>window.CARNET_VERSION = { v: "1.9", date: "2026-11-14", site: "1.9", test: false };</script>
 <script>
 // Espace archer : l'archer (ou son parent) voit uniquement ses propres informations,
 // telles que les renvoie la base (fonction espace_archer), et remplit son carnet.
@@ -1100,16 +1102,19 @@ window.CarnetArcherUI = (API, opts = {}) => {
     if (o.processus || o.classement || o.score) h += `<div class="card"><h3 class="hub-h">Mes objectifs de la saison</h3>${[["processus", "Processus"], ["classement", "Classement"], ["score", "Score"]].filter(([k]) => o[k]).map(([k, l]) => `<div class="eq-l"><span>${l}</span><b>${esc(o[k])}</b></div>`).join("")}</div>`;
     if (window.CarnetTcProgress && (M().has("tir") || M().has("impacts"))) h += window.CarnetTcProgress(list, St.tcCombo, "data-artc", St.tcPer || "30", "data-artcp", { courbe: M().has("tir"), carte: M().has("impacts") });
     h += list.length ? `<div class="list">${list.map((e) => `<button class="row" data-entry="${esc(e.id)}"><span class="date"><span class="d">${dObj(e.date).getDate()}</span><span class="mo">${dObj(e.date).toLocaleDateString("fr-FR", { month: "short" }).replace(".", "")}</span></span>
-      <span class="main"><span class="t">${esc(e.objectif || (e.concoursId ? "Concours" : "Séance"))}</span><span class="m">${[e.concoursId && num(e.scoreCompet) != null ? e.scoreCompet + " pts" : "", !e.concoursId && num(e.scoreCompte) != null ? `tir compté ${e.scoreCompte} pts${e.tcDistance ? " à " + e.tcDistance + " m" : ""}` : "", vol(e) ? vol(e) + " flèches" : "", e.emotion || "", e.seanceId ? "séance du club" : e.concoursId ? "concours" : "noté par moi", e.commentaireCoach ? "💬 mot de l'entraîneur" : ""].filter(Boolean).map(esc).join(" · ")}</span>${e.commentaire ? `<span class="m">${esc(e.commentaire.slice(0, 100))}</span>` : ""}</span>
-      <span class="count">${num(e.note) != null ? `${e.note}<small>/10</small>` : ""}</span></button>`).join("")}</div>` : `<p class="notice">Rien de noté cette saison. « Noter une séance » ajoute une ligne à ton carnet : ton entraîneur la verra.</p>`;
+      <span class="main"><span class="t">${esc(e.objectif || (e.concoursId ? "Concours" : "Séance"))}</span><span class="m">${[e.concoursId && num(e.scoreCompet) != null ? e.scoreCompet + " pts" : "", !e.concoursId && num(e.scoreCompte) != null ? `tir compté ${e.scoreCompte} pts${e.tcDistance ? " à " + e.tcDistance + " m" : ""}` : "", vol(e) ? vol(e) + " flèches" : "", e.emotion || "", e.seanceId ? "séance du club" : e.concoursId ? "concours" : "noté par moi", ptsDe(e) != null && num(e.note) != null ? `ressenti ${e.note}/10` : "", e.commentaireCoach ? "💬 mot de l'entraîneur" : ""].filter(Boolean).map(esc).join(" · ")}</span>${e.commentaire ? `<span class="m">${esc(e.commentaire.slice(0, 100))}</span>` : ""}</span>
+      ${ptsDe(e) != null ? `<span class="count ar-pts">${ptsDe(e)}<small> pts</small></span>` : `<span class="count">${num(e.note) != null ? `${e.note}<small>/10</small>` : ""}</span>`}</button>`).join("")}</div>` : `<p class="notice">Rien de noté cette saison. « Noter une séance » ajoute une ligne à ton carnet : ton entraîneur la verra.</p>`;
     return h;
   }
   // Ligne d'une saison archivée : lecture seule
+  // Les points de la séance (tir compté ou concours) s'affichent en grand dans le carnet (demande des archers)
+  const ptsDe = (e) => num(e.concoursId ? (e.scoreCompet ?? e.auto?.scoreCompet) : (e.scoreCompte ?? e.auto?.scoreCompte));
   function entryRO(e) {
     const el = $("#sheet"), d = e || {}, fl = VOL.map(([k, l]) => [l, volOf(d, k)]).filter(([, v]) => v), sc = num(d.scoreCompte ?? d.auto?.scoreCompte), sp = num(d.scoreCompet ?? d.auto?.scoreCompet);
     const li = (l, v) => (v ? `<div class="eq-l"><b>${l}</b> ${esc(v)}</div>` : "");
     el.innerHTML = `<div class="sheet-bg" data-close><div class="sheet"><h3>${esc(d.objectif || (d.concoursId ? "Concours" : "Ma séance"))}</h3>
       <p class="notice">🔒 Saison archivée par ton entraîneur : tu peux relire cette séance mais plus la modifier.</p>
+      ${ptsDe(d) != null ? `<div class="ar-pts-big">${ptsDe(d)}<small> pts</small>${d.tcDistance && !d.concoursId ? `<span>à ${esc(d.tcDistance)} m</span>` : ""}</div>` : ""}
       ${li("Date", d.date ? dObj(d.date).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : "")}
       ${li("Flèches", fl.map(([l, v]) => `${l} ${v}`).join(" · "))}${li("Tir compté", sc != null ? `${sc} pts${d.tcDistance ? ` à ${d.tcDistance} m` : ""}` : "")}${li("Score du concours", sp != null && d.concoursId ? `${sp} pts` : "")}
       ${li("Objectif atteint", d.atteint === "O" ? "Oui" : d.atteint === "N" ? "Non" : "")}${li("Ressenti", num(d.note) != null ? `${d.note} / 10` : "")}${li("Émotion", d.emotion)}${li("Mes commentaires", d.commentaire)}
@@ -1322,7 +1327,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     const d = e || { date: today() }, el = $("#sheet");
     const lock = e?.concoursId ? "readonly" : "";
     const tcD = tirDefaut(), tcLast = e ? {} : { tcDistance: tcD.distance, tcBlason: tcD.blason }; // reprend la dernière distance // flèches et score d'un concours : saisis par l'entraîneur
-    el.innerHTML = `<div class="sheet-bg" data-close><form class="sheet" id="ar-form"><h3>${e?.__new ? "Ma séance du " + esc(dObj(e.date).toLocaleDateString("fr-FR")) : e ? "Ma séance" : "Noter une séance"}</h3>
+    el.innerHTML = `<div class="sheet-bg" data-close><form class="sheet" id="ar-form"><h3>${e?.__new ? "Ma séance du " + esc(dObj(e.date).toLocaleDateString("fr-FR")) : e ? "Ma séance" : "Noter une séance"}</h3>${e && !e.__new && ptsDe(e) != null ? `<div class="ar-pts-big">${ptsDe(e)}<small> pts</small>${e.tcDistance && !e.concoursId ? `<span>à ${esc(e.tcDistance)} m</span>` : ""}</div>` : ""}
       <div class="grid2"><label class="f">Date<input type="date" name="date" required value="${esc(d.date)}" ${e?.seanceId || e?.concoursId ? "readonly" : ""}></label><label class="f">Objectif<input type="text" name="objectif" value="${esc(d.objectif)}"></label></div>
       ${hyb ? `<div class="f">Comment ça s'est passé ?<div class="hum" role="group" aria-label="Mon ressenti">${HUMEURS.map(([v, ic, l]) => `<button type="button" class="hum-b" data-humf="${v}" aria-pressed="${num(d.note) != null && HUMEURS.reduce((m, h) => (Math.abs(h[0] - d.note) < Math.abs(m[0] - d.note) ? h : m), HUMEURS[0])[0] === v}"><span aria-hidden="true">${ic}</span><small>${l}</small></button>`).join("")}</div><input type="hidden" name="note" id="ar-note" value="${esc(d.note ?? "")}"></div>
         <label class="f">Qu'as-tu appris aujourd'hui ?<textarea name="commentaire" placeholder="Ex. garder l'épaule basse, bien viser le jaune…">${esc(d.commentaire)}</textarea></label>
