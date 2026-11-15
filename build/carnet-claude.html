@@ -839,7 +839,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
 <div id="toast" class="toast" hidden></div>
 <input type="file" id="file-in" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.mp4,.webm,.txt,.md,.csv,application/pdf,image/*,video/mp4,video/webm,text/plain,text/markdown,text/csv">
 
-<script>window.CARNET_VERSION = { v: "1.9", date: "2026-11-14", site: "1.9", test: false };</script>
+<script>window.CARNET_VERSION = { v: "1.9", date: "2026-11-15", site: "1.9", test: false };</script>
 <script>
 // Espace archer : l'archer (ou son parent) voit uniquement ses propres informations,
 // telles que les renvoie la base (fonction espace_archer), et remplit son carnet.
@@ -3577,18 +3577,37 @@ const matShort = (m) => `${mtLab(mtype(m), 3)} n°${m.numero}`;
 const etatLab = (k) => (ETATS.find(([x]) => x === k) || ETATS[0])[1];
 const numKey = (m) => { const n = parseFloat(String(m.numero).replace(",", ".")); return isNaN(n) ? Infinity : n; };
 const byNum = (a, b) => MAT_TYPES.findIndex(([k]) => k === mtype(a)) - MAT_TYPES.findIndex(([k]) => k === mtype(b)) || numKey(a) - numKey(b) || String(a.numero).localeCompare(String(b.numero), "fr", { numeric: true });
+// V.1.9 : tri du matériel par numéro, taille ou puissance ; remarques toutes prêtes à toucher
+const MAT_TRIS = [["num", "Numéro"], ["taille", "Taille"], ["puissance", "Puissance"]];
+const tailleKey = (m) => { const t = String(m.taille || "").trim(), n = parseFloat(t.replace(",", ".")); if (!isNaN(n)) return n; const i = ["courtes", "moyennes", "longues"].indexOf(t.toLowerCase()); return i >= 0 ? i - 10 : Infinity; };
+const puisKey = (m) => { const n = parseFloat(String(m.puissance || "").replace(",", ".")); return isNaN(n) ? Infinity : n; };
+const matTri = () => (MAT_TRIS.some(([k]) => k === S.matTri) ? S.matTri : (S.matTri = LS.get("matTri") || "num"));
+const byMat = (a, b) => { const t = matTri(), ty = MAT_TYPES.findIndex(([k]) => k === mtype(a)) - MAT_TYPES.findIndex(([k]) => k === mtype(b));
+  if (ty) return ty;
+  if (t === "taille") return tailleKey(a) - tailleKey(b) || puisKey(a) - puisKey(b) || byNum(a, b);
+  if (t === "puissance") return puisKey(a) - puisKey(b) || tailleKey(a) - tailleKey(b) || byNum(a, b);
+  return byNum(a, b); };
+const MAT_REMARQUES = ["Corde à changer", "Repose-flèche à remplacer", "Point d'encochage à refaire", "Branche rayée", "Poignée abîmée", "Viseur fourni", "Carquois fourni", "Palette fournie", "Prêt pour la saison", "À vérifier avant prêt"];
+const remarquesDispo = () => { const vues = []; S.materiel.forEach((m) => String(m.remarque || "").split(/\s*[·\n]\s*/).forEach((r) => { r = r.trim(); if (r && r.length <= 60 && !vues.includes(r)) vues.push(r); })); return [...MAT_REMARQUES, ...vues.filter((r) => !MAT_REMARQUES.includes(r)).slice(0, 8)]; };
+const remarqueChips = (champ) => `<div class="chips mat-rq" data-rq-for="${champ}" role="group" aria-label="Remarques toutes prêtes">${remarquesDispo().map((r) => `<button type="button" class="chip" data-rq="${esc(r)}">+ ${esc(r)}</button>`).join("")}</div>`;
+function brancherRemarques() {
+  document.querySelectorAll(".mat-rq").forEach((z) => z.addEventListener("click", (ev) => { const b = ev.target.closest("[data-rq]"); if (!b) return; const ta = document.getElementById(z.dataset.rqFor); if (!ta) return;
+    const deja = ta.value.split(/\s*[·\n]\s*/).map((x) => x.trim()).filter(Boolean); if (deja.includes(b.dataset.rq)) { toast("Déjà dans la remarque"); return; }
+    ta.value = [...deja, b.dataset.rq].join(" · "); ta.focus(); }));
+}
 function viewMateriel() {
   if (!S.clubs.length) return startHere();
   const cid = S.club !== "all" && club(S.club) ? S.club : S.clubs.length === 1 ? S.clubs[0].id : null;
   const fe = S.matEtat || "all", ft = S.matType || "all";
   const inClubT = S.materiel.filter((m) => (!cid || m.clubId === cid));
   const all = inClubT.filter((m) => ft === "all" || mtype(m) === ft);
-  const list = all.filter((m) => fe === "all" || (m.etat || "bon") === fe).sort((a, b) => clubName(a.clubId).localeCompare(clubName(b.clubId)) || byNum(a, b));
+  const list = all.filter((m) => fe === "all" || (m.etat || "bon") === fe).sort((a, b) => clubName(a.clubId).localeCompare(clubName(b.clubId)) || byMat(a, b));
   const cnt = (k) => all.filter((m) => (m.etat || "bon") === k).length;
   let h = clubChips() + `<div class="head"><span class="m">Matériel prêté par le club${cid ? " · " + esc(clubName(cid)) : ""}</span><h2>Matériel</h2></div>`;
   if (!inClubT.length) return h + `<div class="empty"><h3>Aucun matériel enregistré</h3><p>Ajoute les arcs d'initiation, les poignées et les branches de compétition que le club prête : numéro, taille, puissance et état. Tu peux en créer plusieurs d'un coup.</p>${S.canWrite ? `<div class="bar"><button class="btn primary" data-act="mat-new">Ajouter du matériel</button><button class="btn" data-act="mat-bulk">Ajouter une série</button></div>` : ""}</div>`;
   h += `<div class="chips" role="group" aria-label="Type de matériel"><button class="chip" data-mattype="all" aria-pressed="${ft === "all"}">Tout <span style="opacity:.7">${inClubT.length}</span></button>
     ${MAT_TYPES.map(([k, , pl]) => `<button class="chip" data-mattype="${k}" aria-pressed="${ft === k}">${pl} <span style="opacity:.7">${inClubT.filter((m) => mtype(m) === k).length}</span></button>`).join("")}</div>
+    <div class="chips" role="group" aria-label="Trier le matériel"><span class="tirline" style="align-self:center">Trier par</span>${MAT_TRIS.map(([k, l]) => `<button class="chip" data-mattri="${k}" aria-pressed="${matTri() === k}">${l}</button>`).join("")}</div>
     <div class="chips" role="group" aria-label="Filtrer par état"><button class="chip" data-matetat="all" aria-pressed="${fe === "all"}">Tous états</button>
     ${ETATS.map(([k, l]) => `<button class="chip" data-matetat="${k}" aria-pressed="${fe === k}"><span class="dot et-${k}"></span>${l} <span style="opacity:.7">${cnt(k)}</span></button>`).join("")}</div>
     <div class="bar"><span class="tirline">${cnt("bon") + cnt("surveiller")} utilisable${cnt("bon") + cnt("surveiller") > 1 ? "s" : ""} · ${all.filter((m) => m.archerId).length} prêté${all.filter((m) => m.archerId).length > 1 ? "s" : ""}</span><span class="grow"></span>${S.canWrite ? `<button class="btn" data-act="mat-bulk">Ajouter une série</button>` : ""}</div>`;
@@ -3634,7 +3653,7 @@ function formMat(m = null) {
       <label class="f" for="mt-m" id="mt-main-w">Main<select id="mt-m" name="main"><option value="">—</option><option value="D" ${m?.main === "D" ? "selected" : ""}>Droitier</option><option value="G" ${m?.main === "G" ? "selected" : ""}>Gaucher</option></select></label></div>
     <label class="f" for="mt-mod" id="mt-modele-w">Marque et modèle<input type="text" id="mt-mod" name="modele" value="${esc(m?.modele ?? "")}" placeholder="Ex. WNS, Hoyt…"></label>
     <div class="f">État<div class="radio">${ETATS.map(([e, l]) => `<label><input type="radio" name="etat" value="${e}" ${(m?.etat || "bon") === e ? "checked" : ""}> ${l}</label>`).join("")}</div></div>
-    <label class="f" for="mt-r">Remarque<textarea id="mt-r" name="remarque" style="min-height:60px" placeholder="Corde, repose-flèche, viseur fourni, défaut constaté…">${esc(m?.remarque)}</textarea></label>`, {
+    <label class="f" for="mt-r">Remarque<textarea id="mt-r" name="remarque" style="min-height:60px" placeholder="Corde, repose-flèche, viseur fourni, défaut constaté…">${esc(m?.remarque)}</textarea></label>${remarqueChips("mt-r")}`, {
     onSave(fd) {
       const numero = fd.get("numero").trim(); if (!numero) { toast("Indique le numéro"); return false; }
       const clubId = fd.get("clubId"), type = fd.get("type") || "arc";
@@ -3648,7 +3667,7 @@ function formMat(m = null) {
     onDelete: m ? () => { S.materiel = S.materiel.filter((x) => x.id !== m.id); remove("materiel", m.id); render(); toast("Matériel supprimé"); } : null,
     deleteLabel: "Supprimer",
   });
-  bindMatType("mt");
+  bindMatType("mt"); brancherRemarques();
   $("#mt-club").addEventListener("change", () => { if (!m) $("#mt-num").value = nextNum($("#mt-club").value, document.querySelector('#mt-type input:checked')?.value || "arc"); });
 }
 function nextNum(cid, type = "arc") { const n = S.materiel.filter((m) => m.clubId === cid && mtype(m) === type).map(numKey).filter(isFinite); return String(n.length ? Math.max(...n) + 1 : 1); }
@@ -3663,6 +3682,7 @@ function formMatBulk() {
       <label class="f" for="mb-p" id="mb-puissance-w">Puissance (lbs)<input type="number" inputmode="decimal" min="0" max="80" step="0.5" id="mb-p" name="puissance"></label>
       <label class="f" for="mb-m" id="mb-main-w">Main<select id="mb-m" name="main"><option value="">—</option><option value="D">Droitier</option><option value="G">Gaucher</option></select></label></div>
     <label class="f" for="mb-mod" id="mb-modele-w">Marque et modèle<input type="text" id="mb-mod" name="modele"></label>
+    <label class="f" for="mb-r">Remarque pour toute la série<textarea id="mb-r" name="remarque" style="min-height:50px" placeholder="Facultatif"></textarea></label>${remarqueChips("mb-r")}
     <span class="tirline">Tout le matériel créé aura ces caractéristiques et sera en « Bon état ». Tu pourras ensuite modifier chaque élément.</span>`, {
     onSave(fd) {
       const clubId = fd.get("clubId"), type = fd.get("type") || "arc", from = Math.round(Number(fd.get("from"))), to = Math.round(Number(fd.get("to")));
@@ -3671,13 +3691,13 @@ function formMatBulk() {
       let n = 0, skip = 0;
       for (let k = from; k <= to; k++) {
         if (S.materiel.some((x) => x.clubId === clubId && mtype(x) === type && String(x.numero) === String(k))) { skip++; continue; }
-        const id = newId("materiel"), data = { clubId, type, numero: String(k), taille: fd.get("taille").trim(), puissance: has(type, "puissance") ? fd.get("puissance") : "", main: has(type, "main") ? fd.get("main") : "", modele: has(type, "modele") ? fd.get("modele").trim() : "", etat: "bon", remarque: "", archerId: "", createdAt: Date.now() + k, updatedAt: Date.now() };
+        const id = newId("materiel"), data = { clubId, type, numero: String(k), taille: fd.get("taille").trim(), puissance: has(type, "puissance") ? fd.get("puissance") : "", main: has(type, "main") ? fd.get("main") : "", modele: has(type, "modele") ? fd.get("modele").trim() : "", etat: "bon", remarque: (fd.get("remarque") || "").trim(), archerId: "", createdAt: Date.now() + k, updatedAt: Date.now() };
         S.materiel.push({ id, ...data }); save("materiel", id, data); n++;
       }
       toast(`${n} ajout${n > 1 ? "s" : ""}${skip ? ` (${skip} numéro${skip > 1 ? "s" : ""} déjà existant${skip > 1 ? "s" : ""})` : ""}`); render();
     },
   });
-  bindMatType("mb");
+  bindMatType("mb"); brancherRemarques();
   $("#mb-club").addEventListener("change", () => { const nx = Number(nextNum($("#mb-club").value, document.querySelector('#mt-type input:checked')?.value || "arc")); $("#mb-from").value = nx; $("#mb-to").value = nx + 9; });
 }
 
@@ -6324,7 +6344,7 @@ function formSeance(s = null) {
 
 // ---------- Événements ----------
 document.addEventListener("click", (e) => {
-  const t = e.target.closest("[data-tab],[data-ftab],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab],[data-qsort],[data-coptab],[data-com-edit],[data-fmtfed],[data-fmt-del],[data-type-del],[data-fete-ap],[data-fete-new],[data-fete-edit],[data-fete-imgdel],[data-mot-edit],[data-centry-open],[data-cd-exp],[data-cd-arch],[data-exmode],[data-ftheme],[data-fiche],[data-anim],[data-animvue],[data-animtri],[data-anim-saisie],[data-anim-essai-new],[data-anim-retenir],[data-anim-essai-del]");
+  const t = e.target.closest("[data-tab],[data-ftab],[data-mattri],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab],[data-qsort],[data-coptab],[data-com-edit],[data-fmtfed],[data-fmt-del],[data-type-del],[data-fete-ap],[data-fete-new],[data-fete-edit],[data-fete-imgdel],[data-mot-edit],[data-centry-open],[data-cd-exp],[data-cd-arch],[data-exmode],[data-ftheme],[data-fiche],[data-anim],[data-animvue],[data-animtri],[data-anim-saisie],[data-anim-essai-new],[data-anim-retenir],[data-anim-essai-del]");
   if (!t || t.closest("#sheet")) return;
   if (t.dataset.dashSuivi) { const [sid, aid] = t.dataset.dashSuivi.split("|"); S.seance = sid; S.suivi = aid; S.tirOpen = null; render(); window.scrollTo(0, 0); return; }
   if (t.dataset.tab) { go(t.dataset.tab); try { history.replaceState(null, "", "#" + t.dataset.tab); } catch (_) {} return; }
@@ -6406,6 +6426,7 @@ document.addEventListener("click", (e) => {
   if (t.dataset.mat) { formMat(S.materiel.find((x) => x.id === t.dataset.mat)); return; }
   if (t.dataset.matetat) { S.matEtat = t.dataset.matetat; render(); return; }
   if (t.dataset.mattype) { S.matType = t.dataset.mattype; render(); return; }
+  if (t.dataset.mattri) { S.matTri = t.dataset.mattri; LS.set("matTri", S.matTri); render(); return; }
   if (t.dataset.act === "mat-new") { formMat(); return; }
   if (t.dataset.act === "edit-equip") { formEquip(S.archers.find((x) => x.id === S.archer)); return; }
   if (t.dataset.act === "mat-bulk") { formMatBulk(); return; }
