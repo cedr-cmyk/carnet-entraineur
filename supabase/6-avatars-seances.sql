@@ -24,7 +24,7 @@ begin
     'exercices', coalesce((select jsonb_agg(jsonb_build_object('id', t.id, 'remarque', t.data->>'remarque', 'fait', t.data->'fait', 'seanceId', t.data->>'seanceId',
         'date', s.data->>'date', 'createdAt', t.data->'createdAt',
         'document', case when d.id is null then null else jsonb_build_object('id', d.id, 'titre', d.data->>'titre', 'description', d.data->>'description',
-          'assetId', d.data->>'assetId', 'contentType', d.data->>'contentType', 'nomFichier', d.data->>'nomFichier') end))
+          'assetId', d.data->>'assetId', 'contentType', d.data->>'contentType', 'nomFichier', d.data->>'nomFichier', 'video', d.data->>'video') end))
       from docs t
       left join docs d on d.owner = t.owner and d.col = 'documents' and d.id = t.data->>'documentId'
       left join docs s on s.owner = t.owner and s.col = 'seances' and s.id = t.data->>'seanceId'
@@ -56,7 +56,7 @@ begin
           or exists (select 1 from jsonb_array_elements_text(data->'clubIds') x where coalesce(ar->'clubIds', '[]'::jsonb) ? x))), '[]'::jsonb),
     -- documents partagés avec tout le club (calendrier des concours, règlement…)
     'documents', coalesce((select jsonb_agg(jsonb_build_object('id', id, 'titre', data->>'titre', 'description', data->>'description', 'assetId', data->>'assetId',
-        'contentType', data->>'contentType', 'nomFichier', data->>'nomFichier', 'partageLe', data->'partageLe'))
+        'contentType', data->>'contentType', 'nomFichier', data->>'nomFichier', 'video', data->>'video', 'partageLe', data->'partageLe'))
       from docs where owner = p_owner and col = 'documents' and doc_partage(data, ar->'clubIds')), '[]'::jsonb),
     -- entraînements proposés des 6 prochaines semaines, avec la réponse de l'archer ; les encadrants voient aussi qui vient
     'entrainements', coalesce((select jsonb_agg(jsonb_build_object('id', s.id, 'date', s.data->>'date', 'heure', s.data->>'heure', 'groupe', s.data->>'groupe',

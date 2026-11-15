@@ -616,6 +616,7 @@ svg.chart .szl { stroke: var(--line-2, var(--line)); stroke-dasharray: 3 3; }
 .hum { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .hum-b { border: 2px solid var(--line); background: var(--sunk); border-radius: 16px; padding: 10px 4px; display: grid; justify-items: center; gap: 4px; cursor: pointer; color: var(--ink); min-height: 76px; }
 .hum-b span { font-size: 2.2rem; line-height: 1; } .hum-b[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.yt-box { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 12px; overflow: hidden; background: #000; margin: 8px 0; } .yt-box iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
 .cbx { display: flex; align-items: center; gap: 10px; margin: 6px 0; font-weight: 600; cursor: pointer; } .cbx input { width: 20px; height: 20px; flex: none; accent-color: var(--accent); }
 .ar-pts { font-size: 1.75rem; font-weight: 800; color: var(--accent); } .ar-pts small { font-size: .8rem; font-weight: 600; color: var(--muted); }
 .ar-pts-big { font-family: var(--font-display); font-size: 2.6rem; font-weight: 800; color: var(--accent); line-height: 1.1; margin: 4px 0 10px; } .ar-pts-big small { font-size: 1rem; color: var(--muted); } .ar-pts-big span { display: block; font-size: .9rem; font-weight: 600; color: var(--muted); }
@@ -3642,7 +3643,7 @@ async function previewArcher(aid, testWrite = false) {
       seances: S.seances.filter((x) => (x.presents || []).includes(aid)).map((x) => ({ id: x.id, date: x.date, heure: x.heure, groupe: x.groupe, theme: x.theme, lieu: x.lieu, clubId: x.clubId, exercices: (x.exercices || []).map((d) => docOf(d)?.titre).filter(Boolean) })),
       annonces: S.annonces.filter((n) => annActive(n) && (!(n.clubIds || []).length || n.clubIds.some((id) => (a.clubIds || []).includes(id)))),
       animations: S.animations.filter((n) => (n.partage && (n.participants || []).includes(aid)) || animEquipes(n).some((e) => e.chefId === aid || (arModules(S.archers.find((x) => x.id === aid), nbConcoursOf(aid)).has("animations") && e.membres.includes(aid)))).sort((x, y) => (y.date || "").localeCompare(x.date || "")).map((n) => animPourArcher(n, aid)),
-      documents: S.documents.filter((d) => (d.partageClubs || []).some((id) => id === "*" || (a.clubIds || []).includes(id))).map((d) => ({ id: d.id, titre: d.titre, description: d.description, assetId: d.assetId, contentType: d.contentType, nomFichier: d.nomFichier, partageLe: d.partageLe })),
+      documents: S.documents.filter((d) => (d.partageClubs || []).some((id) => id === "*" || (a.clubIds || []).includes(id))).map((d) => ({ id: d.id, titre: d.titre, description: d.description, assetId: d.assetId, contentType: d.contentType, nomFichier: d.nomFichier, video: d.video, partageLe: d.partageLe })),
       entrainements: S.seances.filter((s) => s.public && s.date >= todayISO() && s.date <= addDaysISO(todayISO(), 42) && concerne(s, a)).sort((p, q) => (p.date + (p.heure || "")).localeCompare(q.date + (q.heure || ""))).map((s) => {
         const rs = repsOf(s.id), names = (v) => rs.filter((r) => r.reponse === v).map((r) => S.archers.find((x) => x.id === r.archerId)).sort(byName).map(fullName);
         return { id: s.id, date: s.date, heure: s.heure, groupe: s.groupe, theme: s.theme, lieu: s.lieu, clubId: s.clubId, public: s.public, reponse: rs.find((r) => r.archerId === aid)?.reponse || null,
@@ -3994,8 +3995,32 @@ const OK_TYPES = new Set(Object.values(EXT_TYPES));
 const BLOB_BASE = window.CARNET_BLOB_BASE || "/_blob/";
 const blobUrl = (d) => BLOB_BASE + d.assetId;
 const fmtSize = (b) => (b >= 1048576 ? (b / 1048576).toFixed(1).replace(".", ",") + " Mo" : Math.max(1, Math.round(b / 1024)) + " Ko");
-const kind = (t = "") => (t.startsWith("image/") ? "img" : t.startsWith("video/") ? "vid" : t === "application/pdf" ? "pdf" : "txt");
-const KIND_LAB = { img: "IMG", vid: "VIDÉO", pdf: "PDF", txt: "TXT" };
+// V.1.9 : vidéos YouTube (lien « non répertorié ») lues dans le carnet, sans rien stocker chez Supabase
+const ytId = (u) => { const m = String(u || "").trim().match(/(?:youtu\.be\/|youtube(?:-nocookie)?\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/|v\/))([A-Za-z0-9_-]{11})/); return m ? m[1] : /^[A-Za-z0-9_-]{11}$/.test(String(u || "").trim()) ? String(u).trim() : null; };
+const ytEmbed = (id) => `https://www.youtube-nocookie.com/embed/${id}?rel=0&playsinline=1`;
+const ytBox = (id, titre) => `<div class="yt-box"><iframe src="${ytEmbed(id)}" title="${esc(titre || "Vidéo")}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe></div>`;
+function formVideo(d = null) {
+  sheet(d ? "Modifier la vidéo" : "Ajouter une vidéo YouTube", `
+    <label class="f" for="yt-url">Lien de la vidéo YouTube<input type="url" id="yt-url" name="lien" required value="${esc(d ? "https://youtu.be/" + d.video : "")}" placeholder="https://youtu.be/…"></label>
+    <span class="tirline">Sur YouTube, mets la vidéo en « Non répertoriée » : seuls ceux qui ont le lien peuvent la voir. Puis « Partager » › « Copier le lien ».</span>
+    <label class="f" for="yt-t">Titre<input type="text" id="yt-t" name="titre" value="${esc(d?.titre || "")}" placeholder="Ex. Ancrage : les 3 points de contact"></label>
+    <label class="f" for="yt-d">Description<textarea id="yt-d" name="description" style="min-height:60px">${esc(d?.description || "")}</textarea></label>
+    <div id="yt-prev"></div>`, {
+    onSave(fd) {
+      const id = ytId(fd.get("lien")); if (!id) { toast("Ce lien n'est pas un lien YouTube valide"); return false; }
+      const data = { titre: fd.get("titre").trim() || "Vidéo", description: fd.get("description").trim(), video: id, contentType: "video/youtube", nomFichier: "", taille: 0, updatedAt: Date.now() };
+      if (d) { Object.assign(d, data); patch("documents", d.id, data); toast("Vidéo enregistrée"); }
+      else { const nid = newId("documents"), doc = { ...data, dossierId: S.folder || null, createdAt: Date.now() }; S.documents.push({ id: nid, ...doc }); save("documents", nid, doc); toast("Vidéo ajoutée"); }
+      render();
+    },
+    onDelete: d ? () => { S.documents = S.documents.filter((x) => x.id !== d.id); remove("documents", d.id); render(); toast("Vidéo retirée du carnet (elle reste sur YouTube)"); } : null,
+    deleteLabel: "Supprimer",
+  });
+  const u = $("#yt-url"), pv = $("#yt-prev"), maj = () => { const id = ytId(u.value); pv.innerHTML = id ? ytBox(id, "Aperçu") : u.value.trim() ? `<p class="tirline">Lien non reconnu.</p>` : ""; };
+  u.addEventListener("input", maj); maj();
+}
+const kind = (t = "") => (t === "video/youtube" ? "yt" : t.startsWith("image/") ? "img" : t.startsWith("video/") ? "vid" : t === "application/pdf" ? "pdf" : "txt");
+const KIND_LAB = { img: "IMG", vid: "VIDÉO", yt: "▶ YT", pdf: "PDF", txt: "TXT" };
 const ordreOf = (d) => (Number.isFinite(d.ordre) && d.ordre > 0 ? d.ordre : 999);
 const subFolders = (pid) => S.dossiers.filter((d) => (d.parentId || null) === (pid || null)).sort((a, b) => ordreOf(a) - ordreOf(b) || a.nom.localeCompare(b.nom, "fr"));
 const folderName = (id) => S.dossiers.find((d) => d.id === id)?.nom || "";
@@ -4005,7 +4030,7 @@ function docRow(d, withFolder = false) {
   if (d.canva?.designId) meta = ["Canva" + (d.canva.majLe ? ", à jour le " + fmtDT(d.canva.majLe) : ""), meta !== d.nomFichier ? meta : ""].filter(Boolean).join(" · ");
   return `<button class="row" data-doc="${d.id}">${k === "img" ? `<img class="thumb" src="${esc(blobUrl(d))}" alt="" loading="lazy">` : `<span class="thumb">${KIND_LAB[k]}</span>`}
     <span class="main"><span class="t">${esc(d.titre || d.nomFichier)}</span><span class="m">${esc(meta || d.nomFichier)}</span></span>
-    <span class="tirline">${fmtSize(d.taille || 0)}</span></button>`;
+    <span class="tirline">${k === "yt" ? "YouTube" : fmtSize(d.taille || 0)}</span></button>`;
 }
 // ---------- Studio apparence (V.1.9) : l'entraîneur règle les couleurs, formes et cartes du carnet, depuis l'ordinateur ----------
 // Enregistré dans les paramètres (texte JSON, remplacé en entier) ; appliqué par une feuille de style ajoutée en fin de page.
@@ -4679,7 +4704,7 @@ function viewFichiers() {
   const path = folderPath(S.folder), subs = subFolders(S.folder), docs = docsIn(S.folder);
   const crumbs = `<nav class="crumbs" aria-label="Dossier">${S.folder ? `<button data-folder="">Documents</button>` : `<b>Documents</b>`}
     ${path.map((f, i) => `<span>›</span>${i === path.length - 1 ? `<b>${esc(f.nom)}</b>` : `<button data-folder="${f.id}">${esc(f.nom)}</button>`}`).join("")}</nav>`;
-  const acts = S.canWrite ? `<div class="bar"><button class="btn" data-act="new-folder">+ Nouveau dossier</button>
+  const acts = S.canWrite ? `<div class="bar"><button class="btn" data-act="new-folder">+ Nouveau dossier</button><button class="btn" data-act="new-video">▶ Vidéo YouTube</button>
       ${S.folder ? `<button class="btn" data-act="edit-folder">Renommer ou déplacer</button>` : ""}<span class="grow"></span>
       ${window.CARNET_STANDALONE ? `<button class="btn" data-act="canva">🎨 Fiches Canva</button>` : ""}
       ${S.assets ? `<button class="btn primary" data-act="upload">Déposer des fichiers</button>` : ""}</div>` : "";
@@ -4781,6 +4806,7 @@ async function renderPdf(d, box, zoom) {
 function openDoc(d) {
   const k = kind(d.contentType), url = blobUrl(d);
   const media = k === "img" ? `<img class="viewer-media" src="${esc(url)}" alt="${esc(d.titre)}">`
+    : k === "yt" ? ytBox(d.video, d.titre)
     : k === "vid" ? `<video class="viewer-media" src="${esc(url)}" controls playsinline preload="metadata"></video>`
     : k === "pdf" ? `<div class="bar"><span class="tirline">${esc(d.nomFichier)} · ${fmtSize(d.taille || 0)}</span><span class="grow"></span>
         <button type="button" class="btn" id="pdf-out" aria-label="Réduire">−</button><button type="button" class="btn" id="pdf-in" aria-label="Agrandir">+</button></div>
@@ -4792,17 +4818,17 @@ function openDoc(d) {
     ${d.description ? `<p class="prev">${esc(d.description)}</p>` : ""}
     ${d.canva?.designId ? `<div class="bar"><span class="tirline">🎨 Fiche Canva${d.canva.majLe ? ", à jour le " + esc(fmtDT(d.canva.majLe)) : ""}</span><span class="grow"></span>${S.canWrite && CANVA() ? `<button type="button" class="btn" id="doc-cv">Mettre à jour depuis Canva</button>` : ""}</div>` : ""}
     <div class="acts">
-      <button type="button" class="btn" id="doc-dl">Télécharger</button>
+      ${k === "yt" ? `<a class="btn" href="https://youtu.be/${esc(d.video)}" target="_blank" rel="noopener">Ouvrir dans YouTube</a>` : `<button type="button" class="btn" id="doc-dl">Télécharger</button>`}
       ${S.canWrite ? `<button type="button" class="btn" id="doc-share">${(d.partageClubs || []).length ? "Partagé avec les archers" : "Partager avec les archers"}</button><button type="button" class="btn" id="doc-attr">Attribuer à un archer</button><button type="button" class="btn" id="doc-edit">Modifier</button>` : ""}
       <button type="button" class="btn primary" data-close>Fermer</button></div></div></div>`;
   const close = () => { el.innerHTML = ""; if (S.stale) { S.stale = false; render(); } };
   el.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", (e) => { if (e.target === b) close(); }));
-  $("#doc-dl").addEventListener("click", async () => {
+  $("#doc-dl")?.addEventListener("click", async () => {
     const dl = await claude.use("downloads"); if (!dl) { toast("Téléchargement indisponible ici"); return; }
     try { const blob = await (await fetch(url)).blob(); await dl.save({ filename: d.nomFichier || "document", data: blob }); }
     catch (e) { if (e?.code !== "declined") toast("Téléchargement impossible"); }
   });
-  const ed = $("#doc-edit"); if (ed) ed.addEventListener("click", () => formDoc(d));
+  const ed = $("#doc-edit"); if (ed) ed.addEventListener("click", () => (k === "yt" ? formVideo(d) : formDoc(d)));
   const at = $("#doc-attr"); if (at) at.addEventListener("click", () => formAttrFromDoc(d));
   const sh = $("#doc-share"); if (sh) sh.addEventListener("click", () => formPartage(d));
   const cv = $("#doc-cv"); if (cv) cv.addEventListener("click", async () => {
@@ -5718,6 +5744,7 @@ document.addEventListener("click", (e) => {
   if (t.dataset.act === "fiche-ot") { importOT(); return; }
   if (t.dataset.doc) { const d = S.documents.find((x) => x.id === t.dataset.doc); if (d) openDoc(d); return; }
   if (t.dataset.act === "new-folder") { formFolder(); return; }
+  if (t.dataset.act === "new-video") { formVideo(); return; }
   if (t.dataset.act === "edit-folder") { formFolder(S.dossiers.find((x) => x.id === S.folder)); return; }
   if (t.dataset.act === "upload") { $("#file-in").click(); return; }
   if (t.dataset.act === "canva") { openCanva(); return; }

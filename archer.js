@@ -591,11 +591,21 @@ window.CarnetArcherUI = (API, opts = {}) => {
       ${window.CARNET_VERSION ? `<p class="ar-ver">Appli ${esc("V." + window.CARNET_VERSION.v)}${PREVIEW && window.CARNET_VERSION.test && window.CARNET_VERSION.site !== window.CARNET_VERSION.v ? ` (test · les archers ont la ${esc("V." + window.CARNET_VERSION.site)})` : ""}</p>` : ""}</div>`;
   }
   // ---------- Documents : partagés avec le club + fiches d'exercices de l'archer ----------
+  // Vidéos YouTube partagées par l'entraîneur : lues ici, dans une fenêtre
+  function ouvrirVideo(id, titre) {
+    const el = $("#sheet"); el.innerHTML = `<div class="sheet-bg" data-close><div class="sheet" role="dialog" aria-label="${esc(titre)}"><h3>${esc(titre)}</h3>
+      <div class="yt-box"><iframe src="https://www.youtube-nocookie.com/embed/${esc(id)}?rel=0&playsinline=1" title="${esc(titre)}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
+      <div class="acts"><a class="btn" href="https://youtu.be/${esc(id)}" target="_blank" rel="noopener">Ouvrir dans YouTube</a><button type="button" class="btn primary" data-close>Fermer</button></div></div></div>`;
+    el.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", (e) => { if (e.target === b) el.innerHTML = ""; }));
+  }
+  if (!window.__arYt) { window.__arYt = true; document.addEventListener("click", (e) => { const b = e.target.closest?.("[data-yt]"); if (!b) return; e.preventDefault(); e.stopPropagation(); ouvrirVideo(b.dataset.yt, b.dataset.ytT || "Vidéo"); }, true); }
+  const docBtn = (d) => (d.video ? `<button type="button" class="btn" data-yt="${esc(d.video)}" data-yt-t="${esc(d.titre || "Vidéo")}">▶ Regarder</button>` : `<a class="btn" href="${BLOB}${esc(d.assetId)}" target="_blank" rel="noopener">Ouvrir</a>`);
+  const docThumb = (d) => (d.video ? "▶" : (d.contentType || "").startsWith("image/") ? "IMG" : "PDF");
   function vDocs() {
     const docs = (St.data.documents || []).slice().sort((a, b) => (b.partageLe || 0) - (a.partageLe || 0));
     let h = `<h2 class="sec">Documents du club</h2>`;
-    h += docs.length ? `<div class="list">${docs.map((d) => `<div class="row"><span class="thumb">${(d.contentType || "").startsWith("image/") ? "IMG" : "PDF"}</span><span class="main"><span class="t">${esc(d.titre || d.nomFichier)}</span>${d.description ? `<span class="m">${esc(d.description.slice(0, 140))}</span>` : ""}</span>
-      <a class="btn" href="${BLOB}${esc(d.assetId)}" target="_blank" rel="noopener">Ouvrir</a></div>`).join("")}</div>` : `<p class="notice">Aucun document partagé pour l'instant (calendrier des concours, règlement…).</p>`;
+    h += docs.length ? `<div class="list">${docs.map((d) => `<div class="row"><span class="thumb">${docThumb(d)}</span><span class="main"><span class="t">${esc(d.titre || d.nomFichier)}</span>${d.description ? `<span class="m">${esc(d.description.slice(0, 140))}</span>` : ""}</span>
+      ${docBtn(d)}</div>`).join("")}</div>` : `<p class="notice">Aucun document partagé pour l'instant (calendrier des concours, règlement…).</p>`;
     return h + `<h2 class="sec">Mes exercices</h2>` + vExos();
   }
   // Animations : résultats (si l'entraîneur les ouvre) et saisie par le chef d'équipe, essai par essai.
@@ -675,9 +685,9 @@ window.CarnetArcherUI = (API, opts = {}) => {
     const list = St.data.exercices.slice().sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.createdAt || 0) - (a.createdAt || 0));
     if (!list.length) return `<p class="notice">Ton entraîneur ne t'a pas encore partagé de fiche d'exercice.</p>`;
     return `<div class="list">${list.map((x) => { const d = x.document;
-      return `<div class="row"><span class="thumb">${d && (d.contentType || "").startsWith("image/") ? "IMG" : "PDF"}</span><span class="main"><span class="t">${esc(d ? d.titre || d.nomFichier : "Fiche retirée")}${x.fait ? ' <span class="tag">fait</span>' : ""}</span>
+      return `<div class="row"><span class="thumb">${d ? docThumb(d) : "PDF"}</span><span class="main"><span class="t">${esc(d ? d.titre || d.nomFichier : "Fiche retirée")}${x.fait ? ' <span class="tag">fait</span>' : ""}</span>
         <span class="m">${[x.date ? "pour le " + fmtLong(x.date) : "", x.remarque].filter(Boolean).map(esc).join(" · ")}</span>${d?.description ? `<span class="m">${esc(d.description.slice(0, 140))}</span>` : ""}</span>
-        ${d ? `<a class="btn" href="${BLOB}${esc(d.assetId)}" target="_blank" rel="noopener">Ouvrir</a>` : ""}</div>`; }).join("")}</div>`;
+        ${d ? docBtn(d) : ""}</div>`; }).join("")}</div>`;
   }
   // ---------- Évaluations ----------
   function vEvals() {
