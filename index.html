@@ -1470,7 +1470,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
   const docThumb = (d) => (d.video ? "▶" : (d.contentType || "").startsWith("image/") ? "IMG" : "PDF");
   function vDocs() {
     const docs = (St.data.documents || []).slice().sort((a, b) => (b.partageLe || 0) - (a.partageLe || 0));
-    let h = `<h2 class="sec">Documents du club</h2>`;
+    let h = `<h2 class="sec">Documents partagés par ton entraîneur</h2>`;
     h += docs.length ? `<div class="list">${docs.map((d) => `<div class="row"><span class="thumb">${docThumb(d)}</span><span class="main"><span class="t">${esc(d.titre || d.nomFichier)}</span>${d.description ? `<span class="m">${esc(d.description.slice(0, 140))}</span>` : ""}</span>
       ${docBtn(d)}</div>`).join("")}</div>` : `<p class="notice">Aucun document partagé pour l'instant (calendrier des concours, règlement…).</p>`;
     return h + `<h2 class="sec">Mes exercices</h2>` + vExos();
@@ -3747,7 +3747,7 @@ async function exportMateriel(cid, ft, fe, format, prets, remarques, filtres) {
     ["Main", mainTxt, 22], ["Modèle", (m) => m.modele || "", 32], ["État", (m) => etatLab(m.etat || "bon"), 24], ...(prets ? [["Prêté à", qui, 38]] : []), ...(remarques ? [["Remarque", (m) => m.remarque || "", 0]] : [])];
   let data, filename;
   if (format === "csv") {
-    const q = (v) => `"${String(v ?? "").replace(/"/g, '""').replace(/\r?\n/g, " ")}"`;
+    const q = (v) => { let t = String(v ?? ""); if (/^[=+\-@\t\r]/.test(t) && isNaN(Number(t))) t = "'" + t; return `"${t.replace(/"/g, '""').replace(/\r?\n/g, " ")}"`; }; // une cellule qui commence par = + - @ n'est jamais lue comme une formule par Excel
     const rows = [cols.map(([l]) => l), ...L.map((m) => cols.map(([, f]) => f(m)))];
     data = new Blob(["﻿" + rows.map((r) => r.map(q).join(";")).join("\r\n")], { type: "text/csv;charset=utf-8" }); filename = name + ".csv";
   } else {
@@ -6055,7 +6055,7 @@ async function exportCarnets(archers, saison, format, clubLabel) {
   const dl = await claude.use("downloads"); if (!dl) { toast("Téléchargement indisponible sur cet appareil"); return; }
   let data, filename;
   if (format === "csv") {
-    const q = (v) => `"${String(v ?? "").replace(/"/g, '""').replace(/\r?\n/g, " ")}"`;
+    const q = (v) => { let t = String(v ?? ""); if (/^[=+\-@\t\r]/.test(t) && isNaN(Number(t))) t = "'" + t; return `"${t.replace(/"/g, '""').replace(/\r?\n/g, " ")}"`; }; // une cellule qui commence par = + - @ n'est jamais lue comme une formule par Excel
     const head = ["Archer", "Date", "Objectif", ...VOL.map(([, l]) => `Flèches ${l.toLowerCase()}`), "Total flèches", "Tir compté", "Score compétition", "Objectif atteint", "Ressenti /10", "Émotion", "Commentaire de l'archer", "Mot de l'entraîneur"];
     const rows = [head]; archers.forEach((a) => lines(a.id).forEach((e) => rows.push([fullName(a), e.date ? dObj(e.date).toLocaleDateString("fr-FR") : "", quoi(e), ...VOL.map(([k]) => volOf(e, k) || ""), entVol(e) || "", scoreOf(e, "scoreCompte") ?? "", scoreOf(e, "scoreCompet") ?? "", e.atteint === "O" ? "Oui" : e.atteint === "N" ? "Non" : "", e.note ?? "", e.emotion || "", e.commentaire || "", e.commentaireCoach || ""])));
     if (rows.length === 1) { toast("Aucune ligne de carnet pour cette saison"); return; }
