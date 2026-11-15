@@ -755,7 +755,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
 <div id="toast" class="toast" hidden></div>
 <input type="file" id="file-in" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.mp4,.webm,.txt,.md,.csv,application/pdf,image/*,video/mp4,video/webm,text/plain,text/markdown,text/csv">
 
-<script>window.CARNET_VERSION = { v: "1.8", date: "2026-11-12", site: "1.8", test: false };</script>
+<script>window.CARNET_VERSION = { v: "1.8", date: "2026-11-15", site: "1.8", test: false };</script>
 <script>
 // Espace archer : l'archer (ou son parent) voit uniquement ses propres informations,
 // telles que les renvoie la base (fonction espace_archer), et remplit son carnet.
@@ -1704,7 +1704,7 @@ const remove = (col, id) => write(`${col}/${id}`, () => S.db.collection(col).doc
 const newId = (col) => S.db.collection(col).doc().id;
 
 // ---------- Navigation ----------
-const TABS = [["accueil", "Accueil"], ["seances", "Séances"], ["archers", "Archers"], ["clubs", "Clubs"], ["exos", "Exercices"], ["concours", "Concours"], ["materiel", "Matériel"], ["parametres", "Paramètres"]];
+const TABS = [["accueil", "Accueil"], ["seances", "Séances"], ["archers", "Archers"], ["clubs", "Clubs"], ["exos", "Documents"], ["concours", "Concours"], ["materiel", "Matériel"], ["parametres", "Paramètres"]];
 function go(tab) { S.tab = tab; S.quick = false; S.concoursId = null; S.seance = null; S.archer = null; S.suivi = null; S.tirOpen = null; S.evaluation = null; if (S.carnet) { S.carnet = null; carnetSubscribe(); } render(); window.scrollTo(0, 0); }
 try { const h = location.hash.slice(1); if (TABS.some((t) => t[0] === h)) S.tab = h; } catch (e) {}
 try { const c = localStorage.getItem("club"); if (c) S.club = c; } catch (e) {}
@@ -1886,8 +1886,8 @@ function pickAttr() {
   const block = (fid, label, open) => { const docs = docsIn(fid); if (!docs.length) return ""; return `<details class="pick" ${open ? "open" : ""}><summary>${esc(label)} <span class="tirline">${docs.length} fiche${docs.length > 1 ? "s" : ""}</span></summary>${docs.map(line).join("")}</details>`; };
   const sess = [...sessionDocs].map(docOf).filter(Boolean);
   const body = (sess.length ? `<details class="pick" open><summary>Fiches de la séance <span class="tirline">${sess.length}</span></summary>${sess.map(line).join("")}</details>` : "")
-    + block(null, "Exercices (racine)", false) + sorted.map((f) => block(f.id, folderPath(f.id).map((x) => x.nom).join(" › "), !sess.length && suggest.includes(f.id))).join("");
-  sheet("Attribuer des fiches", (body || `<p class="notice">Ta bibliothèque est vide. Dépose d'abord tes fiches dans l'onglet Exercices.</p>`) +
+    + block(null, "Documents (racine)", false) + sorted.map((f) => block(f.id, folderPath(f.id).map((x) => x.nom).join(" › "), !sess.length && suggest.includes(f.id))).join("");
+  sheet("Attribuer des fiches", (body || `<p class="notice">Ta bibliothèque est vide. Dépose d'abord tes fiches dans l'onglet Documents.</p>`) +
     `<label class="f" for="at-rem">Remarque (facultatif, pour toutes les fiches choisies)<textarea id="at-rem" name="remarque" placeholder="Ex. 3 séries de 6 flèches, garder le coude haut"></textarea></label>${window.CarnetArcherUI ? `<label class="chk" style="display:flex;gap:8px;align-items:center;border:0"><input type="checkbox" name="visible"> Visible par l'archer dans son espace</label>` : ""}`, {
     onSave(fd) {
       const ids = fd.getAll("doc").filter((id) => !have.has(id)); if (!ids.length) { toast("Choisis au moins une fiche"); return false; }
@@ -4488,8 +4488,8 @@ function pickExos() {
   };
   const order = []; const walk = (pid) => subFolders(pid).forEach((f) => { order.push(f); walk(f.id); }); walk(null);
   const sorted = [...order.filter((f) => suggest.includes(f.id)), ...order.filter((f) => !suggest.includes(f.id))];
-  const body = block(null, "Exercices (racine)") + sorted.map((f) => block(f.id, folderPath(f.id).map((x) => x.nom).join(" › "))).join("");
-  sheet("Fiches de la séance", body || `<p class="notice">Ta bibliothèque est vide. Dépose d'abord tes fiches dans l'onglet Exercices.</p>`, {
+  const body = block(null, "Documents (racine)") + sorted.map((f) => block(f.id, folderPath(f.id).map((x) => x.nom).join(" › "))).join("");
+  sheet("Fiches de la séance", body || `<p class="notice">Ta bibliothèque est vide. Dépose d'abord tes fiches dans l'onglet Documents.</p>`, {
     onSave(fd) { const ex = fd.getAll("exo"); patch("seances", s.id, { exercices: ex }); s.exercices = ex; toast(`${ex.length} fiche${ex.length > 1 ? "s" : ""} pour cette séance`); render(); },
   });
 }
@@ -4497,14 +4497,14 @@ const docsIn = (fid) => S.documents.filter((d) => (d.dossierId || null) === (fid
 function folderPath(id) { const p = []; let f = S.dossiers.find((d) => d.id === id), guard = 0; while (f && guard++ < 30) { p.unshift(f); f = S.dossiers.find((d) => d.id === f.parentId); } return p; }
 const descendants = (id) => { const out = []; const walk = (x) => subFolders(x).forEach((c) => { out.push(c.id); walk(c.id); }); walk(id); return out; };
 function folderOptions(sel, exclude = []) {
-  const opts = [`<option value="" ${!sel ? "selected" : ""}>Exercices (racine)</option>`];
+  const opts = [`<option value="" ${!sel ? "selected" : ""}>Documents (racine)</option>`];
   const walk = (pid, depth) => subFolders(pid).forEach((f) => { if (exclude.includes(f.id)) return; opts.push(`<option value="${f.id}" ${f.id === sel ? "selected" : ""}>${"— ".repeat(depth)}${esc(f.nom)}</option>`); walk(f.id, depth + 1); });
   walk(null, 1); return opts.join("");
 }
 function viewExos() {
   if (S.folder && !S.dossiers.some((d) => d.id === S.folder)) S.folder = null;
   const path = folderPath(S.folder), subs = subFolders(S.folder), docs = docsIn(S.folder);
-  const crumbs = `<nav class="crumbs" aria-label="Dossier">${S.folder ? `<button data-folder="">Exercices</button>` : `<b>Exercices</b>`}
+  const crumbs = `<nav class="crumbs" aria-label="Dossier">${S.folder ? `<button data-folder="">Documents</button>` : `<b>Documents</b>`}
     ${path.map((f, i) => `<span>›</span>${i === path.length - 1 ? `<b>${esc(f.nom)}</b>` : `<button data-folder="${f.id}">${esc(f.nom)}</button>`}`).join("")}</nav>`;
   const acts = S.canWrite ? `<div class="bar"><button class="btn" data-act="new-folder">+ Nouveau dossier</button>
       ${S.folder ? `<button class="btn" data-act="edit-folder">Renommer ou déplacer</button>` : ""}<span class="grow"></span>
