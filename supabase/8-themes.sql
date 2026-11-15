@@ -1,3 +1,8 @@
+-- Document partagé avec un club de l'archer, ou avec lui seul (liste d'archers choisie par l'entraîneur)
+create or replace function public.doc_partage_archer(p_doc jsonb, p_clubs jsonb, p_archer text) returns boolean language sql immutable as $$
+  select coalesce(public.doc_partage(p_doc, p_clubs), false) or coalesce(jsonb_typeof(p_doc->'partageArchers') = 'array' and p_doc->'partageArchers' ? p_archer, false)
+$$;
+
 -- 8. Thèmes créés par l'entraîneur (V.1.9) : les archers peuvent voir l'image (bannière) de ces thèmes, comme pour Noël et les fêtes.
 --    Les thèmes eux-mêmes passent déjà par l'espace des archers (réglage « fetes ») : seule la lecture des images change.
 -- À exécuter une fois dans Supabase › SQL Editor, APRÈS le script 6 (relançable sans risque).
@@ -16,7 +21,7 @@ create or replace function public.archer_peut_lire(p_name text) returns boolean 
   or exists (
     select 1 from acces a
     join docs ar on ar.owner = a.owner and ar.col = 'archers' and ar.id = a.archer_id
-    join docs d on d.owner = a.owner and d.col = 'documents' and public.doc_partage(d.data, ar.data->'clubIds')
+    join docs d on d.owner = a.owner and d.col = 'documents' and public.doc_partage_archer(d.data, ar.data->'clubIds', a.archer_id)
     where a.user_id = auth.uid() and a.owner::text = split_part(p_name, '/', 1) and d.data->>'assetId' = split_part(p_name, '/', 2))
   -- image d'un thème de fête (Paramètres › Général), visible par les archers si le thème leur est diffusé
   or exists (

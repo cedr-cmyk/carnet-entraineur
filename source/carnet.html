@@ -3643,7 +3643,7 @@ async function previewArcher(aid, testWrite = false) {
       seances: S.seances.filter((x) => (x.presents || []).includes(aid)).map((x) => ({ id: x.id, date: x.date, heure: x.heure, groupe: x.groupe, theme: x.theme, lieu: x.lieu, clubId: x.clubId, exercices: (x.exercices || []).map((d) => docOf(d)?.titre).filter(Boolean) })),
       annonces: S.annonces.filter((n) => annActive(n) && (!(n.clubIds || []).length || n.clubIds.some((id) => (a.clubIds || []).includes(id)))),
       animations: S.animations.filter((n) => (n.partage && (n.participants || []).includes(aid)) || animEquipes(n).some((e) => e.chefId === aid || (arModules(S.archers.find((x) => x.id === aid), nbConcoursOf(aid)).has("animations") && e.membres.includes(aid)))).sort((x, y) => (y.date || "").localeCompare(x.date || "")).map((n) => animPourArcher(n, aid)),
-      documents: S.documents.filter((d) => (d.partageClubs || []).some((id) => id === "*" || (a.clubIds || []).includes(id))).map((d) => ({ id: d.id, titre: d.titre, description: d.description, assetId: d.assetId, contentType: d.contentType, nomFichier: d.nomFichier, video: d.video, partageLe: d.partageLe })),
+      documents: S.documents.filter((d) => (d.partageClubs || []).some((id) => id === "*" || (a.clubIds || []).includes(id)) || (d.partageArchers || []).includes(a.id)).map((d) => ({ id: d.id, titre: d.titre, description: d.description, assetId: d.assetId, contentType: d.contentType, nomFichier: d.nomFichier, video: d.video, partageLe: d.partageLe })),
       entrainements: S.seances.filter((s) => s.public && s.date >= todayISO() && s.date <= addDaysISO(todayISO(), 42) && concerne(s, a)).sort((p, q) => (p.date + (p.heure || "")).localeCompare(q.date + (q.heure || ""))).map((s) => {
         const rs = repsOf(s.id), names = (v) => rs.filter((r) => r.reponse === v).map((r) => S.archers.find((x) => x.id === r.archerId)).sort(byName).map(fullName);
         return { id: s.id, date: s.date, heure: s.heure, groupe: s.groupe, theme: s.theme, lieu: s.lieu, clubId: s.clubId, public: s.public, reponse: rs.find((r) => r.archerId === aid)?.reponse || null,
@@ -3801,27 +3801,31 @@ function formAnnonce(n = null) {
 }
 
 function formPartage(d = null) {
-  const ids = d?.partageClubs || [];
+  const ids = d?.partageClubs || [], arIds = d?.partageArchers || [];
+  const arChoix = S.archers.filter((a) => a.actif !== false).sort(byName);
   const choix = S.documents.slice().sort((a, b) => (a.titre || a.nomFichier || "").localeCompare(b.titre || b.nomFichier || "", "fr"));
   sheet(d ? "Partage du document" : "Partager un document avec les archers", `
     ${d ? `<b>${esc(d.titre || d.nomFichier)}</b>` : `<label class="f" for="pa-doc">Document de ta bibliothèque<select id="pa-doc" name="docId"><option value="">— choisir —</option>${choix.map((x) => `<option value="${x.id}">${esc(x.titre || x.nomFichier)}</option>`).join("")}</select></label>
       ${S.assets ? `<label class="f" for="pa-file">Ou un nouveau fichier (PDF, image)<input type="file" id="pa-file" name="file" accept="application/pdf,image/*"></label>` : ""}`}
-    <div class="f">Visible par les archers de<div class="checks"><label><input type="checkbox" name="club" value="*" ${ids.includes("*") || (!d && !ids.length) ? "checked" : ""}>Tous les clubs</label>${S.clubs.map((c) => `<label><input type="checkbox" name="club" value="${c.id}" ${ids.includes(c.id) ? "checked" : ""}>${esc(c.nom)}</label>`).join("")}</div></div>`, {
+    <div class="f">Visible par les archers de<div class="checks"><label><input type="checkbox" name="club" value="*" ${ids.includes("*") || (!d && !ids.length) ? "checked" : ""}>Tous les clubs</label>${S.clubs.map((c) => `<label><input type="checkbox" name="club" value="${c.id}" ${ids.includes(c.id) ? "checked" : ""}>${esc(c.nom)}</label>`).join("")}</div></div>
+    <details class="f" ${arIds.length ? "open" : ""}><summary>Ou seulement certains archers${arIds.length ? ` (${arIds.length})` : ""}</summary>
+      <span class="tirline">Coche-les ici et décoche les clubs au-dessus : le document n'apparaîtra que dans leur onglet Documents.</span>
+      <div class="checks" style="max-height:260px;overflow:auto">${arChoix.map((a) => `<label><input type="checkbox" name="archer" value="${a.id}" ${arIds.includes(a.id) ? "checked" : ""}>${esc(fullName(a))}</label>`).join("")}</div></details>`, {
     onSave(fd) {
-      const clubs = fd.getAll("club"), cl = clubs.includes("*") ? ["*"] : clubs;
-      if (!cl.length) { toast("Coche au moins un club, ou utilise « Ne plus partager »"); return false; }
+      const clubs = fd.getAll("club"), cl = clubs.includes("*") ? ["*"] : clubs, ars = fd.getAll("archer");
+      if (!cl.length && !ars.length) { toast("Coche au moins un club ou un archer, ou utilise « Ne plus partager »"); return false; }
       const f = fd.get("file");
       if (!d && f && f.size) {
         const type = guessType(f); if (!type) { toast("Format non accepté. Enregistre-le en PDF."); return false; }
         (async () => { try { const r = await S.assets.upload(f, { type }); const id = newId("documents");
-          await save("documents", id, { dossierId: null, titre: f.name.replace(/\.[^.]+$/, ""), description: "", assetId: r.id, nomFichier: f.name, contentType: r.contentType, taille: r.sizeBytes, createdAt: Date.now(), partageClubs: cl, partageLe: Date.now() });
+          await save("documents", id, { dossierId: null, titre: f.name.replace(/\.[^.]+$/, ""), description: "", assetId: r.id, nomFichier: f.name, contentType: r.contentType, taille: r.sizeBytes, createdAt: Date.now(), partageClubs: cl, partageArchers: ars, partageLe: Date.now() });
           toast("Document partagé avec les archers"); render(); } catch (e) { console.error(e); toast("Envoi impossible"); } })();
         return;
       }
       const doc = d || S.documents.find((x) => x.id === fd.get("docId")); if (!doc) { toast("Choisis un document ou un fichier"); return false; }
-      doc.partageClubs = cl; doc.partageLe = doc.partageLe || Date.now(); patch("documents", doc.id, { partageClubs: cl, partageLe: doc.partageLe }); toast("Document partagé avec les archers"); render();
+      doc.partageClubs = cl; doc.partageArchers = ars; doc.partageLe = doc.partageLe || Date.now(); patch("documents", doc.id, { partageClubs: cl, partageArchers: ars, partageLe: doc.partageLe }); toast(cl.length ? "Document partagé avec les archers" : `Document partagé avec ${ars.length} archer${ars.length > 1 ? "s" : ""}`); render();
     },
-    onDelete: d && (d.partageClubs || []).length ? () => { d.partageClubs = []; patch("documents", d.id, { partageClubs: [] }); toast("Le document n'est plus partagé"); render(); } : null, deleteLabel: "Ne plus partager",
+    onDelete: d && ((d.partageClubs || []).length || (d.partageArchers || []).length) ? () => { d.partageClubs = []; d.partageArchers = []; patch("documents", d.id, { partageClubs: [], partageArchers: [] }); toast("Le document n'est plus partagé"); render(); } : null, deleteLabel: "Ne plus partager",
   });
 }
 let accCache = null;
@@ -4819,7 +4823,7 @@ function openDoc(d) {
     ${d.canva?.designId ? `<div class="bar"><span class="tirline">🎨 Fiche Canva${d.canva.majLe ? ", à jour le " + esc(fmtDT(d.canva.majLe)) : ""}</span><span class="grow"></span>${S.canWrite && CANVA() ? `<button type="button" class="btn" id="doc-cv">Mettre à jour depuis Canva</button>` : ""}</div>` : ""}
     <div class="acts">
       ${k === "yt" ? `<a class="btn" href="https://youtu.be/${esc(d.video)}" target="_blank" rel="noopener">Ouvrir dans YouTube</a>` : `<button type="button" class="btn" id="doc-dl">Télécharger</button>`}
-      ${S.canWrite ? `<button type="button" class="btn" id="doc-share">${(d.partageClubs || []).length ? "Partagé avec les archers" : "Partager avec les archers"}</button><button type="button" class="btn" id="doc-attr">Attribuer à un archer</button><button type="button" class="btn" id="doc-edit">Modifier</button>` : ""}
+      ${S.canWrite ? `<button type="button" class="btn" id="doc-share">${(d.partageClubs || []).length || (d.partageArchers || []).length ? "Partagé avec les archers" : "Partager avec les archers"}</button><button type="button" class="btn" id="doc-attr">Attribuer à un archer</button><button type="button" class="btn" id="doc-edit">Modifier</button>` : ""}
       <button type="button" class="btn primary" data-close>Fermer</button></div></div></div>`;
   const close = () => { el.innerHTML = ""; if (S.stale) { S.stale = false; render(); } };
   el.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", (e) => { if (e.target === b) close(); }));
