@@ -613,6 +613,7 @@ svg.chart .szl { stroke: var(--line-2, var(--line)); stroke-dasharray: 3 3; }
 .hum { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .hum-b { border: 2px solid var(--line); background: var(--sunk); border-radius: 16px; padding: 10px 4px; display: grid; justify-items: center; gap: 4px; cursor: pointer; color: var(--ink); min-height: 76px; }
 .hum-b span { font-size: 2.2rem; line-height: 1; } .hum-b[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.cbx { display: flex; align-items: center; gap: 10px; margin: 6px 0; font-weight: 600; cursor: pointer; } .cbx input { width: 20px; height: 20px; flex: none; accent-color: var(--accent); }
 .ar-pts { font-size: 1.75rem; font-weight: 800; color: var(--accent); } .ar-pts small { font-size: .8rem; font-weight: 600; color: var(--muted); }
 .ar-pts-big { font-family: var(--font-display); font-size: 2.6rem; font-weight: 800; color: var(--accent); line-height: 1.1; margin: 4px 0 10px; } .ar-pts-big small { font-size: 1rem; color: var(--muted); } .ar-pts-big span { display: block; font-size: .9rem; font-weight: 600; color: var(--muted); }
 .ar-cpt { display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 4px; margin-top: 4px; }
@@ -3620,7 +3621,7 @@ function viewMateriel() {
     <div class="chips" role="group" aria-label="Trier le matériel"><span class="tirline" style="align-self:center">Trier par</span>${MAT_TRIS.map(([k, l]) => `<button class="chip" data-mattri="${k}" aria-pressed="${matTri() === k}">${l}</button>`).join("")}</div>
     <div class="chips" role="group" aria-label="Filtrer par état"><button class="chip" data-matetat="all" aria-pressed="${fe === "all"}">Tous états</button>
     ${ETATS.map(([k, l]) => `<button class="chip" data-matetat="${k}" aria-pressed="${fe === k}"><span class="dot et-${k}"></span>${l} <span style="opacity:.7">${cnt(k)}</span></button>`).join("")}</div>
-    <div class="bar"><span class="tirline">${cnt("bon") + cnt("surveiller")} utilisable${cnt("bon") + cnt("surveiller") > 1 ? "s" : ""} · ${all.filter((m) => m.archerId).length} prêté${all.filter((m) => m.archerId).length > 1 ? "s" : ""}</span><span class="grow"></span>${S.canWrite ? `<button class="btn" data-act="mat-bulk">Ajouter une série</button>` : ""}</div>`;
+    <div class="bar"><span class="tirline">${cnt("bon") + cnt("surveiller")} utilisable${cnt("bon") + cnt("surveiller") > 1 ? "s" : ""} · ${all.filter((m) => m.archerId).length} prêté${all.filter((m) => m.archerId).length > 1 ? "s" : ""}</span><span class="grow"></span>${S.canWrite ? `<button class="btn" data-act="mat-bulk">Ajouter une série</button><button class="btn" data-act="mat-export">Exporter</button>` : ""}</div>`;
   const ro = S.canWrite ? "" : "disabled";
   const showType = ft === "all";
   h += `<div class="scroll"><table class="vol mat"><thead><tr>${cid ? "" : "<th>Club</th>"}${showType ? "<th>Type</th>" : ""}<th>N°</th><th>Taille</th><th>Puissance</th><th>Main</th><th>Modèle</th><th>État</th><th>Prêté à</th><th>Remarque</th><th></th></tr></thead><tbody>
@@ -3679,6 +3680,69 @@ function formMat(m = null) {
   });
   bindMatType("mt"); brancherRemarques();
   $("#mt-club").addEventListener("change", () => { if (!m) $("#mt-num").value = nextNum($("#mt-club").value, document.querySelector('#mt-type input:checked')?.value || "arc"); });
+}
+// V.1.9 : export du matériel, en PDF (à afficher au club) ou en tableur (pour le bureau), avec les filtres et le tri en cours
+function matListe(cid, ft, fe) {
+  return S.materiel.filter((m) => (!cid || m.clubId === cid) && (ft === "all" || mtype(m) === ft) && (fe === "all" || (m.etat || "bon") === fe))
+    .sort((a, b) => clubName(a.clubId).localeCompare(clubName(b.clubId)) || byMat(a, b));
+}
+const mainTxt = (m) => (has(mtype(m), "main") ? ({ G: "Gaucher", D: "Droitier", A: "Ambidextre" })[m.main] || "" : "");
+function formMatExport() {
+  const cid = S.club !== "all" && club(S.club) ? S.club : S.clubs.length === 1 ? S.clubs[0].id : null;
+  const ft = S.matType || "all", fe = S.matEtat || "all", n = matListe(cid, ft, fe).length;
+  const filtres = [cid ? clubName(cid) : "tous les clubs", ft === "all" ? "tout le matériel" : mtLab(ft, 2).toLowerCase(), fe === "all" ? "tous états" : etatLab(fe).toLowerCase(), "tri par " + (MAT_TRIS.find(([k]) => k === matTri()) || MAT_TRIS[0])[1].toLowerCase()].join(" · ");
+  sheet("Exporter le matériel", `
+    <p class="tirline">${n} élément${n > 1 ? "s" : ""} : ${esc(filtres)}. Change les filtres de l'onglet Matériel pour exporter autre chose.</p>
+    <div class="f">Format<div class="radio">
+      <label><input type="radio" name="format" value="pdf" checked> PDF à afficher ou imprimer</label>
+      <label><input type="radio" name="format" value="csv"> Tableur (Excel, LibreOffice) pour le bureau</label></div></div>
+    <label class="cbx"><input type="checkbox" name="prets" checked> Indiquer à qui le matériel est prêté</label>
+    <label class="cbx"><input type="checkbox" name="remarques" checked> Inclure les remarques</label>
+    <span class="tirline">Pour un affichage au club, tu peux décocher les noms des archers.</span>`, {
+    onSave(fd) { if (!n) { toast("Aucun matériel avec ces filtres"); return false; } exportMateriel(cid, ft, fe, fd.get("format"), !!fd.get("prets"), !!fd.get("remarques"), filtres); },
+  });
+  const ok = document.querySelector(".sheet .acts .primary"); if (ok) ok.textContent = "Exporter";
+}
+async function exportMateriel(cid, ft, fe, format, prets, remarques, filtres) {
+  const L = matListe(cid, ft, fe); if (!L.length) { toast("Aucun matériel avec ces filtres"); return; }
+  const dl = await claude.use("downloads"); if (!dl) { toast("Téléchargement indisponible sur cet appareil"); return; }
+  const qui = (m) => { if (!m.archerId) return ""; const a = S.archers.find((x) => x.id === m.archerId); return a ? fullName(a) : "Prêté"; };
+  const jour = new Date().toLocaleDateString("fr-FR"), name = `materiel-${slugOf(cid ? clubName(cid) : "clubs")}-${todayISO()}`;
+  const etCol = (et) => (et === "reparer" || et === "hs" ? [170, 40, 30] : et === "surveiller" ? [160, 110, 0] : [30, 110, 60]);
+  const cols = [...(cid ? [] : [["Club", (m) => clubName(m.clubId), 30]]), ["Type", (m) => mtLab(mtype(m)), 38], ["N°", (m) => m.numero, 12], ["Taille", (m) => tailleTxt(m).replace("″", " po"), 18], ["Puissance", (m) => (has(mtype(m), "puissance") && m.puissance ? m.puissance + " lbs" : ""), 20],
+    ["Main", mainTxt, 22], ["Modèle", (m) => m.modele || "", 32], ["État", (m) => etatLab(m.etat || "bon"), 24], ...(prets ? [["Prêté à", qui, 38]] : []), ...(remarques ? [["Remarque", (m) => m.remarque || "", 0]] : [])];
+  let data, filename;
+  if (format === "csv") {
+    const q = (v) => `"${String(v ?? "").replace(/"/g, '""').replace(/\r?\n/g, " ")}"`;
+    const rows = [cols.map(([l]) => l), ...L.map((m) => cols.map(([, f]) => f(m)))];
+    data = new Blob(["﻿" + rows.map((r) => r.map(q).join(";")).join("\r\n")], { type: "text/csv;charset=utf-8" }); filename = name + ".csv";
+  } else {
+    try { await loadPdfLib(); } catch (e) { toast("Impossible de charger l'outil PDF, vérifie la connexion"); return; }
+    const W = 297, H = 210, M = 12, doc = await makePdf(W, H); let y = 0;
+    const fixe = cols.reduce((t, [, , w]) => t + w, 0), reste = Math.max(30, W - 2 * M - fixe);
+    let x = M; const C = cols.map(([l, f, w]) => { const c = { l, f, x, w: w || reste }; x += c.w; return c; });
+    const entete = () => { doc.setFillColor(232, 240, 234); doc.rect(M, y - 4.2, W - 2 * M, 6.5, "F"); doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...PDF_INK); C.forEach((c) => doc.text(c.l, c.x + 1, y)); y += 5.5; doc.setFont("helvetica", "normal"); };
+    const page = (premiere) => { doc.addPage(); y = M; doc.setFillColor(...PDF_GREEN); doc.rect(0, 0, W, 4, "F");
+      if (premiere) { doc.setTextColor(...PDF_GREY); doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.text(`MATÉRIEL DU CLUB · ${jour}`, M, y + 4); doc.setTextColor(...PDF_INK); doc.setFontSize(18); doc.text(cid ? clubName(cid) : "Matériel des clubs", M, y + 12);
+        doc.setFont("helvetica", "normal"); doc.setFontSize(9.5); doc.setTextColor(...PDF_GREY);
+        const ut = L.filter((m) => ["bon", "surveiller"].includes(m.etat || "bon")).length, pr = L.filter((m) => m.archerId).length;
+        doc.text(`${L.length} élément${L.length > 1 ? "s" : ""} · ${ut} utilisable${ut > 1 ? "s" : ""} · ${pr} prêté${pr > 1 ? "s" : ""} · ${filtres}`, M, y + 18); y += 26; }
+      else y += 6;
+      entete(); };
+    page(true);
+    let typePrec = null;
+    L.forEach((m) => {
+      doc.setFontSize(9);
+      if (ft === "all" && mtype(m) !== typePrec) { typePrec = mtype(m); if (y + 14 > H - M) page(false); doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(...PDF_GREEN); doc.text(mtLab(typePrec, 2), M, y + 1); y += 6; doc.setFont("helvetica", "normal"); doc.setFontSize(9); }
+      const wr = C.map((c) => doc.splitTextToSize(String(c.f(m) ?? "") || "—", c.w - 2)), h = Math.max(1, ...wr.map((w) => w.length)) * 3.9 + 2.6;
+      if (y + h > H - M) page(false);
+      const et = m.etat || "bon";
+      wr.forEach((w, i) => { doc.setTextColor(...(C[i].l === "État" ? etCol(et) : PDF_INK)); doc.text(w, C[i].x + 1, y); });
+      doc.setDrawColor(210, 218, 212); doc.setLineWidth(0.2); doc.line(M, y + h - 3.7, W - M, y + h - 3.7); y += h;
+    });
+    data = await doc.blob(); filename = name + ".pdf";
+  }
+  try { await dl.save({ filename, data }); toast("Matériel exporté : ouvre le fichier téléchargé"); } catch (e) { if (e?.code !== "declined") toast("Téléchargement impossible"); }
 }
 function nextNum(cid, type = "arc") { const n = S.materiel.filter((m) => m.clubId === cid && mtype(m) === type).map(numKey).filter(isFinite); return String(n.length ? Math.max(...n) + 1 : 1); }
 function formMatBulk() {
@@ -6444,6 +6508,7 @@ document.addEventListener("click", (e) => {
   if (t.dataset.act === "mat-new") { formMat(); return; }
   if (t.dataset.act === "edit-equip") { formEquip(S.archers.find((x) => x.id === S.archer)); return; }
   if (t.dataset.act === "mat-bulk") { formMatBulk(); return; }
+  if (t.dataset.act === "mat-export") { formMatExport(); return; }
   if (t.dataset.cls) { const c = S.concours.find((x) => x.id === S.concoursId), k = (c?.classements || []).find((x) => x.id === t.dataset.cls); if (k) openClassement(c, k); return; }
   if (t.dataset.clsDel) {
     if (!t.dataset.confirm) { t.dataset.confirm = 1; t.textContent = "Supprimer ?"; return; }
