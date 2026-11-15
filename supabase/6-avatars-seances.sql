@@ -1,3 +1,8 @@
+-- Document partagé avec un club de l'archer, ou avec lui seul (liste d'archers choisie par l'entraîneur)
+create or replace function public.doc_partage_archer(p_doc jsonb, p_clubs jsonb, p_archer text) returns boolean language sql immutable as $$
+  select coalesce(public.doc_partage(p_doc, p_clubs), false) or coalesce(jsonb_typeof(p_doc->'partageArchers') = 'array' and p_doc->'partageArchers' ? p_archer, false)
+$$;
+
 -- 6. Avatars, journal des séances et parties visibles : l'archer choisit un dessin (aucune photo), retrouve les séances du club où il était présent,
 --    et ne voit que les parties de son espace choisies par l'entraîneur (profil Découverte, Loisir, Compétiteur)
 -- À exécuter une fois dans Supabase › SQL Editor, après les scripts 2 à 5 (relançable sans risque).
@@ -57,7 +62,7 @@ begin
     -- documents partagés avec tout le club (calendrier des concours, règlement…)
     'documents', coalesce((select jsonb_agg(jsonb_build_object('id', id, 'titre', data->>'titre', 'description', data->>'description', 'assetId', data->>'assetId',
         'contentType', data->>'contentType', 'nomFichier', data->>'nomFichier', 'video', data->>'video', 'partageLe', data->'partageLe'))
-      from docs where owner = p_owner and col = 'documents' and doc_partage(data, ar->'clubIds')), '[]'::jsonb),
+      from docs where owner = p_owner and col = 'documents' and doc_partage_archer(data, ar->'clubIds', p_archer)), '[]'::jsonb),
     -- entraînements proposés des 6 prochaines semaines, avec la réponse de l'archer ; les encadrants voient aussi qui vient
     'entrainements', coalesce((select jsonb_agg(jsonb_build_object('id', s.id, 'date', s.data->>'date', 'heure', s.data->>'heure', 'groupe', s.data->>'groupe',
         'theme', s.data->>'theme', 'lieu', s.data->>'lieu', 'clubId', s.data->>'clubId', 'public', s.data->>'public',
@@ -175,7 +180,7 @@ create or replace function public.archer_peut_lire(p_name text) returns boolean 
   or exists (
     select 1 from acces a
     join docs ar on ar.owner = a.owner and ar.col = 'archers' and ar.id = a.archer_id
-    join docs d on d.owner = a.owner and d.col = 'documents' and public.doc_partage(d.data, ar.data->'clubIds')
+    join docs d on d.owner = a.owner and d.col = 'documents' and public.doc_partage_archer(d.data, ar.data->'clubIds', a.archer_id)
     where a.user_id = auth.uid() and a.owner::text = split_part(p_name, '/', 1) and d.data->>'assetId' = split_part(p_name, '/', 2))
   -- image d'un thème de fête (Paramètres › Général), visible par les archers si le thème leur est diffusé
   or exists (
