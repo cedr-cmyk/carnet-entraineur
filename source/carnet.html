@@ -2801,7 +2801,7 @@ const MAT_TYPES = [["arc", "Arc d'initiation", "Arcs d'initiation", "arc"], ["po
 const mtype = (m) => m?.type || "arc";
 const mtLab = (k, i = 1) => (MAT_TYPES.find(([x]) => x === k) || MAT_TYPES[0])[i];
 // Champs utiles selon le type : une poignée n'a pas de puissance, des branches n'ont pas de main
-const MAT_FIELDS = { arc: ["taille", "puissance", "main"], poignee: ["taille", "main", "modele"], branches: ["taille", "puissance", "modele"] };
+const MAT_FIELDS = { arc: ["taille", "puissance", "main", "modele"], poignee: ["taille", "main", "modele"], branches: ["taille", "puissance", "modele"] };
 const has = (k, f) => MAT_FIELDS[k].includes(f);
 const TAILLES = { arc: [48, 54, 58, 60, 62, 64, 66, 68, 70], poignee: [19, 21, 23, 25, 27], branches: ["Courtes", "Moyennes", "Longues", 66, 68, 70] };
 const tailleTxt = (m) => (m.taille ? (isNaN(Number(m.taille)) ? m.taille : m.taille + "″") : "");
@@ -2860,7 +2860,7 @@ function viewMateriel() {
       const k = mtype(m), ar = S.archers.filter((a) => (a.clubIds || []).includes(m.clubId) && a.actif !== false).sort(byName);
       return `<tr class="et-row-${m.etat || "bon"}">${cid ? "" : `<td class="txt"><span class="dot" style="background:${esc(clubColor(m.clubId))};display:inline-block"></span> ${esc(clubName(m.clubId))}</td>`}
         ${showType ? `<td class="txt">${esc(mtLab(k, 2).replace(/s$/, ""))}</td>` : ""}
-        <th>${esc(m.numero)}</th><td>${esc(tailleTxt(m)) || "—"}</td><td>${has(k, "puissance") && m.puissance ? esc(m.puissance) + " lbs" : "—"}</td><td>${has(k, "main") ? (m.main === "G" ? "Gaucher" : m.main === "D" ? "Droitier" : "—") : "—"}</td>
+        <th>${esc(m.numero)}</th><td>${esc(tailleTxt(m)) || "—"}</td><td>${has(k, "puissance") && m.puissance ? esc(m.puissance) + " lbs" : "—"}</td><td>${has(k, "main") ? (m.main === "G" ? "Gaucher" : m.main === "D" ? "Droitier" : m.main === "A" ? "Ambidextre" : "—") : "—"}</td>
         <td class="txt">${esc(m.modele || "") || "—"}</td>
         <td><select class="etat-sel et-${m.etat || "bon"}" data-matf="${m.id}|etat" ${ro} aria-label="État du n°${esc(m.numero)}">${ETATS.map(([e, l]) => `<option value="${e}" ${(m.etat || "bon") === e ? "selected" : ""}>${l}</option>`).join("")}</select></td>
         <td><select data-matf="${m.id}|archerId" ${ro} aria-label="Prêté à"><option value="">—</option>${ar.map((a) => `<option value="${a.id}" ${m.archerId === a.id ? "selected" : ""}>${esc(fullName(a))}</option>`).join("")}${m.archerId && !ar.some((a) => a.id === m.archerId) ? `<option value="${esc(m.archerId)}" selected>${esc(fullName(S.archers.find((a) => a.id === m.archerId) || {}))}</option>` : ""}</select></td>
@@ -2892,7 +2892,7 @@ function formMat(m = null) {
       <label class="f" for="mt-num">Numéro<input type="text" id="mt-num" name="numero" required value="${esc(m?.numero ?? nextNum(cid, k0))}"></label></div>
     <div class="grid3"><label class="f" for="mt-t"><span id="mt-tlab">Taille</span><input type="text" inputmode="numeric" id="mt-t" name="taille" list="mt-tl" value="${esc(m?.taille ?? "")}">${tailleList("mt-tl", k0)}</label>
       <label class="f" for="mt-p" id="mt-puissance-w">Puissance (lbs)<input type="number" inputmode="decimal" min="0" max="80" step="0.5" id="mt-p" name="puissance" value="${esc(m?.puissance ?? "")}"></label>
-      <label class="f" for="mt-m" id="mt-main-w">Main<select id="mt-m" name="main"><option value="">—</option><option value="D" ${m?.main === "D" ? "selected" : ""}>Droitier</option><option value="G" ${m?.main === "G" ? "selected" : ""}>Gaucher</option></select></label></div>
+      <label class="f" for="mt-m" id="mt-main-w">Main<select id="mt-m" name="main"><option value="">—</option><option value="D" ${m?.main === "D" ? "selected" : ""}>Droitier</option><option value="G" ${m?.main === "G" ? "selected" : ""}>Gaucher</option><option value="A" ${m?.main === "A" ? "selected" : ""}>Ambidextre</option></select></label></div>
     <label class="f" for="mt-mod" id="mt-modele-w">Marque et modèle<input type="text" id="mt-mod" name="modele" value="${esc(m?.modele ?? "")}" placeholder="Ex. WNS, Hoyt…"></label>
     <div class="f">État<div class="radio">${ETATS.map(([e, l]) => `<label><input type="radio" name="etat" value="${e}" ${(m?.etat || "bon") === e ? "checked" : ""}> ${l}</label>`).join("")}</div></div>
     <label class="f" for="mt-r">Remarque<textarea id="mt-r" name="remarque" style="min-height:60px" placeholder="Corde, repose-flèche, viseur fourni, défaut constaté…">${esc(m?.remarque)}</textarea></label>${remarqueChips("mt-r")}`, {
@@ -2922,7 +2922,7 @@ function formMatBulk() {
       <label class="f" for="mb-to">Au numéro<input type="number" inputmode="numeric" min="0" id="mb-to" name="to"></label></div>
     <div class="grid3"><label class="f" for="mb-t"><span id="mb-tlab">Taille</span><input type="text" inputmode="numeric" id="mb-t" name="taille" list="mb-tl">${tailleList("mb-tl", k0)}</label>
       <label class="f" for="mb-p" id="mb-puissance-w">Puissance (lbs)<input type="number" inputmode="decimal" min="0" max="80" step="0.5" id="mb-p" name="puissance"></label>
-      <label class="f" for="mb-m" id="mb-main-w">Main<select id="mb-m" name="main"><option value="">—</option><option value="D">Droitier</option><option value="G">Gaucher</option></select></label></div>
+      <label class="f" for="mb-m" id="mb-main-w">Main<select id="mb-m" name="main"><option value="">—</option><option value="D">Droitier</option><option value="G">Gaucher</option><option value="A">Ambidextre</option></select></label></div>
     <label class="f" for="mb-mod" id="mb-modele-w">Marque et modèle<input type="text" id="mb-mod" name="modele"></label>
     <label class="f" for="mb-r">Remarque pour toute la série<textarea id="mb-r" name="remarque" style="min-height:50px" placeholder="Facultatif"></textarea></label>${remarqueChips("mb-r")}
     <span class="tirline">Tout le matériel créé aura ces caractéristiques et sera en « Bon état ». Tu pourras ensuite modifier chaque élément.</span>`, {
