@@ -3608,8 +3608,18 @@ const byMat = (a, b) => { const t = matTri(), ty = MAT_TYPES.findIndex(([k]) => 
   if (t === "puissance") return puisKey(a) - puisKey(b) || tailleKey(a) - tailleKey(b) || byNum(a, b);
   return byNum(a, b); };
 const MAT_REMARQUES = ["Corde à changer", "Repose-flèche à remplacer", "Point d'encochage à refaire", "Branche rayée", "Poignée abîmée", "Viseur fourni", "Carquois fourni", "Palette fournie", "Prêt pour la saison", "À vérifier avant prêt"];
-const remarquesDispo = () => { const vues = []; S.materiel.forEach((m) => String(m.remarque || "").split(/\s*[·\n]\s*/).forEach((r) => { r = r.trim(); if (r && r.length <= 60 && !vues.includes(r)) vues.push(r); })); return [...MAT_REMARQUES, ...vues.filter((r) => !MAT_REMARQUES.includes(r)).slice(0, 8)]; };
-const remarqueChips = (champ) => `<div class="chips mat-rq" data-rq-for="${champ}" role="group" aria-label="Remarques toutes prêtes">${remarquesDispo().map((r) => `<button type="button" class="chip" data-rq="${esc(r)}">+ ${esc(r)}</button>`).join("")}</div>`;
+// La liste se gère dans Paramètres › Matériel (ajouter, retirer, remettre la liste de départ)
+const remarquesDispo = () => { try { const l = JSON.parse(prm().matRemarquesJson || "null"); if (Array.isArray(l)) return l; } catch (e) { /* liste de départ */ } return [...MAT_REMARQUES]; };
+const setRemarques = (l) => setParam({ matRemarquesJson: JSON.stringify(l) });
+function remarquesCard(ro) {
+  const l = remarquesDispo();
+  return `<h2 class="sec">Remarques toutes prêtes</h2><div class="card">
+    <span class="tirline">Elles s'ajoutent d'un toucher dans la remarque d'un matériel (fiche et série).</span>
+    <div class="chips" style="margin-top:8px">${l.map((r, i) => `<span class="chip">${esc(r)}${ro ? "" : ` <button type="button" class="lnk" data-rqdel="${i}" aria-label="Retirer ${esc(r)}" title="Retirer">✕</button>`}</span>`).join("") || `<span class="tirline">Aucune remarque pour l'instant.</span>`}</div>
+    ${ro ? "" : `<div class="bar" style="margin-top:8px"><input type="text" id="rq-new" maxlength="60" placeholder="Nouvelle remarque, ex. Corde de 66″ fournie" aria-label="Nouvelle remarque"><button class="btn" data-act="rq-add">Ajouter</button></div>
+    <div class="bar"><span class="grow"></span><button class="btn ghost" data-act="rq-reset">Remettre la liste de départ</button></div>`}</div>`;
+}
+const remarqueChips = (champ) => `<div class="chips mat-rq" data-rq-for="${champ}" role="group" aria-label="Remarques toutes prêtes">${remarquesDispo().map((r) => `<button type="button" class="chip" data-rq="${esc(r)}">+ ${esc(r)}</button>`).join("")}</div><span class="tirline">Cette liste se gère dans Paramètres › Matériel.</span>`;
 function brancherRemarques() {
   document.querySelectorAll(".mat-rq").forEach((z) => z.addEventListener("click", (ev) => { const b = ev.target.closest("[data-rq]"); if (!b) return; const ta = document.getElementById(z.dataset.rqFor); if (!ta) return;
     const deja = ta.value.split(/\s*[·\n]\s*/).map((x) => x.trim()).filter(Boolean); if (deja.includes(b.dataset.rq)) { toast("Déjà dans la remarque"); return; }
@@ -5741,7 +5751,7 @@ function feteCard(ro) {
 function viewData() {
   const p = prm(), ro = S.canWrite ? "" : "disabled";
   const nEnt = S.carnets.length;
-  const PT = [["general", "Général"], ["themes", "Thèmes et apparence"], ["seances", "Séances"], ["concours", "Concours"], ["archers", "Espace archers"], ["donnees", "Données"]], pt = PT.some(([k]) => k === S.pTab) ? S.pTab : LS.get("ptab", "general");
+  const PT = [["general", "Général"], ["themes", "Thèmes et apparence"], ["seances", "Séances"], ["concours", "Concours"], ["archers", "Espace archers"], ["materiel", "Matériel"], ["donnees", "Données"]], pt = PT.some(([k]) => k === S.pTab) ? S.pTab : LS.get("ptab", "general");
   const part = { general: () => `    ${versionCard()}
     <h2 class="sec">Entraîneur</h2>
     <div class="card"><label class="f" for="pr-nom">Ton prénom ou nom (affiché en haut du carnet)<input type="text" id="pr-nom" data-prm="nom" value="${esc(p.nom)}" placeholder="Ex. Cédric" ${ro}></label></div>
@@ -5756,6 +5766,7 @@ function viewData() {
     </div>
     ${animCodeCard()}
 `,
+    materiel: () => remarquesCard(ro),
     themes: () => `    <p class="tirline" style="margin:0">Les thèmes de fête et ceux que tu crées (Octobre rose, Movember, Mars bleu…), et sur l'ordinateur le studio pour régler l'apparence du carnet.</p>
     ${feteCard(ro)}
     ${studioCard()}
@@ -6364,7 +6375,7 @@ function formSeance(s = null) {
 
 // ---------- Événements ----------
 document.addEventListener("click", (e) => {
-  const t = e.target.closest("[data-tab],[data-ftab],[data-mattri],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab],[data-qsort],[data-coptab],[data-com-edit],[data-fmtfed],[data-fmt-del],[data-type-del],[data-fete-ap],[data-fete-new],[data-fete-edit],[data-fete-imgdel],[data-mot-edit],[data-centry-open],[data-cd-exp],[data-cd-arch],[data-exmode],[data-ftheme],[data-fiche],[data-anim],[data-animvue],[data-animtri],[data-anim-saisie],[data-anim-essai-new],[data-anim-retenir],[data-anim-essai-del]");
+  const t = e.target.closest("[data-tab],[data-ftab],[data-mattri],[data-rqdel],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab],[data-qsort],[data-coptab],[data-com-edit],[data-fmtfed],[data-fmt-del],[data-type-del],[data-fete-ap],[data-fete-new],[data-fete-edit],[data-fete-imgdel],[data-mot-edit],[data-centry-open],[data-cd-exp],[data-cd-arch],[data-exmode],[data-ftheme],[data-fiche],[data-anim],[data-animvue],[data-animtri],[data-anim-saisie],[data-anim-essai-new],[data-anim-retenir],[data-anim-essai-del]");
   if (!t || t.closest("#sheet")) return;
   if (t.dataset.dashSuivi) { const [sid, aid] = t.dataset.dashSuivi.split("|"); S.seance = sid; S.suivi = aid; S.tirOpen = null; render(); window.scrollTo(0, 0); return; }
   if (t.dataset.tab) { go(t.dataset.tab); try { history.replaceState(null, "", "#" + t.dataset.tab); } catch (_) {} return; }
@@ -6446,6 +6457,9 @@ document.addEventListener("click", (e) => {
   if (t.dataset.mat) { formMat(S.materiel.find((x) => x.id === t.dataset.mat)); return; }
   if (t.dataset.matetat) { S.matEtat = t.dataset.matetat; render(); return; }
   if (t.dataset.mattype) { S.matType = t.dataset.mattype; render(); return; }
+  if (t.dataset.rqdel != null && S.canWrite) { const l = remarquesDispo(); const r = l.splice(Number(t.dataset.rqdel), 1)[0]; setRemarques(l); toast(`« ${r} » retirée`); render(); return; }
+  if (t.dataset.act === "rq-add" && S.canWrite) { const v = ($("#rq-new")?.value || "").trim().replace(/\s*·\s*/g, " "); if (!v) { toast("Écris la remarque à ajouter"); return; } const l = remarquesDispo(); if (l.some((x) => x.toLowerCase() === v.toLowerCase())) { toast("Elle est déjà dans la liste"); return; } setRemarques([...l, v]); toast(`« ${v} » ajoutée`); render(); return; }
+  if (t.dataset.act === "rq-reset" && S.canWrite) { setRemarques([...MAT_REMARQUES]); toast("Liste de départ remise"); render(); return; }
   if (t.dataset.mattri) { S.matTri = t.dataset.mattri; LS.set("matTri", S.matTri); render(); return; }
   if (t.dataset.act === "mat-new") { formMat(); return; }
   if (t.dataset.act === "edit-equip") { formEquip(S.archers.find((x) => x.id === S.archer)); return; }
