@@ -603,7 +603,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
   const docThumb = (d) => (d.video ? "▶" : (d.contentType || "").startsWith("image/") ? "IMG" : "PDF");
   function vDocs() {
     const docs = (St.data.documents || []).slice().sort((a, b) => (b.partageLe || 0) - (a.partageLe || 0));
-    let h = `<h2 class="sec">Documents du club</h2>`;
+    let h = `<h2 class="sec">Documents partagés par ton entraîneur</h2>`;
     h += docs.length ? `<div class="list">${docs.map((d) => `<div class="row"><span class="thumb">${docThumb(d)}</span><span class="main"><span class="t">${esc(d.titre || d.nomFichier)}</span>${d.description ? `<span class="m">${esc(d.description.slice(0, 140))}</span>` : ""}</span>
       ${docBtn(d)}</div>`).join("")}</div>` : `<p class="notice">Aucun document partagé pour l'instant (calendrier des concours, règlement…).</p>`;
     return h + `<h2 class="sec">Mes exercices</h2>` + vExos();
