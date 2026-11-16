@@ -45,6 +45,29 @@ window.CarnetCampagne = (() => {
   const inconnue = (t, i) => { const c = t.campagne?.connues; return c === false || (c === "mixte" && !!(t.campagne.cibles[i] || {}).i); };
   const modeDist = (t) => (t.campagne?.connues === "mixte" ? "mixtes" : t.campagne?.connues === false ? "inconnues" : "connues");
   const est = (t) => !!(t && t.campagne);
+  // Blason de campagne : spot jaune (6 au centre, puis 5) et 4 zones noires de même largeur ; r normalisé (1 = bord du blason)
+  const RAY = [[0.1, "6"], [0.2, "5"], [0.4, "4"], [0.6, "3"], [0.8, "2"], [1, "1"]];
+  const valeurA = (r, ufo) => { if (r > 1) return "M"; const z = RAY.find(([x]) => r <= x)[1]; return ufo && z === "6" ? "5" : z; };
+  const R0 = 200; // rayon du blason dans le dessin (marge autour pour les flèches hors cible)
+  function blasonSvg(imps = [], o = {}) {
+    const anneaux = RAY.slice().reverse().map(([x, z]) => `<circle cx="250" cy="250" r="${x * R0}" fill="${+z >= 5 ? "#FFD700" : "#1E293B"}" stroke="${+z >= 5 ? (z === "6" ? "#1E293B" : "#B45309") : "#F8FAFC"}" stroke-width="${z === "6" ? 1 : 2}"/>`).join("");
+    const pts = imps.filter(Boolean).map(([x, y], k) => `<circle cx="${250 + x * R0}" cy="${250 + y * R0}" r="${o.petit ? 6 : 9}" fill="${o.couleur || "#06B6D4"}" stroke="#0B0F19" stroke-width="2"${o.dernier && k === imps.length - 1 ? ' stroke-width="3"' : ""}/>`).join("");
+    const moy = o.moyenne && imps.length >= 3 ? (() => { const m = imps.filter(Boolean).reduce((a, [x, y]) => [a[0] + x, a[1] + y], [0, 0]).map((v) => v / imps.filter(Boolean).length); return `<path d="M${250 + m[0] * R0 - 12} ${250 + m[1] * R0}h24M${250 + m[0] * R0} ${250 + m[1] * R0 - 12}v24" stroke="#EF4444" stroke-width="4"/>`; })() : "";
+    return `<svg viewBox="0 0 500 500" class="cp-blason" ${o.attr || ""} style="width:min(100%,${o.taille || 360}px);height:auto;display:block;margin:0 auto;touch-action:manipulation;${o.attr ? "cursor:crosshair" : ""}" role="img" aria-label="Blason de campagne"><rect width="500" height="500" fill="#F1F5F9" rx="16"/>${anneaux}<path d="M244 250h12M250 244v12" stroke="#1E293B" stroke-width="1.5"/>${pts}${moy}</svg>`;
+  }
+  // tendance du groupement (centre des impacts) en mots
+  function tendance(imps) {
+    const l = imps.filter(Boolean); if (l.length < 3) return "";
+    const [mx, my] = l.reduce((a, [x, y]) => [a[0] + x, a[1] + y], [0, 0]).map((v) => v / l.length), seuil = 0.12;
+    const v = my > seuil ? "bas" : my < -seuil ? "haut" : "", h = mx > seuil ? "droite" : mx < -seuil ? "gauche" : "";
+    const mots = [v && `le ${v}`, h && `la ${h}`].filter(Boolean);
+    return mots.length ? `Groupement décalé vers ${mots.join(" et vers ")}.` : "Groupement bien centré.";
+  }
+  const impactsDe = (t) => (t.campagne?.cibles || []).flatMap((c) => (c.imp || []).filter(Boolean));
+  function ouVont(t) {
+    const imps = impactsDe(t); if (!imps.length) return "";
+    return `<div class="card" style="gap:8px"><b>Où vont les flèches</b>${blasonSvg(imps, { petit: true, moyenne: true, taille: 300 })}<span class="tirline">${imps.length} flèche${imps.length > 1 ? "s" : ""} placée${imps.length > 1 ? "s" : ""}, ramenées sur un même blason. ${tendance(imps)} La croix rouge montre le centre du groupement.</span></div>`;
+  }
   function stats(t) {
     const fl = (t.volees || []).flat(), [ca, cb] = colsDe(t);
     return { total: fl.reduce((s, x) => s + val(x), 0), n: fl.length, n6: fl.filter((x) => x === "6").length, n5: fl.filter((x) => x === "5").length, n4: fl.filter((x) => x === "4").length,
@@ -121,21 +144,30 @@ window.CarnetCampagne = (() => {
         ${mx ? `<div class="f">Cette cible<div class="seg-mode" role="group"><button type="button" data-ci="0" aria-pressed="${cn}">Distance connue</button><button type="button" data-ci="1" aria-pressed="${!cn}">Distance inconnue</button></div></div>` : ""}
         <label class="f">Distance de la cible (m)${cn ? "" : " — estimée"}<input type="number" inputmode="decimal" min="0" max="80" step="0.5" id="cp-d" value="${esc(c.d)}" placeholder="${pl ? pl[0] + " à " + pl[1] : "facultatif"}"></label>
         ${sug && !uf(t) ? `<div class="chips">${[...new Set(sug)].map((d) => `<button type="button" class="chip" data-cd="${d}" aria-pressed="${String(c.d) === String(d)}">${d} m</button>`).join("")}</div><span class="tirline">Distances du piquet ${pqNom(p).toLowerCase()} pour un blason de ${c.b} cm (règlement FFTA).</span>` : pl ? `<span class="tirline">Piquet ${pqNom(p).toLowerCase()}, blason de ${c.b} cm : entre ${pl[0]} et ${pl[1]} m.</span>` : uf(t) ? `<span class="tirline">Blason et distance repris de l'exemple de parcours du règlement UFOLEP (cible ${(i % 12) + 1}) : corrige-les si ton parcours est différent.</span>` : ""}
+        ${o.impacts !== false ? `<div class="seg-mode" role="group" aria-label="Façon de noter"><button type="button" data-cmode="touches" aria-pressed="${!t.campagne.surCible}">Touches</button><button type="button" data-cmode="cible" aria-pressed="${!!t.campagne.surCible}">Sur la cible</button></div>` : ""}
+        ${t.campagne.surCible && o.impacts !== false ? `${blasonSvg(c.imp || [], { attr: 'data-cblason', dernier: true })}<span class="tirline">Touche le blason là où la flèche s'est plantée (en dehors = manquée).</span>` : ""}
         <div class="cp-fl" style="display:flex;gap:8px;justify-content:center">${[0, 1, 2].map((k) => `<span class="key ${v[k] !== undefined ? kcls(v[k]) : "k-miss"}" style="display:grid;place-items:center;width:64px;min-height:56px">${v[k] ?? "·"}</span>`).join("")}</div>
-        <div class="pad" style="grid-template-columns:repeat(${keysDe(t).length},minmax(0,1fr))">${keysDe(t).map((k) => `<button type="button" class="key ${kcls(k)}" data-ck="${k}" ${v.length >= 3 ? "disabled" : ""} aria-label="Flèche ${k === "M" ? "manquée" : k}">${k}</button>`).join("")}</div>`}
+        <div class="pad" ${t.campagne.surCible && o.impacts !== false ? "hidden" : ""} style="grid-template-columns:repeat(${keysDe(t).length},minmax(0,1fr))">${keysDe(t).map((k) => `<button type="button" class="key ${kcls(k)}" data-ck="${k}" ${v.length >= 3 ? "disabled" : ""} aria-label="Flèche ${k === "M" ? "manquée" : k}">${k}</button>`).join("")}</div>`}
         <div style="display:grid;grid-template-columns:auto 1fr 1fr auto;gap:8px"><button type="button" class="btn" data-cnav="-1" ${i ? "" : "disabled"} aria-label="Cible précédente">‹</button><button type="button" class="btn" data-cundo ${v.length || i ? "" : "disabled"}>↶ Annuler</button>
           <button type="button" class="btn" data-cfeuille>${vueFeuille ? "Saisie" : "Feuille de marque"}</button><button type="button" class="btn" data-cnav="1" ${i < N - 1 ? "" : "disabled"} aria-label="Cible suivante">›</button></div>
         <div class="acts"><button type="button" class="btn danger left" data-cabandon>${o.tir ? "Annuler les modifications" : "Abandonner"}</button><button type="button" class="btn" data-cquit>Plus tard</button><button type="button" class="btn primary" data-cfin ${st.n ? "" : "disabled"}>${st.cibles >= N ? "Enregistrer le parcours" : "Terminer ici"}</button></div>
         <span class="tirline">« Terminer ici » enregistre le parcours avec les cibles déjà tirées. ${o.cle ? "« Plus tard » garde la saisie sur cet appareil pour la reprendre. " : ""}« ${o.tir ? "Annuler les modifications" : "Abandonner"} » ${o.tir ? "ferme sans rien changer" : "efface ce parcours"}.</span></div></div>`;
       const dIn = el.querySelector("#cp-d"); if (dIn) dIn.addEventListener("input", () => { c.d = dIn.value; garder(); });
+      const avancer = () => { garder(); if (v.length >= 3 && i < N - 1) { parcours(); setTimeout(() => { if (!ferme && t.volees[i] === v) { i++; parcours(); } }, 450); return; } parcours(); };
+      el.querySelector("[data-cblason]")?.addEventListener("click", (ev) => {
+        if (v.length >= 3) return; const sv = ev.currentTarget, pt = sv.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
+        const q = pt.matrixTransform(sv.getScreenCTM().inverse()), x = (q.x - 250) / R0, y = (q.y - 250) / R0;
+        c.imp = c.imp || []; c.imp[v.length] = [Math.round(x * 1000) / 1000, Math.round(y * 1000) / 1000]; v.push(valeurA(Math.hypot(x, y), uf(t))); avancer();
+      });
       el.querySelector(".cp-sheet").addEventListener("click", (ev) => {
         const b = ev.target.closest("button,[data-cc]"); if (!b) return;
+        if (b.dataset.cmode) { t.campagne.surCible = b.dataset.cmode === "cible"; garder(); return parcours(); }
         if (b.dataset.cb) { c.b = Number(b.dataset.cb); garder(); return parcours(); }
         if (b.dataset.ci) { c.i = b.dataset.ci === "1"; garder(); return parcours(); }
         if (b.dataset.cd) { c.d = b.dataset.cd; garder(); return parcours(); }
         if (b.dataset.cc != null) { i = Number(b.dataset.cc); vueFeuille = false; return parcours(); }
-        if (b.dataset.ck) { if (v.length >= 3) return; v.push(b.dataset.ck); garder(); if (v.length >= 3 && i < N - 1) { parcours(); setTimeout(() => { if (!ferme && t.volees[i] === v) { i++; parcours(); } }, 450); return; } return parcours(); }
-        if (b.hasAttribute("data-cundo")) { if (v.length) v.pop(); else if (i) { i--; t.volees[i].pop(); } garder(); return parcours(); }
+        if (b.dataset.ck) { if (v.length >= 3) return; if (c.imp) c.imp[v.length] = null; v.push(b.dataset.ck); return avancer(); }
+        if (b.hasAttribute("data-cundo")) { const cut = (cc, vv) => { vv.pop(); if (cc.imp) cc.imp.length = vv.length; }; if (v.length) cut(c, v); else if (i) { i--; cut(cb[i] || {}, t.volees[i]); } garder(); return parcours(); }
         if (b.dataset.cnav) { i = Math.min(N - 1, Math.max(0, i + Number(b.dataset.cnav))); return parcours(); }
         if (b.hasAttribute("data-cfeuille")) { vueFeuille = !vueFeuille; return parcours(); }
         if (b.hasAttribute("data-cabandon")) {
@@ -153,7 +185,7 @@ window.CarnetCampagne = (() => {
     if (t && t.campagne) parcours(); else reglage();
   }
   const enCours = (cle) => { try { return !!localStorage.getItem("carnet-campagne:" + cle); } catch (e) { return false; } };
-  return { piquet, piquetUf, piquetsDe, stats, feuille, resume, libelle, saisir, enCours, est, val, PIQUETS, PIQUETS_UF, CONNUES, INCONNUES };
+  return { blasonSvg, tendance, ouVont, piquet, piquetUf, piquetsDe, stats, feuille, resume, libelle, saisir, enCours, est, val, PIQUETS, PIQUETS_UF, CONNUES, INCONNUES };
 })();
 // V.1.10 : run-archery (guide FFTA) — course en boucles + tirs sur 4 cibles à 18 m ; chaque cible manquée = une boucle de pénalité.
 // Proposé aux archers FFTA ; pour les autres, l'entraîneur l'active sur la fiche de l'archer (espace.run).
@@ -168,6 +200,40 @@ window.CarnetRun = (() => {
   };
   const POS = { debout: "debout", genou: "à genou" };
   const est = (t) => !!(t && t.run);
+  // Les 4 cibles à abattre (16 cm, centre de 3 cm) ; un impact = [cible 0..3, x, y] avec x, y rapportés au rayon de la cible
+  const DR = 70, DX = (k) => 100 + k * 200;
+  function disquesSvg(imps = [], n = 4, attr = "") {
+    const touch = new Set(imps.filter((p) => p && Math.hypot(p[1], p[2]) <= 1).map((p) => p[0]));
+    const d = Array.from({ length: n }, (_, k) => `<circle cx="${DX(k)}" cy="110" r="${DR}" fill="${touch.has(k) ? "#F8FAFC" : "#1E293B"}" stroke="${touch.has(k) ? "#22C55E" : "#475569"}" stroke-width="${touch.has(k) ? 6 : 2}"/><circle cx="${DX(k)}" cy="110" r="${DR * 3 / 16}" fill="${touch.has(k) ? "#CBD5E1" : "#334155"}"/><text x="${DX(k)}" y="205" text-anchor="middle" font-size="22" fill="#94A3B8">${k + 1}</text>`).join("");
+    const pts = imps.filter(Boolean).map(([k, x, y], i) => `<circle cx="${DX(k) + x * DR}" cy="${110 + y * DR}" r="9" fill="#06B6D4" stroke="#0B0F19" stroke-width="2"/><text x="${DX(k) + x * DR}" y="${110 + y * DR + 5}" text-anchor="middle" font-size="12" font-weight="700" fill="#0B0F19">${i + 1}</text>`).join("");
+    return `<svg viewBox="0 0 ${n * 200} 220" ${attr} style="width:100%;height:auto;display:block;touch-action:manipulation;${attr ? "cursor:crosshair" : ""}" role="img" aria-label="Les ${n} cibles"><rect width="${n * 200}" height="220" rx="14" fill="#0F172A"/>${d}${pts}</svg>`;
+  }
+  const touchees = (imps) => new Set(imps.filter((p) => p && Math.hypot(p[1], p[2]) <= 1).map((p) => p[0])).size;
+  // placement sur les 4 cibles dans un conteneur : ok({ imp, touchees, fleches })
+  function placer(box, r, x0, ok) {
+    let imps = (x0?.imp || []).slice();
+    const dessiner = () => {
+      box.innerHTML = `<div class="card" style="gap:8px;padding:10px">${disquesSvg(imps, r.cibles, "data-rdisq")}
+        <div class="bar"><span class="tirline">${imps.length}/${r.fleches} flèche${imps.length > 1 ? "s" : ""} · ${touchees(imps)} cible${touchees(imps) > 1 ? "s" : ""} touchée${touchees(imps) > 1 ? "s" : ""}</span><span class="grow"></span>
+        <button type="button" class="btn" data-rpundo ${imps.length ? "" : "disabled"}>↶</button><button type="button" class="btn primary" data-rpok>OK</button></div>
+        <span class="tirline">Touche là où chaque flèche est passée : sur une cible (elle tombe) ou à côté.</span></div>`;
+      box.querySelector("[data-rdisq]").addEventListener("click", (ev) => {
+        if (imps.length >= r.fleches) return; const sv = ev.currentTarget, pt = sv.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
+        const q = pt.matrixTransform(sv.getScreenCTM().inverse()), k = Math.max(0, Math.min(r.cibles - 1, Math.round((q.x - 100) / 200)));
+        imps.push([k, Math.round(((q.x - DX(k)) / DR) * 100) / 100, Math.round(((q.y - 110) / DR) * 100) / 100]); dessiner();
+      });
+      box.querySelector("[data-rpundo]").addEventListener("click", () => { imps.pop(); dessiner(); });
+      box.querySelector("[data-rpok]").addEventListener("click", () => ok({ imp: imps, touchees: touchees(imps), fleches: Math.max(imps.length, 1) }));
+    };
+    dessiner();
+  }
+  function ouVont(t) {
+    const imps = (t.run?.tirs || []).flatMap((x) => x.imp || []); if (!imps.length) return "";
+    const rel = imps.map(([, x, y]) => [x, y]), tc = window.CarnetCampagne?.tendance(rel) || "";
+    const pts = rel.map(([x, y]) => `<circle cx="${120 + x * 90}" cy="${120 + y * 90}" r="7" fill="${Math.hypot(x, y) <= 1 ? "#06B6D4" : "#EF4444"}" stroke="#0B0F19" stroke-width="2"/>`).join("");
+    return `<div class="card" style="gap:8px"><b>Où vont les flèches</b><svg viewBox="0 0 240 240" style="width:min(100%,260px);height:auto;display:block;margin:0 auto" role="img" aria-label="Impacts ramenés sur une cible"><rect width="240" height="240" rx="14" fill="#0F172A"/><circle cx="120" cy="120" r="90" fill="#F8FAFC"/><circle cx="120" cy="120" r="17" fill="#CBD5E1"/>${pts}</svg>
+      <span class="tirline">${imps.length} flèche${imps.length > 1 ? "s" : ""} placée${imps.length > 1 ? "s" : ""}, ramenées sur une seule cible (en rouge : à côté). ${tc}</span></div>`;
+  }
   const ouvert = (a) => !!a && (a.espace?.run === true || (a.espace?.run !== false && (a.federations || []).includes("FFTA")));
   const mmss = (ms) => { if (ms == null || !isFinite(ms)) return "—"; const s = Math.max(0, ms) / 1000, m = Math.floor(s / 60); return `${m}:${String(Math.floor(s % 60)).padStart(2, "0")}${s < 600 ? "," + Math.floor((s * 10) % 10) : ""}`; };
   const lireTemps = (x) => { const m = String(x || "").trim().match(/^(?:(\d+)[:h'])?(\d{1,2})(?:[,.](\d))?$/) || String(x || "").trim().match(/^(\d+)[:'](\d{1,2})(?:[:'"](\d{1,2}))?$/); if (!m) return null; return ((Number(m[1] || 0) * 60) + Number(m[2])) * 1000 + Number(m[3] || 0) * 100; };
@@ -296,7 +362,8 @@ window.CarnetRun = (() => {
           ${G.fin && reste.length ? `<p class="notice">Il reste ${reste.length} tir${reste.length > 1 ? "s" : ""} à noter. Tu peux les noter maintenant ou enregistrer quand même (ils compteront comme non notés).</p>` : ""}
           ${lignes.length ? lignes.map(({ id, n, x }) => `<div class="card" data-g="${esc(id)}" data-gtir="${n}" style="gap:6px;${x.touchees != null ? "opacity:.8" : ""}"><div class="bar"><span class="tag">cible ${G.cible[id]}</span><b>${esc(nom(id))}</b><span class="grow"></span><span class="tirline">tir ${n + 1} · ${POS[r.positions[n]]}</span></div>
             <div class="seg-mode" role="group" aria-label="Cibles touchées">${Array.from({ length: r.cibles + 1 }, (_, k) => `<button type="button" data-gtc="${k}" aria-pressed="${x.touchees === k}">${k}</button>`).join("")}</div>
-            ${r.fleches > r.cibles ? `<div class="seg-mode" role="group" aria-label="Flèches tirées"><small style="align-self:center;padding:0 6px">flèches</small>${Array.from({ length: r.fleches - r.cibles + 1 }, (_, k) => k + r.cibles).map((k) => `<button type="button" data-gfl="${k}" aria-pressed="${(x.fleches ?? r.cibles) === k}">${k}</button>`).join("")}</div>` : ""}</div>`).join("") : `<p class="notice">Aucun archer n'est encore reparti du pas de tir.</p>`}`;
+            ${r.fleches > r.cibles ? `<div class="seg-mode" role="group" aria-label="Flèches tirées"><small style="align-self:center;padding:0 6px">flèches</small>${Array.from({ length: r.fleches - r.cibles + 1 }, (_, k) => k + r.cibles).map((k) => `<button type="button" data-gfl="${k}" aria-pressed="${(x.fleches ?? r.cibles) === k}">${k}</button>`).join("")}</div>` : ""}
+            <div class="bar"><button type="button" class="btn" data-gplace>🎯 ${x.imp?.length ? "Revoir les flèches" : "Placer les flèches"}</button></div><div data-gpbox></div></div>`).join("") : `<p class="notice">Aucun archer n'est encore reparti du pas de tir.</p>`}`;
       } else {
         corps = `${G.depart ? `<button type="button" class="btn" data-gvue="tirs" ${G.ordre.some((id) => G.a[id].tirs.length) ? "" : "disabled"}>🎯 Noter les tirs${reste.length ? ` (${reste.length} à noter)` : ""}</button>` : `<button type="button" class="btn primary" data-gdep style="min-height:72px;font-size:1.3rem">▶ Départ groupé (${G.ordre.length} archers)</button><span class="tirline">Indique la cible de chaque archer : tu noteras ses tirs cible par cible.</span>`}
           <div style="display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(250px,1fr))">${G.ordre.map(carte).join("")}</div>`;
@@ -325,7 +392,8 @@ window.CarnetRun = (() => {
           oublier(); fermer(); fini(res); return;
         }
         const g = b.closest("[data-g]"); if (!g) return; const A = G.a[g.dataset.g];
-        if (g.dataset.gtir != null) { const x = A.tirs[Number(g.dataset.gtir)]; if (b.dataset.gtc) { x.touchees = Number(b.dataset.gtc); if (x.fleches == null) x.fleches = r.cibles; } if (b.dataset.gfl) x.fleches = Number(b.dataset.gfl); garder(); return groupe(); }
+        if (g.dataset.gtir != null && b.hasAttribute("data-gplace")) { const x = A.tirs[Number(g.dataset.gtir)]; placer(g.querySelector("[data-gpbox]"), r, x, (res) => { Object.assign(x, res, { fleches: Math.max(Math.min(r.fleches, res.fleches), r.cibles) }); garder(); groupe(); }); return; }
+        if (g.dataset.gtir != null && (b.dataset.gtc || b.dataset.gfl)) { const x = A.tirs[Number(g.dataset.gtir)]; if (b.dataset.gtc) { x.touchees = Number(b.dataset.gtc); if (x.fleches == null) x.fleches = r.cibles; } if (b.dataset.gfl) x.fleches = Number(b.dataset.gfl); garder(); return groupe(); }
         const i = A.segs.length, e = et[i];
         if (b.hasAttribute("data-gnext")) { if (e?.k === "tir") A.tirs[e.n] = A.tirs[e.n] || { touchees: null, fleches: null }; A.segs.push(Date.now() - G.depart - A.segs.reduce((s, x) => s + x, 0)); G.fin = false; garder(); return groupe(); }
         if (b.hasAttribute("data-gundo")) { if (A.stop) delete A.stop; else if (A.segs.length) { const k = A.segs.length - 1; A.segs.pop(); if (et[k]?.k === "tir" && A.tirs[et[k].n]?.touchees == null) A.tirs.length = et[k].n; } garder(); return groupe(); }
@@ -337,21 +405,26 @@ window.CarnetRun = (() => {
     }
     // saisie après coup : temps total (et temps par étape si on les a), cibles touchées à chaque tir
     function manuel() {
-      const r = t.run, et = etapes(r), pris = r.simple && r.arrive && !o.tir;
+      const r = t.run, et = etapes(r), pris = r.simple && r.arrive && !o.tir, imps = r.positions.map((_, k) => r.tirs[k]?.imp || null);
       const box = sheet(`<h3>${esc(libelle(t))}</h3><form id="run-man" style="display:grid;gap:12px">
         ${pris ? `<div class="ar-pts-big">${mmss(r.temps)}<span>Ton temps au chrono. Note maintenant tes tirs.</span></div>` : ""}
         <label class="f" ${pris ? "hidden" : ""}>Temps total (min:s)<input type="text" inputmode="decimal" name="temps" value="${r.temps != null ? mmss(r.temps) : ""}" placeholder="ex. 12:45" required></label>
         ${r.positions.map((p, k) => `<div class="grid3"><label class="f">Tir ${k + 1} (${POS[p]}) : cibles touchées<select name="t${k}">${Array.from({ length: r.cibles + 1 }, (_, n) => `<option ${Number(r.tirs[k]?.touchees ?? r.cibles) === n ? "selected" : ""}>${n}</option>`).join("")}</select></label>
-          <label class="f">Flèches tirées<select name="f${k}">${Array.from({ length: r.fleches }, (_, n) => n + 1).map((n) => `<option ${Number(r.tirs[k]?.fleches ?? Math.min(r.cibles, r.fleches)) === n ? "selected" : ""}>${n}</option>`).join("")}</select></label></div>`).join("")}
+          <label class="f">Flèches tirées<select name="f${k}">${Array.from({ length: r.fleches }, (_, n) => n + 1).map((n) => `<option ${Number(r.tirs[k]?.fleches ?? Math.min(r.cibles, r.fleches)) === n ? "selected" : ""}>${n}</option>`).join("")}</select></label>
+          ${o.impacts !== false ? `<button type="button" class="btn" data-rplace="${k}" style="align-self:end">🎯 ${imps[k]?.length ? "Revoir mes flèches" : "Placer mes flèches"}</button>` : ""}</div><div data-rpbox="${k}"></div>`).join("")}
         <details ${r.simple ? "hidden" : ""}><summary>Temps de chaque étape (facultatif)</summary><div class="grid3">${et.map((e, i) => `<label class="f">${e.k === "course" ? `Boucle ${e.n + 1}` : `Tir ${e.n + 1}`}<input type="text" inputmode="decimal" name="s${i}" value="${r.segs[i] != null ? mmss(r.segs[i]) : ""}" placeholder="min:s"></label>`).join("")}</div></details>
         <div class="acts"><button type="button" class="btn danger left" data-rab>${o.tir ? "Annuler les modifications" : "Abandonner"}</button><button class="btn primary">Enregistrer</button></div></form>`);
       box.querySelector("[data-rab]").addEventListener("click", (ev) => abandon(ev.currentTarget));
       const f = box.querySelector("#run-man");
+      box.querySelectorAll("[data-rplace]").forEach((b) => b.addEventListener("click", () => {
+        const k = Number(b.dataset.rplace), pb = box.querySelector(`[data-rpbox="${k}"]`);
+        placer(pb, r, { imp: imps[k] || [] }, (res) => { imps[k] = res.imp; f["t" + k].value = String(res.touchees); f["f" + k].value = String(Math.min(r.fleches, res.fleches)); pb.innerHTML = ""; b.textContent = "🎯 Revoir mes flèches"; });
+      }));
       f.addEventListener("submit", (ev) => {
         ev.preventDefault();
         const tot = pris ? r.temps : lireTemps(f.temps.value); if (tot == null) { f.temps.setCustomValidity("Écris le temps en minutes:secondes, par exemple 12:45"); f.temps.reportValidity(); f.temps.setCustomValidity(""); return; }
         r.temps = tot; r.fini = true; r.manuel = !r.simple; delete r.depart;
-        r.tirs = r.positions.map((_, k) => ({ touchees: Number(f["t" + k].value), fleches: Number(f["f" + k].value) }));
+        r.tirs = r.positions.map((_, k) => ({ touchees: Number(f["t" + k].value), fleches: Number(f["f" + k].value), ...(imps[k]?.length ? { imp: imps[k] } : {}) }));
         const segs = et.map((_, i) => lireTemps(f["s" + i].value)); r.segs = segs.every((x) => x != null) ? segs : [];
         enregistrer();
       });
@@ -360,7 +433,7 @@ window.CarnetRun = (() => {
     if (t && t.run) (t.run.manuel ? manuel : t.run.simple && !t.run.arrive ? simple : t.run.simple ? manuel : chrono)(); else reglage();
   }
   const enCours = (cle) => { try { return !!localStorage.getItem("carnet-run:" + cle); } catch (e) { return false; } };
-  return { FORMATS, est, ouvert, stats, libelle, resume, feuille, saisir, enCours, mmss, etapes };
+  return { FORMATS, est, ouvert, stats, libelle, resume, feuille, saisir, enCours, mmss, etapes, ouVont };
 })();
 window.CarnetArcherUI = (API, opts = {}) => {
   const API0 = API;
@@ -616,7 +689,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
       ${li("Date", d.date ? dObj(d.date).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : "")}
       ${li("Flèches", fl.map(([l, v]) => `${l} ${v}`).join(" · "))}${li("Tir compté", sc != null ? `${sc} pts${d.tcDistance ? ` à ${d.tcDistance} m` : ""}` : "")}${li("Score du concours", sp != null && d.concoursId ? `${sp} pts` : "")}
       ${li("Objectif atteint", d.atteint === "O" ? "Oui" : d.atteint === "N" ? "Non" : "")}${li("Ressenti", num(d.note) != null ? `${d.note} / 10` : "")}${li("Émotion", d.emotion)}${li("Mes commentaires", d.commentaire)}
-      ${window.CarnetRun.est(d.tcTir) ? `<div class="ar-pts-big">${window.CarnetRun.mmss(window.CarnetRun.stats(d.tcTir).temps)}<span>${esc(window.CarnetRun.resume(d.tcTir))}</span></div>` + window.CarnetRun.feuille(d.tcTir) : window.CarnetCampagne.est(d.tcTir) ? window.CarnetCampagne.feuille(d.tcTir) : d.tcTir && window.CarnetCible?.carte ? (() => { try { return window.CarnetCible.carte(d.tcTir); } catch (err) { return ""; } })() : ""}
+      ${window.CarnetRun.est(d.tcTir) ? `<div class="ar-pts-big">${window.CarnetRun.mmss(window.CarnetRun.stats(d.tcTir).temps)}<span>${esc(window.CarnetRun.resume(d.tcTir))}</span></div>` + window.CarnetRun.feuille(d.tcTir) + window.CarnetRun.ouVont(d.tcTir) : window.CarnetCampagne.est(d.tcTir) ? window.CarnetCampagne.feuille(d.tcTir) + window.CarnetCampagne.ouVont(d.tcTir) : d.tcTir && window.CarnetCible?.carte ? (() => { try { return window.CarnetCible.carte(d.tcTir); } catch (err) { return ""; } })() : ""}
       ${d.commentaireCoach ? `<div class="coach-mot"><b>💬 Le mot de ton entraîneur</b><p style="margin:4px 0 0;color:var(--ink)">${esc(d.commentaireCoach)}</p></div>` : ""}
       ${fl.length || sc != null || d.note || d.commentaire || d.emotion ? "" : `<p class="tirline">Rien n'a été noté pour cette séance.</p>`}
       <div class="acts"><button type="button" class="btn primary" data-close>Fermer</button></div></div></div>`;
@@ -757,14 +830,14 @@ window.CarnetArcherUI = (API, opts = {}) => {
   }
   const cpCle = () => "ar:" + (who()?.archer_id || "");
   function tirCampagne() {
-    window.CarnetCampagne.saisir({ ...campagneProfil(), cle: cpCle(), titre: "Parcours campagne", surFermer: render }, async (t) => {
+    window.CarnetCampagne.saisir({ ...campagneProfil(), cle: cpCle(), titre: "Parcours campagne", impacts: M().has("impacts"), surFermer: render }, async (t) => {
       const st = window.CarnetCampagne.stats(t); if (!st.n) return;
       if (PREVIEW) { toast("Aperçu : l'archer enregistrera ce parcours, pas toi"); return; }
       const date = today(), data = { date, saison: `${saisonOf(date) - 1}-${saisonOf(date)}`, objectif: "Parcours campagne", tcDistance: "", tcBlason: "Campagne", compte: String(st.n), scoreCompte: String(st.total), tcTir: t };
       let res; try { res = await API.ecrire(who(), "a_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), data); } catch (err) { toast("Enregistrement impossible : " + err.message); return; }
       const el = $("#sheet");
       el.innerHTML = `<div class="sheet-bg" data-close><div class="sheet" role="dialog" aria-label="Parcours enregistré"><h3>Parcours enregistré dans ton carnet</h3>${res?.enAttente ? `<p class="notice">📴 Pas de réseau : ton parcours est gardé sur ce téléphone et partira tout seul dès que le réseau revient.</p>` : ""}
-        <div class="ar-pts-big">${st.total}<small> pts</small><span>${esc(window.CarnetCampagne.libelle(t))}</span></div>${window.CarnetCampagne.feuille(t)}
+        <div class="ar-pts-big">${st.total}<small> pts</small><span>${esc(window.CarnetCampagne.libelle(t))}</span></div>${window.CarnetCampagne.feuille(t)}${window.CarnetCampagne.ouVont(t)}
         <div class="acts"><button type="button" class="btn primary" data-close>Fermer</button></div></div></div>`;
       el.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", (ev) => { if (ev.target === b) el.innerHTML = ""; }));
       St.saison = saisonOf(date); load();
@@ -776,13 +849,13 @@ window.CarnetArcherUI = (API, opts = {}) => {
   const runData = (t) => { const st = window.CarnetRun.stats(t); return { tcDistance: String(t.run.dist), tcBlason: "Run-archery", compte: String(st.fleches), scoreCompte: "", tcTir: t }; };
   function tirRun() {
     const age = campagneProfil().age;
-    window.CarnetRun.saisir({ cle: runCle(), titre: "Run-archery", kids: age != null && age < 15, simple: true, surFermer: render }, async (t) => {
+    window.CarnetRun.saisir({ cle: runCle(), titre: "Run-archery", kids: age != null && age < 15, simple: true, impacts: M().has("impacts"), surFermer: render }, async (t) => {
       if (PREVIEW) { toast("Aperçu : l'archer enregistrera ce run, pas toi"); return; }
       const date = today(), data = { date, saison: `${saisonOf(date) - 1}-${saisonOf(date)}`, objectif: "Run-archery", ...runData(t) };
       let res; try { res = await API.ecrire(who(), "a_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), data); } catch (err) { toast("Enregistrement impossible : " + err.message); return; }
       const el = $("#sheet");
       el.innerHTML = `<div class="sheet-bg" data-close><div class="sheet" role="dialog" aria-label="Run enregistré"><h3>Run-archery enregistré dans ton carnet</h3>${res?.enAttente ? `<p class="notice">📴 Pas de réseau : ton run est gardé sur ce téléphone et partira tout seul dès que le réseau revient.</p>` : ""}
-        <div class="ar-pts-big">${window.CarnetRun.mmss(window.CarnetRun.stats(t).temps)}<span>${esc(window.CarnetRun.resume(t))}</span></div>${window.CarnetRun.feuille(t)}
+        <div class="ar-pts-big">${window.CarnetRun.mmss(window.CarnetRun.stats(t).temps)}<span>${esc(window.CarnetRun.resume(t))}</span></div>${window.CarnetRun.feuille(t)}${window.CarnetRun.ouVont(t)}
         <div class="acts"><button type="button" class="btn primary" data-close>Fermer</button></div></div></div>`;
       el.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", (ev) => { if (ev.target === b) el.innerHTML = ""; }));
       St.saison = saisonOf(date); load();
@@ -898,7 +971,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
       const f = $("#ar-form"); let prev = null; try { prev = f.tcTir.value ? JSON.parse(f.tcTir.value) : null; } catch (err) { prev = null; }
       const garde = el.innerHTML, valeurs = Object.fromEntries([...new FormData(f)].map(([k, v]) => [k, v]));
       // la saisie du parcours prend la place de la fiche ; on la remet ensuite avec le parcours
-      window.CarnetCampagne.saisir({ ...campagneProfil(), tir: window.CarnetCampagne.est(prev) ? prev : null, cle: window.CarnetCampagne.est(prev) ? null : cpCle() + ":" + (e?.id || "nouveau"), titre: "Parcours campagne" }, (t) => {
+      window.CarnetCampagne.saisir({ ...campagneProfil(), tir: window.CarnetCampagne.est(prev) ? prev : null, impacts: M().has("impacts"), cle: window.CarnetCampagne.est(prev) ? null : cpCle() + ":" + (e?.id || "nouveau"), titre: "Parcours campagne" }, (t) => {
         const st = window.CarnetCampagne.stats(t);
         formEntry({ ...(e || {}), ...valeurs, tcDistance: "", tcBlason: "Campagne", compte: String(st.n), scoreCompte: String(st.total), tcTir: t, objectif: valeurs.objectif || "Parcours campagne", __new: e?.__new });
       });
@@ -906,7 +979,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     $("#ar-run")?.addEventListener("click", () => {
       const f = $("#ar-form"); let prev = null; try { prev = f.tcTir.value ? JSON.parse(f.tcTir.value) : null; } catch (err) { prev = null; }
       const valeurs = Object.fromEntries([...new FormData(f)].map(([k, v]) => [k, v])), age = campagneProfil().age;
-      window.CarnetRun.saisir({ tir: window.CarnetRun.est(prev) ? prev : null, cle: window.CarnetRun.est(prev) ? null : runCle() + ":" + (e?.id || "nouveau"), titre: "Run-archery", kids: age != null && age < 15, simple: true }, (t) => {
+      window.CarnetRun.saisir({ tir: window.CarnetRun.est(prev) ? prev : null, cle: window.CarnetRun.est(prev) ? null : runCle() + ":" + (e?.id || "nouveau"), titre: "Run-archery", kids: age != null && age < 15, simple: true, impacts: M().has("impacts") }, (t) => {
         formEntry({ ...(e || {}), ...valeurs, ...runData(t), objectif: valeurs.objectif || "Run-archery", __new: e?.__new });
       });
     });

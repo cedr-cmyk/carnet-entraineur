@@ -1414,13 +1414,13 @@ function tirCard(t) {
   if (RA.est(t)) { // run-archery : temps, cibles touchées, pénalités
     const rs = RA.stats(t);
     return `<div class="card"><div class="bar"><div style="min-width:0"><b>${esc(RA.libelle(t))}</b><div style="color:var(--muted);font-size:.85rem">${rs.touchees}/${rs.cibles} cibles · ${rs.penal} pénalité${rs.penal > 1 ? "s" : ""}${rs.fini ? "" : " · arrêté avant la fin"}</div></div><span class="grow"></span>
-      <div class="score"><b>${RA.mmss(rs.temps)}</b></div></div>${RA.feuille(t)}
+      <div class="score"><b>${RA.mmss(rs.temps)}</b></div></div>${RA.feuille(t)}${RA.ouVont(t)}
       ${S.canWrite ? `<div class="bar"><button class="btn" data-act="run-edit" data-tir="${t.id}">Modifier</button><span class="grow"></span><button class="btn danger" data-act="del-tir" data-tir="${t.id}">Supprimer ce run</button></div>` : ""}</div>`;
   }
   if (CC.est(t)) { // parcours campagne : feuille de marque FFTA
     const cs = CC.stats(t);
     return `<div class="card"><div class="bar"><div style="min-width:0"><b>${esc(CC.libelle(t))}</b><div style="color:var(--muted);font-size:.85rem">${TIR_TYPES.find(([k]) => k === tirType(t))[1]} · ${cs.cibles} / ${cs.prevues} cibles</div></div><span class="grow"></span>
-      <div class="score"><b>${cs.total}</b><span>pts · ${cs.ca} × ${cs.la} · ${cs.cb} × ${cs.lb}</span></div></div>${CC.feuille(t)}
+      <div class="score"><b>${cs.total}</b><span>pts · ${cs.ca} × ${cs.la} · ${cs.cb} × ${cs.lb}</span></div></div>${CC.feuille(t)}${CC.ouVont(t)}
       ${S.canWrite ? `<div class="bar"><button class="btn" data-act="cp-edit" data-tir="${t.id}">Reprendre la saisie</button><span class="grow"></span><button class="btn danger" data-act="del-tir" data-tir="${t.id}">Supprimer ce parcours</button></div>` : ""}</div>`;
   }
   const st = tirStats(t), open = S.tirOpen === t.id && t.mode !== "total" && S.canWrite;
@@ -2179,8 +2179,8 @@ function formEntree(e = null) {
       ${e?.seanceId ? `<span class="tirline">Ligne liée à une séance du club : les flèches et scores des feuilles de marque s'ajoutent automatiquement.</span>` : ""}</div>
     <div class="grid2"><label class="f" for="ce-sc">Score tir compté<input type="number" inputmode="numeric" min="0" id="ce-sc" name="scoreCompte" value="${esc(e?.scoreCompte)}" placeholder="${e?.auto?.scoreCompte ?? ""}"></label>
       <label class="f" for="ce-scc">Score compétition<input type="number" inputmode="numeric" min="0" id="ce-scc" name="scoreCompet" value="${esc(e?.scoreCompet)}" placeholder="${e?.auto?.scoreCompet ?? ""}"></label></div>
-    ${RA.est(e?.tcTir) ? `<details class="card" open><summary><b>Run-archery</b> <span class="tirline">noté par l'archer · ${esc(RA.resume(e.tcTir))}</span></summary>${RA.feuille(e.tcTir)}</details>` : ""}
-    ${CC.est(e?.tcTir) ? `<details class="card" open><summary><b>Parcours campagne</b> <span class="tirline">noté par l'archer · ${esc(CC.resume(e.tcTir))}</span></summary>${CC.feuille(e.tcTir)}</details>` : ""}
+    ${RA.est(e?.tcTir) ? `<details class="card" open><summary><b>Run-archery</b> <span class="tirline">noté par l'archer · ${esc(RA.resume(e.tcTir))}</span></summary>${RA.feuille(e.tcTir)}${RA.ouVont(e.tcTir)}</details>` : ""}
+    ${CC.est(e?.tcTir) ? `<details class="card" open><summary><b>Parcours campagne</b> <span class="tirline">noté par l'archer · ${esc(CC.resume(e.tcTir))}</span></summary>${CC.feuille(e.tcTir)}${CC.ouVont(e.tcTir)}</details>` : ""}
     ${e?.tcTir && !CC.est(e.tcTir) && !RA.est(e.tcTir) && (e.tcTir.volees || []).some((v) => v.length) ? `<details class="card"><summary><b>Tir compté sur la cible</b> <span class="tirline">noté par l'archer · ${esc(e.tcTir.distance || "")} m · ${esc(e.tcTir.blason || "")}</span></summary><div id="ce-tv">${tirViewer(e.tcTir, "all", "data-tv", S.centrees.filter((x) => x.id !== e.id && x.date <= e.date))}</div></details>` : ""}
     <div class="grid2"><label class="f" for="ce-tcd">Distance du tir compté (m)<input type="number" inputmode="numeric" min="0" id="ce-tcd" name="tcDistance" list="ce-dl" value="${esc(e?.tcDistance)}" placeholder="${esc(e?.auto?.tcDistance ?? "")}"><datalist id="ce-dl">${DISTANCES.map((d) => `<option value="${d}">`).join("")}</datalist></label>
       <label class="f" for="ce-tcb">Blason du tir compté<select id="ce-tcb" name="tcBlason"><option value="">—</option>${blasonOpts(e?.tcBlason || "")}</select></label></div>
@@ -3957,7 +3957,7 @@ function coachTir(id) {
   const others = tcCache.list.filter((x) => x.id !== e.id && x.date <= e.date);
   sheet(`Tir compté du ${fmtLong(e.date)}`, `
     <span class="tirline">${esc(tirLab(e))} · ${esc(e.scoreCompte)} pts${e.compte ? ` en ${esc(e.compte)} flèches` : ""}${e.saisiParArcher ? " · noté par l'archer" : ""}</span>
-    ${RA.est(e.tcTir) ? `<span class="tirline">${esc(RA.libelle(e.tcTir))} · ${esc(RA.resume(e.tcTir))}</span>${RA.feuille(e.tcTir)}` : CC.est(e.tcTir) ? `<span class="tirline">${esc(CC.libelle(e.tcTir))} · ${esc(CC.resume(e.tcTir))}</span>${CC.feuille(e.tcTir)}` : e.tcTir ? `<div id="ct-tv">${tirViewer(e.tcTir, "all", "data-tv", others)}</div>` : ""}
+    ${RA.est(e.tcTir) ? `<span class="tirline">${esc(RA.libelle(e.tcTir))} · ${esc(RA.resume(e.tcTir))}</span>${RA.feuille(e.tcTir)}${RA.ouVont(e.tcTir)}` : CC.est(e.tcTir) ? `<span class="tirline">${esc(CC.libelle(e.tcTir))} · ${esc(CC.resume(e.tcTir))}</span>${CC.feuille(e.tcTir)}${CC.ouVont(e.tcTir)}` : e.tcTir ? `<div id="ct-tv">${tirViewer(e.tcTir, "all", "data-tv", others)}</div>` : ""}
     ${e.commentaire ? `<div class="f">Ressenti de l'archer<p class="prev" style="color:var(--ink)">${esc(e.commentaire)}</p></div>` : ""}
     <label class="f" for="ct-com">Mot de l'entraîneur (l'archer le lit dans son espace)<textarea id="ct-com" name="commentaireCoach" placeholder="Ex. Beau groupement, garde ce placement d'épaule.">${esc(e.commentaireCoach)}</textarea></label>${motRepHtml(e)}`, {
     onSave(fd) { const v = (fd.get("commentaireCoach") || "").trim(); const chg = v !== (e.commentaireCoach || ""), up = chg ? { commentaireCoach: v, motArchive: false } : { commentaireCoach: v }; Object.assign(e, up); patch("carnetEntrees", e.id, up); toast(v ? "Mot envoyé à l'archer" : "Mot retiré"); render(); },
