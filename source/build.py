@@ -1,7 +1,7 @@
 # Construit les versions du carnet à partir de la source unique source/carnet.html.
 #   python3 source/build.py
 # Produit : index.html (appli installée, racine du dépôt), build/carnet-claude.html (carnet Claude) et build/carnet-essai.html (copie d'essai Claude).
-import os
+import re, os
 root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 s = open(os.path.join(root, 'source/carnet.html'), encoding='utf8').read()
 # l'espace archer (archer.js) est intégré à toutes les versions, pour l'aperçu côté entraîneur
@@ -19,7 +19,10 @@ date = datetime.date.today().isoformat()
 # (sur la branche d'une version, on ne compte que ses propres commits : pas ceux du site ni de la version de test précédente)
 try:
   cur = subprocess.run(['git', '-C', root, 'rev-parse', '--abbrev-ref', 'HEAD'], capture_output=True, text=True, check=True).stdout.strip()
-  exclure = [b for b in ('main', 'test') if b != cur]
+  refs = subprocess.run(['git', '-C', root, 'for-each-ref', '--format=%(refname:short)', 'refs/heads', 'refs/remotes/origin'], capture_output=True, text=True).stdout.split()
+  num = lambda b: tuple(int(x) for x in b.replace('origin/', '')[1:].split('.')) if re.fullmatch(r'v\d+(\.\d+)*', b.replace('origin/', '')) else None
+  # le site (main) et les versions précédentes (test = 1.8, v1.9…) ne comptent pas dans le numéro d'essai
+  exclure = [b for b in refs if b.replace('origin/', '') != cur and (b.replace('origin/', '') in ('main', 'test') or (num(b) and num(cur) and num(b) < num(cur)))]
   essai = int(subprocess.run(['git', '-C', root, 'rev-list', '--count', 'HEAD', '--not'] + exclure, capture_output=True, text=True, check=True).stdout.strip() or 0)
 except Exception: essai = 0
 vtest = ver + ('.%d' % essai if essai and ver != site else '')  # ex. 1.9.23 = 23e modification de la 1.9 en test
