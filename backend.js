@@ -215,6 +215,21 @@
   }
   navigator.serviceWorker?.addEventListener("message", (e) => { if (e.data?.type === "need-auth") tellSW(); });
 
+  // ---------- Fiches Canva (V.1.9) : la fonction Supabase « canva » exporte les PDF et met à jour les documents ----------
+  window.CARNET_CANVA = async (action, body = {}) => {
+    if (!navigator.onLine || !session || session.offline) { const e = new Error("Il faut le réseau pour parler à Canva."); e.code = "reseau"; throw e; }
+    const s = (await sb.auth.getSession()).data?.session || session;
+    let r;
+    try {
+      r = await fetch(CFG.supabaseUrl + "/functions/v1/canva", { method: "POST", headers: { "Content-Type": "application/json", apikey: CFG.supabaseAnonKey, Authorization: "Bearer " + s.access_token }, body: JSON.stringify({ action, ...body }) });
+    } catch (e) { const er = new Error("Canva ne répond pas : vérifie le réseau, ou que la fonction « canva » est bien installée dans Supabase."); er.code = "reseau"; throw er; }
+    const d = await r.json().catch(() => ({}));
+    if (r.status === 404 && !d.erreur) { const e = new Error("La fonction « canva » n'est pas encore installée dans Supabase."); e.code = "absente"; throw e; }
+    if (!r.ok || d.erreur) { const e = new Error(d.message || "Erreur " + r.status); e.code = d.erreur || "erreur"; throw e; }
+    if (["ajouter", "sync"].includes(action)) await pull().catch(() => {}); // les documents mis à jour par le serveur
+    return d;
+  };
+
   // ---------- Téléchargements ----------
   const downloads = {
     async save({ filename, data }) {
@@ -234,7 +249,7 @@
     liste: (archerId) => rpc("acces_archer", { p_archer: archerId }),
     retirer: (userId, archerId) => rpc("retirer_acces", { p_user: userId, p_archer: archerId }),
     tous: () => rpc("acces_tous"),
-    // V.1.7.4 : l'entraîneur qui est aussi archer relie sa propre fiche à son compte, puis passe d'un mode à l'autre sur le même appareil
+    // V.1.9 : l'entraîneur qui est aussi archer relie sa propre fiche à son compte, puis passe d'un mode à l'autre sur le même appareil
     moi: () => rpc("mes_acces"),
     relierMoi: async (archerId) => { const c = await rpc("creer_invitation", { p_archer: archerId }); await rpc("utiliser_invitation", { p_code: c }); return rpc("mes_acces"); },
     basculer: (mode) => { ls.set("mode", mode); location.reload(); },
@@ -271,11 +286,19 @@
     await domReady();
     window.carnetArcherAPI = {
       list,
-      charger: (a) => rpc("espace_archer", { p_owner: a.owner, p_archer: a.archer_id }),
+      charger: async (a) => {
+        const d = await rpc("espace_archer", { p_owner: a.owner, p_archer: a.archer_id });
+        // Animations ouvertes aux archers (V.1.9, script 9) : si le script n'est pas encore installé, l'onglet reste simplement caché
+        try { if (d) d.animations = await rpc("archer_animations", { p_owner: a.owner, p_archer: a.archer_id }); } catch (e) { if (d) d.animations = []; }
+        // Thèmes de fête (V.1.9, script 9) : si l'espace ne les donne pas encore (avant le script 6), on les demande à part
+        try { if (d && !(d.reglagesEspace && "fetes" in d.reglagesEspace)) { const f = await rpc("archer_fetes", { p_owner: a.owner, p_archer: a.archer_id }); if (f) d.reglagesEspace = { ...(d.reglagesEspace || {}), ...f }; } } catch (e) {}
+        return d;
+      },
       ecrire: (a, id, data) => rpc("archer_ecrire_entree", { p_owner: a.owner, p_archer: a.archer_id, p_id: id, p_data: data }),
       supprimer: (a, id) => rpc("archer_supprimer_entree", { p_owner: a.owner, p_archer: a.archer_id, p_id: id }),
       repondre: (a, seance, reponse) => rpc("archer_repondre", { p_owner: a.owner, p_archer: a.archer_id, p_seance: seance, p_reponse: reponse }),
       mot: (a, id, action, texte) => rpc("archer_mot", { p_owner: a.owner, p_archer: a.archer_id, p_id: id, p_action: action, p_texte: texte || "" }),
+      animEssai: (a, anim, jeu, essai, cible, compte) => rpc("archer_anim_essai", { p_owner: a.owner, p_archer: a.archer_id, p_anim: anim, p_jeu: jeu, p_essai: essai, p_cible: cible, p_compte: compte }),
       avatar: (a, v) => rpc("archer_avatar", { p_owner: a.owner, p_archer: a.archer_id, p_avatar: v }),
       fichiers: (a) => { filesOwner = a.owner; tellSW(); },
       ajouterCode: async (code) => { await rpc("utiliser_invitation", { p_code: code }); return rpc("mes_acces"); },
@@ -337,7 +360,7 @@
     }
     if (coach === null && !net) return besoinReseau("Pas de réseau. La première ouverture du carnet a besoin d'internet.");
     if (coach === false) { if (!session.offline) sb.auth.onAuthStateChange((_e, s) => { if (s) { session = s; tellSW(); } }); let maint = false; if (net) { try { maint = !!(await withTimeout(rpc("etat_maintenance"), 4000))?.actif; } catch (e) { /* script pas encore installé ou pas de réseau */ } } return archerMode(net, false, maint); }
-    // entraîneur qui a choisi son espace archer (Paramètres › Mon espace archer) ; adresse ?mode=coach = retour forcé en entraîneur
+    // entraîneur qui a choisi son espace archer (Paramètres › Général › Mon espace archer) ; adresse ?mode=coach = retour forcé en entraîneur
     if (/[?&]mode=coach\b/.test(location.search)) { ls.set("mode", "coach"); history.replaceState(null, "", location.pathname + location.hash); }
     if (ls.get("mode", "coach") === "archer") { if (!session.offline) sb.auth.onAuthStateChange((_e, s) => { if (s) { session = s; tellSW(); } }); let apercu = false; try { apercu = sessionStorage.getItem("apercu-maint") === "1"; } catch (e) { /* rien */ } return archerMode(net, true, apercu); }
     if (!session.offline) {

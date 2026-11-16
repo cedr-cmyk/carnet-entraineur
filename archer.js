@@ -75,14 +75,14 @@ window.CarnetArcherUI = (API, opts = {}) => {
     St.err = ""; St.data = null; render();
     try { API.fichiers(who()); St.data = await API.charger(who());
       // thème de fête choisi par l'entraîneur (dans l'aperçu côté entraîneur, la page garde le sien)
-      if (!PREVIEW && !TESTW && window.CarnetFete) window.CarnetFete.appliquer(window.CarnetFete.jour((St.data.reglagesEspace || {}).fetes), (St.data.reglagesEspace || {}).fetesAnim !== false);
+      if (!PREVIEW && !TESTW && window.CarnetFete) window.CarnetFete.appliquer(window.CarnetFete.jour((St.data.reglagesEspace || {}).fetes), (St.data.reglagesEspace || {}).fetesAnim !== false, (St.data.reglagesEspace || {}).fetes || null);
     }
     catch (e) { console.error(e); St.err = "Impossible de charger ton espace. Vérifie ta connexion."; }
     render();
   }
   function header() {
-    const tabs = [["accueil", "Accueil"], ["entrainement", "Entraînement"], ["concours", "Mes concours"], ["documents", "Documents"], ["parametres", "Paramètres"]];
-    const m = M(), vis = { entrainement: ["seances", "carnet", "tir", "impacts", "evals"].some((k) => m.has(k)), concours: m.has("concours"), documents: m.has("documents") };
+    const tabs = [["accueil", "Accueil"], ["entrainement", "Entraînement"], ["concours", "Mes concours"], ["documents", "Documents"], ["animations", "Animations"], ["parametres", "Paramètres"]];
+    const m = M(), vis = { entrainement: ["seances", "carnet", "tir", "impacts", "evals"].some((k) => m.has(k)), concours: m.has("concours"), documents: m.has("documents"), animations: anVisibles(m).length > 0 };
     const shownTabs = tabs.filter(([k]) => vis[k] !== false);
     if (!shownTabs.some(([k]) => k === St.tab) && !["carnet", "evaluations"].includes(St.tab)) St.tab = "accueil";
     top.innerHTML = `<div class="top-in"><div class="brand">${window.CarnetAvatar && St.data?.archer ? "" : `<span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/></svg></span>`}
@@ -98,7 +98,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     else h += `<div class="bar"><span class="grow"></span><button class="btn ghost" data-act="add-code">J'ai un autre code (frère, sœur…)</button></div>`;
     if (St.err) h += `<p class="notice">${esc(St.err)}</p><button class="btn" data-act="reload">Réessayer</button>`;
     else if (!St.data) h += `<p class="notice">Chargement…</p>`;
-    else h += ({ accueil: vAccueil, entrainement: vEntrainement, carnet: vEntrainement, evaluations: vEntrainement, concours: vConcours, documents: vDocs, parametres: vParams }[St.tab] || vAccueil)();
+    else h += ({ accueil: vAccueil, entrainement: vEntrainement, carnet: vEntrainement, evaluations: vEntrainement, concours: vConcours, documents: vDocs, animations: vAnimations, parametres: vParams }[St.tab] || vAccueil)();
     view.innerHTML = h;
   }
   // Réglages du chrono de l'archer : gardés sur son appareil
@@ -239,16 +239,19 @@ window.CarnetArcherUI = (API, opts = {}) => {
     if (o.processus || o.classement || o.score) h += `<div class="card"><h3 class="hub-h">Mes objectifs de la saison</h3>${[["processus", "Processus"], ["classement", "Classement"], ["score", "Score"]].filter(([k]) => o[k]).map(([k, l]) => `<div class="eq-l"><span>${l}</span><b>${esc(o[k])}</b></div>`).join("")}</div>`;
     if (window.CarnetTcProgress && (M().has("tir") || M().has("impacts"))) h += window.CarnetTcProgress(list, St.tcCombo, "data-artc", St.tcPer || "30", "data-artcp", { courbe: M().has("tir"), carte: M().has("impacts") });
     h += list.length ? `<div class="list">${list.map((e) => `<button class="row" data-entry="${esc(e.id)}"><span class="date"><span class="d">${dObj(e.date).getDate()}</span><span class="mo">${dObj(e.date).toLocaleDateString("fr-FR", { month: "short" }).replace(".", "")}</span></span>
-      <span class="main"><span class="t">${esc(e.objectif || (e.concoursId ? "Concours" : "Séance"))}</span><span class="m">${[e.concoursId && num(e.scoreCompet) != null ? e.scoreCompet + " pts" : "", !e.concoursId && num(e.scoreCompte) != null ? `tir compté ${e.scoreCompte} pts${e.tcDistance ? " à " + e.tcDistance + " m" : ""}` : "", vol(e) ? vol(e) + " flèches" : "", e.emotion || "", e.seanceId ? "séance du club" : e.concoursId ? "concours" : "noté par moi", e.commentaireCoach ? "💬 mot de l'entraîneur" : ""].filter(Boolean).map(esc).join(" · ")}</span>${e.commentaire ? `<span class="m">${esc(e.commentaire.slice(0, 100))}</span>` : ""}</span>
-      <span class="count">${num(e.note) != null ? `${e.note}<small>/10</small>` : ""}</span></button>`).join("")}</div>` : `<p class="notice">Rien de noté cette saison. « Noter une séance » ajoute une ligne à ton carnet : ton entraîneur la verra.</p>`;
+      <span class="main"><span class="t">${esc(e.objectif || (e.concoursId ? "Concours" : "Séance"))}</span><span class="m">${[e.concoursId && num(e.scoreCompet) != null ? e.scoreCompet + " pts" : "", !e.concoursId && num(e.scoreCompte) != null ? `tir compté ${e.scoreCompte} pts${e.tcDistance ? " à " + e.tcDistance + " m" : ""}` : "", vol(e) ? vol(e) + " flèches" : "", e.emotion || "", e.seanceId ? "séance du club" : e.concoursId ? "concours" : "noté par moi", ptsDe(e) != null && num(e.note) != null ? `ressenti ${e.note}/10` : "", e.commentaireCoach ? "💬 mot de l'entraîneur" : ""].filter(Boolean).map(esc).join(" · ")}</span>${e.commentaire ? `<span class="m">${esc(e.commentaire.slice(0, 100))}</span>` : ""}</span>
+      ${ptsDe(e) != null ? `<span class="count ar-pts">${ptsDe(e)}<small> pts</small></span>` : `<span class="count">${num(e.note) != null ? `${e.note}<small>/10</small>` : ""}</span>`}</button>`).join("")}</div>` : `<p class="notice">Rien de noté cette saison. « Noter une séance » ajoute une ligne à ton carnet : ton entraîneur la verra.</p>`;
     return h;
   }
   // Ligne d'une saison archivée : lecture seule
+  // Les points de la séance (tir compté ou concours) s'affichent en grand dans le carnet (demande des archers)
+  const ptsDe = (e) => num(e.concoursId ? (e.scoreCompet ?? e.auto?.scoreCompet) : (e.scoreCompte ?? e.auto?.scoreCompte));
   function entryRO(e) {
     const el = $("#sheet"), d = e || {}, fl = VOL.map(([k, l]) => [l, volOf(d, k)]).filter(([, v]) => v), sc = num(d.scoreCompte ?? d.auto?.scoreCompte), sp = num(d.scoreCompet ?? d.auto?.scoreCompet);
     const li = (l, v) => (v ? `<div class="eq-l"><b>${l}</b> ${esc(v)}</div>` : "");
     el.innerHTML = `<div class="sheet-bg" data-close><div class="sheet"><h3>${esc(d.objectif || (d.concoursId ? "Concours" : "Ma séance"))}</h3>
       <p class="notice">🔒 Saison archivée par ton entraîneur : tu peux relire cette séance mais plus la modifier.</p>
+      ${ptsDe(d) != null ? `<div class="ar-pts-big">${ptsDe(d)}<small> pts</small>${d.tcDistance && !d.concoursId ? `<span>à ${esc(d.tcDistance)} m</span>` : ""}</div>` : ""}
       ${li("Date", d.date ? dObj(d.date).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : "")}
       ${li("Flèches", fl.map(([l, v]) => `${l} ${v}`).join(" · "))}${li("Tir compté", sc != null ? `${sc} pts${d.tcDistance ? ` à ${d.tcDistance} m` : ""}` : "")}${li("Score du concours", sp != null && d.concoursId ? `${sp} pts` : "")}
       ${li("Objectif atteint", d.atteint === "O" ? "Oui" : d.atteint === "N" ? "Non" : "")}${li("Ressenti", num(d.note) != null ? `${d.note} / 10` : "")}${li("Émotion", d.emotion)}${li("Mes commentaires", d.commentaire)}
@@ -461,7 +464,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     const d = e || { date: today() }, el = $("#sheet");
     const lock = e?.concoursId ? "readonly" : "";
     const tcD = tirDefaut(), tcLast = e ? {} : { tcDistance: tcD.distance, tcBlason: tcD.blason }; // reprend la dernière distance // flèches et score d'un concours : saisis par l'entraîneur
-    el.innerHTML = `<div class="sheet-bg" data-close><form class="sheet" id="ar-form"><h3>${e?.__new ? "Ma séance du " + esc(dObj(e.date).toLocaleDateString("fr-FR")) : e ? "Ma séance" : "Noter une séance"}</h3>
+    el.innerHTML = `<div class="sheet-bg" data-close><form class="sheet" id="ar-form"><h3>${e?.__new ? "Ma séance du " + esc(dObj(e.date).toLocaleDateString("fr-FR")) : e ? "Ma séance" : "Noter une séance"}</h3>${e && !e.__new && ptsDe(e) != null ? `<div class="ar-pts-big">${ptsDe(e)}<small> pts</small>${e.tcDistance && !e.concoursId ? `<span>à ${esc(e.tcDistance)} m</span>` : ""}</div>` : ""}
       <div class="grid2"><label class="f">Date<input type="date" name="date" required value="${esc(d.date)}" ${e?.seanceId || e?.concoursId ? "readonly" : ""}></label><label class="f">Objectif<input type="text" name="objectif" value="${esc(d.objectif)}"></label></div>
       ${hyb ? `<div class="f">Comment ça s'est passé ?<div class="hum" role="group" aria-label="Mon ressenti">${HUMEURS.map(([v, ic, l]) => `<button type="button" class="hum-b" data-humf="${v}" aria-pressed="${num(d.note) != null && HUMEURS.reduce((m, h) => (Math.abs(h[0] - d.note) < Math.abs(m[0] - d.note) ? h : m), HUMEURS[0])[0] === v}"><span aria-hidden="true">${ic}</span><small>${l}</small></button>`).join("")}</div><input type="hidden" name="note" id="ar-note" value="${esc(d.note ?? "")}"></div>
         <label class="f">Qu'as-tu appris aujourd'hui ?<textarea name="commentaire" placeholder="Ex. garder l'épaule basse, bien viser le jaune…">${esc(d.commentaire)}</textarea></label>
@@ -588,20 +591,103 @@ window.CarnetArcherUI = (API, opts = {}) => {
       ${window.CARNET_VERSION ? `<p class="ar-ver">Appli ${esc("V." + window.CARNET_VERSION.v)}${PREVIEW && window.CARNET_VERSION.test && window.CARNET_VERSION.site !== window.CARNET_VERSION.v ? ` (test · les archers ont la ${esc("V." + window.CARNET_VERSION.site)})` : ""}</p>` : ""}</div>`;
   }
   // ---------- Documents : partagés avec le club + fiches d'exercices de l'archer ----------
+  // Vidéos YouTube partagées par l'entraîneur : lues ici, dans une fenêtre
+  function ouvrirVideo(id, titre) {
+    const el = $("#sheet"); el.innerHTML = `<div class="sheet-bg" data-close><div class="sheet" role="dialog" aria-label="${esc(titre)}"><h3>${esc(titre)}</h3>
+      <div class="yt-box"><iframe src="https://www.youtube-nocookie.com/embed/${esc(id)}?rel=0&playsinline=1" title="${esc(titre)}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
+      <div class="acts"><a class="btn" href="https://youtu.be/${esc(id)}" target="_blank" rel="noopener">Ouvrir dans YouTube</a><button type="button" class="btn primary" data-close>Fermer</button></div></div></div>`;
+    el.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", (e) => { if (e.target === b) el.innerHTML = ""; }));
+  }
+  if (!window.__arYt) { window.__arYt = true; document.addEventListener("click", (e) => { const b = e.target.closest?.("[data-yt]"); if (!b) return; e.preventDefault(); e.stopPropagation(); ouvrirVideo(b.dataset.yt, b.dataset.ytT || "Vidéo"); }, true); }
+  const docBtn = (d) => (d.video ? `<button type="button" class="btn" data-yt="${esc(d.video)}" data-yt-t="${esc(d.titre || "Vidéo")}">▶ Regarder</button>` : `<a class="btn" href="${BLOB}${esc(d.assetId)}" target="_blank" rel="noopener">Ouvrir</a>`);
+  const docThumb = (d) => (d.video ? "▶" : (d.contentType || "").startsWith("image/") ? "IMG" : "PDF");
   function vDocs() {
     const docs = (St.data.documents || []).slice().sort((a, b) => (b.partageLe || 0) - (a.partageLe || 0));
-    let h = `<h2 class="sec">Documents du club</h2>`;
-    h += docs.length ? `<div class="list">${docs.map((d) => `<div class="row"><span class="thumb">${(d.contentType || "").startsWith("image/") ? "IMG" : "PDF"}</span><span class="main"><span class="t">${esc(d.titre || d.nomFichier)}</span>${d.description ? `<span class="m">${esc(d.description.slice(0, 140))}</span>` : ""}</span>
-      <a class="btn" href="${BLOB}${esc(d.assetId)}" target="_blank" rel="noopener">Ouvrir</a></div>`).join("")}</div>` : `<p class="notice">Aucun document partagé pour l'instant (calendrier des concours, règlement…).</p>`;
+    let h = `<h2 class="sec">Documents partagés par ton entraîneur</h2>`;
+    h += docs.length ? `<div class="list">${docs.map((d) => `<div class="row"><span class="thumb">${docThumb(d)}</span><span class="main"><span class="t">${esc(d.titre || d.nomFichier)}</span>${d.description ? `<span class="m">${esc(d.description.slice(0, 140))}</span>` : ""}</span>
+      ${docBtn(d)}</div>`).join("")}</div>` : `<p class="notice">Aucun document partagé pour l'instant (calendrier des concours, règlement…).</p>`;
     return h + `<h2 class="sec">Mes exercices</h2>` + vExos();
+  }
+  // Animations : résultats (si l'entraîneur les ouvre) et saisie par le chef d'équipe, essai par essai.
+  // Les points des zones ne sont jamais envoyés à l'archer : le chef compte seulement les flèches.
+  const anMed = (n) => (n === 1 ? "🥇" : n === 2 ? "🥈" : n === 3 ? "🥉" : n);
+  const anRang = (list, f) => { const r = list.slice().sort((x, y) => f(y) - f(x)); let k = 0; r.forEach((p, i) => { if (i === 0 || f(p) !== f(r[i - 1])) k = i + 1; p.rang = k; }); return r; };
+  const anHeure = (ms) => (ms ? new Date(ms).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "");
+  // Onglet autorisé par l'entraîneur (module « animations ») ; le chef d'équipe l'a d'office, pour son équipe seulement
+  function anVisibles(m) {
+    const ok = m.has("animations");
+    return (St.data?.animations || []).filter((a) => a.monEquipe?.chef || (ok && (a.partage || a.monEquipe))).map((a) => (ok ? a : { ...a, partage: false }));
+  }
+  function vAnimations() {
+    const list = anVisibles(M());
+    if (!list.length) return `<p class="notice">Aucune animation pour l'instant.</p>`;
+    return list.map((a) => {
+      const jeux = a.jeux || [], P = (a.participants || []).map((p) => { const sc = p.scores || {}; return { ...p, sc, total: jeux.reduce((t, j) => t + (Number(sc[j.id]) || 0), 0), joue: jeux.some((j) => sc[j.id] != null) }; });
+      const moi = P.find((p) => p.moi), joues = P.filter((p) => p.joue), me = who().archer_id || St.data.archer?.id, mon = a.monEquipe;
+      let h = `<h2 class="sec">${esc(a.nom || "Animation")}</h2><p class="m" style="margin:0 0 8px">${esc([a.date ? fmtLong(a.date) : "", a.lieu].filter(Boolean).join(" · "))}</p>`;
+      const vType = (t) => (/^image\//.test(t || "") ? "img" : "pdf");
+      const regle = (txt, asset, type) => `${(txt || "").split(/\n+/).filter(Boolean).map((l) => `<p>${esc(l)}</p>`).join("")}${asset ? `${window.CarnetVisuelHtml ? window.CarnetVisuelHtml(BLOB + asset, vType(type), "Règle") : ""}<div><a class="btn" href="${BLOB}${esc(asset)}" target="_blank" rel="noopener">🔍 Ouvrir en grand</a></div>` : ""}`;
+      const avecRegle = jeux.filter((j) => j.regle || j.regleAsset);
+      if (a.regles || a.reglesAsset || avecRegle.length) h += `<details class="an-reg"><summary>Les règles</summary>${a.regles || a.reglesAsset ? `<h4>Règles générales</h4>${regle(a.regles, a.reglesAsset, a.reglesType)}` : ""}${avecRegle.map((j) => `<h4>${esc(j.nom)}</h4>${regle(j.regle, j.regleAsset, j.regleType)}`).join("")}</details>`;
+      if (mon) {
+        const jid = (St.anJeu || {})[a.id] && jeux.some((j) => j.id === St.anJeu[a.id]) ? St.anJeu[a.id] : jeux[0]?.id, L = mon.essais?.[jid] || [];
+        const mb = (a.participants || []).filter((p) => mon.membres.includes(p.id)).sort((x, y) => (x.nom || "").localeCompare(y.nom || "", "fr"));
+        const jeu = jeux.find((x) => x.id === jid), chef = mon.chef !== false, edit = (es) => chef && a.saisie && !es.retenu;
+        const detail = (c) => (c || []).map((n, i) => (Number(n) ? `${esc(jeu?.zones?.[i]?.nom || "Zone " + (i + 1))} ×${n}` : "")).filter(Boolean).join(" · ") || "Aucune flèche dans les zones";
+        const ouv = St.anOuv || {};
+        h += `<div class="card" style="gap:8px"><b>${chef ? "Chef de l'équipe" : "Ton équipe :"} ${esc(mon.nom)}</b><span class="m">${!chef ? "Les parties de ton équipe : touche une partie pour voir les flèches de chacun. C'est ton chef d'équipe qui les compte." : a.saisie ? `Choisis le jeu, lance une partie, puis touche chaque archer pour compter ses flèches par zone${a.fleches ? ` (${a.fleches} flèches chacun)` : ""}. Vous pouvez refaire une partie autant que vous voulez et choisir celle à garder : c'est ton entraîneur qui valide la partie qui compte pour les résultats.` : "La saisie est close par ton entraîneur."}</span>
+          <div class="chips">${jeux.map((x) => `<button class="chip" data-an-jeu="${a.id}|${x.id}" aria-pressed="${x.id === jid}">${esc(x.nom)}</button>`).join("")}</div>
+          ${L.length ? "" : `<span class="m">Aucune partie pour l'instant sur ce jeu.</span>`}
+          ${L.map((es, k) => { const open = ouv[es.id] ?? (edit(es) && k === L.length - 1), nbOk = mb.filter((p) => es.scores?.[p.id]).length;
+            return `<div class="an-essai${es.retenu ? " on" : ""}"><div class="bar"><button class="btn ghost" data-an-ouv="${es.id}" aria-expanded="${open}">${open ? "▾" : "▸"} <b>Partie ${k + 1}</b></button><span class="m">${anHeure(es.le)} · ${nbOk}/${mb.length} archers${es.retenu ? " · ✓ validée par ton entraîneur" : es.choisi ? " · votre choix, en attente de validation" : ""}</span><span class="grow"></span>
+              ${chef && a.saisie && L.length > 1 && !es.choisi && !L.some((x) => x.retenu) ? `<button class="btn" data-an-garder="${a.id}|${jid}|${es.id}">Garder cette partie</button>` : ""}${edit(es) ? `<button class="btn" data-an-del="${a.id}|${jid}|${es.id}" aria-label="Supprimer la partie ${k + 1}">✕</button>` : ""}</div>
+              ${open ? `<div class="list">${mb.map((p) => { const c = es.scores?.[p.id]; return `<${edit(es) ? `button class="row" data-an-saisie="${a.id}|${jid}|${es.id}|${p.id}"` : `div class="row"`}><span class="main"><span class="t">${esc(p.nom)}</span><span class="m">${c ? detail(c) : edit(es) ? "Pas encore compté · touche pour compter" : "Pas encore compté"}</span></span>${c ? "<b>✓</b>" : ""}</${edit(es) ? "button" : "div"}>`; }).join("")}</div>` : ""}</div>`; }).join("")}
+          ${chef && a.saisie ? `<button class="btn primary" data-an-essai="${a.id}|${jid}">${L.length ? "↻ Refaire une partie" : "+ Lancer la première partie"}</button>` : ""}</div>`;
+      }
+      if (!a.partage) return h;
+      if (moi) h += `<div class="list">${jeux.map((j) => `<div class="row"><span class="main"><span class="t">${esc(j.nom)}</span></span><b>${moi.sc[j.id] == null ? "–" : moi.sc[j.id] + " pts"}</b></div>`).join("")}
+          <div class="row"><span class="main"><span class="t">Mon total</span>${a.classement && moi.joue ? `<span class="m">${(() => { const k = anRang(joues, (p) => p.total).find((p) => p.moi).rang; return k === 1 ? "1re" : k + "e"; })()} place sur ${joues.length}</span>` : ""}</span><b>${moi.joue ? moi.total + " pts" : "pas encore tiré"}</b></div></div>`;
+      const eqs = (a.equipes || []).filter((e) => e.membres?.length).map((e) => ({ ...e, total: P.filter((p) => e.membres.includes(p.id)).reduce((t, p) => t + p.total, 0), moi: e.membres.includes(me) }));
+      if (eqs.length) { const r = a.classement ? anRang(eqs, (e) => e.total) : eqs;
+        h += `<div style="overflow-x:auto;margin-top:10px"><table class="ar-an"><thead><tr>${a.classement ? "<th>Place</th>" : ""}<th>Équipe</th><th>Total</th></tr></thead><tbody>${r.map((e) => `<tr${e.moi ? ' class="moi"' : ""}>${a.classement ? `<td>${anMed(e.rang)}</td>` : ""}<td>${esc(e.nom)}</td><td><b>${e.total}</b></td></tr>`).join("")}</tbody></table></div>`; }
+      const r = a.classement ? anRang(joues, (p) => p.total) : joues.slice().sort((x, y) => (x.nom || "").localeCompare(y.nom || "", "fr"));
+      if (r.length) h += `<div style="overflow-x:auto;margin-top:10px"><table class="ar-an"><thead><tr>${a.classement ? "<th>Place</th>" : ""}<th>Archer</th>${jeux.map((j) => `<th>${esc(j.nom)}</th>`).join("")}<th>Total</th></tr></thead><tbody>
+          ${r.map((p) => `<tr${p.moi ? ' class="moi"' : ""}>${a.classement ? `<td>${anMed(p.rang)}</td>` : ""}<td>${esc(p.nom)}</td>${jeux.map((j) => `<td>${p.sc[j.id] ?? "–"}</td>`).join("")}<td><b>${p.total}</b></td></tr>`).join("")}</tbody></table></div>`;
+      return h;
+    }).join("");
+  }
+  const anErr = (err) => toast(/apercu/.test(err.message) ? "C'est un aperçu : rien n'est enregistré ici. Pour essayer, connecte-toi avec le code du chef d'équipe." : /archer_anim_essai|function|schema cache/i.test(err.message) ? "Impossible : la mise à jour du serveur (script 9) n'est pas encore installée." : "Impossible : " + (/fermee/.test(err.message) ? "la saisie est close" : /trop de fleches/.test(err.message) ? "plus de flèches que prévu" : /retenu/.test(err.message) ? "cette partie a été validée par ton entraîneur" : err.message));
+  const anRecharger = () => API.charger(who()).then((d) => { if (d) { St.data = d; render(); } }).catch(() => {});
+  async function anEssai(animId, jid) { try { await API.animEssai(who(), animId, jid, null, null, null); toast("Partie lancée : compte les flèches de chacun"); await anRecharger(); } catch (err) { anErr(err); } }
+  async function anGarder(animId, jid, essaiId) { try { await API.animEssai(who(), animId, jid, essaiId, "@garder", null); toast("C'est noté : ton entraîneur va valider cette partie"); await anRecharger(); } catch (err) { anErr(err); } }
+  async function anSupprEssai(animId, jid, essaiId) { try { await API.animEssai(who(), animId, jid, essaiId, null, null); toast("Partie supprimée"); await anRecharger(); } catch (err) { anErr(err); } }
+  function anSaisie(animId, jid, essaiId, cible) {
+    const a = (St.data.animations || []).find((x) => x.id === animId), j = a?.jeux?.find((x) => x.id === jid), p = a?.participants?.find((x) => x.id === cible);
+    const es = a?.monEquipe?.essais?.[jid]?.find((x) => x.id === essaiId); if (!j || !p || !es) return;
+    const c = j.zones.map((_, i) => Number(es.scores?.[cible]?.[i]) || 0), el = $("#sheet"), F = a.fleches || 0;
+    el.innerHTML = `<div class="sheet-bg" data-close><form class="sheet" id="an-form"><h3>${esc(p.nom)} · ${esc(j.nom)}</h3><span class="tirline">Compte les flèches tombées dans chaque zone.</span>
+      <div class="an-zones">${j.zones.map((z, i) => `<div class="an-z"><span class="main"><b>${esc(z.nom)}</b></span>
+        <button type="button" class="btn an-b" data-z="${i}" data-d="-1" aria-label="Une flèche de moins dans ${esc(z.nom)}">−</button><output class="an-c" id="anc${i}">${c[i]}</output><button type="button" class="btn an-b" data-z="${i}" data-d="1" aria-label="Une flèche de plus dans ${esc(z.nom)}">+</button></div>`).join("")}</div>
+      <p class="an-tot" id="an-n"></p>
+      <div class="acts">${es.scores?.[cible] ? `<button type="button" class="btn danger left" id="an-del">Effacer</button>` : ""}<button type="button" class="btn" data-close>Annuler</button><button class="btn primary">Enregistrer</button></div></form></div>`;
+    el.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", (ev) => { if (ev.target === b) el.innerHTML = ""; }));
+    const maj = () => { const n = c.reduce((t, x) => t + x, 0); $("#an-n").textContent = F ? `${n} / ${F} flèches dans les zones` : `${n} flèche${n > 1 ? "s" : ""} dans les zones`; el.querySelectorAll('.an-b[data-d="1"]').forEach((b) => (b.disabled = !!F && n >= F)); };
+    el.querySelector(".an-zones").addEventListener("click", (ev) => { const b = ev.target.closest(".an-b"); if (!b) return; const i = Number(b.dataset.z), n = c.reduce((t, x) => t + x, 0); if (Number(b.dataset.d) > 0 && F && n >= F) return; c[i] = Math.max(0, Math.min(99, c[i] + Number(b.dataset.d))); $("#anc" + i).textContent = c[i]; maj(); });
+    maj();
+    const send = async (compte) => {
+      try { await API.animEssai(who(), animId, jid, essaiId, cible, compte); el.innerHTML = ""; toast(compte ? `${p.nom} : c'est noté` : "Effacé"); await anRecharger(); }
+      catch (err) { anErr(err); }
+    };
+    $("#an-form").addEventListener("submit", (ev) => { ev.preventDefault(); send(c); });
+    const d = $("#an-del"); if (d) d.addEventListener("click", () => send(null));
   }
   function vExos() {
     const list = St.data.exercices.slice().sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.createdAt || 0) - (a.createdAt || 0));
     if (!list.length) return `<p class="notice">Ton entraîneur ne t'a pas encore partagé de fiche d'exercice.</p>`;
     return `<div class="list">${list.map((x) => { const d = x.document;
-      return `<div class="row"><span class="thumb">${d && (d.contentType || "").startsWith("image/") ? "IMG" : "PDF"}</span><span class="main"><span class="t">${esc(d ? d.titre || d.nomFichier : "Fiche retirée")}${x.fait ? ' <span class="tag">fait</span>' : ""}</span>
+      return `<div class="row"><span class="thumb">${d ? docThumb(d) : "PDF"}</span><span class="main"><span class="t">${esc(d ? d.titre || d.nomFichier : "Fiche retirée")}${x.fait ? ' <span class="tag">fait</span>' : ""}</span>
         <span class="m">${[x.date ? "pour le " + fmtLong(x.date) : "", x.remarque].filter(Boolean).map(esc).join(" · ")}</span>${d?.description ? `<span class="m">${esc(d.description.slice(0, 140))}</span>` : ""}</span>
-        ${d ? `<a class="btn" href="${BLOB}${esc(d.assetId)}" target="_blank" rel="noopener">Ouvrir</a>` : ""}</div>`; }).join("")}</div>`;
+        ${d ? docBtn(d) : ""}</div>`; }).join("")}</div>`;
   }
   // ---------- Évaluations ----------
   function vEvals() {
@@ -630,12 +716,18 @@ window.CarnetArcherUI = (API, opts = {}) => {
     if (t.hasAttribute("data-pref-chrono")) { chronoStore.setLast(t.value); toast("Réglage du chrono enregistré"); }
   });
   root.addEventListener("click", async (ev) => {
-    const t = ev.target.closest("[data-atab],[data-who],[data-act],[data-saison],[data-entry],[data-eval],[data-arcombo],[data-rep],[data-artc],[data-artcp],[data-asub],[data-seance-ar],[data-mot-rep],[data-mot-arch],#ar-out,#ar-coach"); if (!t) return;
+    const t = ev.target.closest("[data-an-ouv],[data-an-jeu],[data-an-saisie],[data-an-essai],[data-an-del],[data-an-garder],[data-atab],[data-who],[data-act],[data-saison],[data-entry],[data-eval],[data-arcombo],[data-rep],[data-artc],[data-artcp],[data-asub],[data-seance-ar],[data-mot-rep],[data-mot-arch],#ar-out,#ar-coach"); if (!t) return;
     ev.stopPropagation();
     if (t.dataset.act === "close-preview") { root.remove(); return; }
     if (t.id === "ar-out") return API.deconnexion();
     if (t.id === "ar-coach") return API.versCoach();
     if (t.dataset.atab) { St.tab = t.dataset.atab; render(); return; }
+    if (t.dataset.anJeu) { const [aid, jid] = t.dataset.anJeu.split("|"); St.anJeu = { ...(St.anJeu || {}), [aid]: jid }; render(); return; }
+    if (t.dataset.anSaisie) { const [aid, jid, es, cid] = t.dataset.anSaisie.split("|"); anSaisie(aid, jid, es, cid); return; }
+    if (t.dataset.anOuv) { const es = t.dataset.anOuv; St.anOuv = { ...(St.anOuv || {}), [es]: t.getAttribute("aria-expanded") !== "true" }; render(); return; }
+    if (t.dataset.anGarder) { const [aid, jid, es] = t.dataset.anGarder.split("|"); anGarder(aid, jid, es); return; }
+    if (t.dataset.anEssai) { const [aid, jid] = t.dataset.anEssai.split("|"); anEssai(aid, jid); return; }
+    if (t.dataset.anDel) { if (t.dataset.confirm !== "1") { t.dataset.confirm = "1"; t.textContent = "Supprimer ?"; return; } const [aid, jid, es] = t.dataset.anDel.split("|"); anSupprEssai(aid, jid, es); return; }
     if (t.dataset.eval) { St.evalId = t.dataset.eval; if (t.dataset.asubGo) { St.tab = "entrainement"; St.sub = "evaluations"; } render(); return; }
     if (t.dataset.rep) {
       const [sid, val] = t.dataset.rep.split("|"), e = (St.data.entrainements || []).find((x) => x.id === sid); if (!e) return;
