@@ -857,7 +857,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
 <div id="toast" class="toast" hidden></div>
 <input type="file" id="file-in" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.mp4,.webm,.txt,.md,.csv,application/pdf,image/*,video/mp4,video/webm,text/plain,text/markdown,text/csv">
 
-<script>window.CARNET_VERSION = { v: "1.10.5", date: "2026-11-16", site: "1.7.4", test: true };</script>
+<script>window.CARNET_VERSION = { v: "1.10.6", date: "2026-11-16", site: "1.7.4", test: true };</script>
 <script>
 // Espace archer : l'archer (ou son parent) voit uniquement ses propres informations,
 // telles que les renvoie la base (fonction espace_archer), et remplit son carnet.
@@ -1906,7 +1906,25 @@ const newId = (col) => S.db.collection(col).doc().id;
 
 // ---------- Navigation ----------
 const TABS = [["accueil", "Accueil"], ["seances", "Séances"], ["archers", "Archers"], ["clubs", "Clubs"], ["exos", "Documents"], ["concours", "Concours"], ["materiel", "Matériel"], ["animations", "Animations"], ["parametres", "Paramètres"]];
-function go(tab) { S.tab = tab; S.anim = null; S.quick = false; S.concoursId = null; S.seance = null; S.archer = null; S.suivi = null; S.tirOpen = null; S.evaluation = null; if (S.carnet) { S.carnet = null; carnetSubscribe(); } render(); window.scrollTo(0, 0); }
+// V.1.10 : encadrant / animateur connecté au carnet de l'entraîneur (droits choisis dans Paramètres › Accès)
+const ENC = () => window.CARNET_ENCADRANT || null;
+const encDroits = () => ENC()?.droits || {};
+function tabOk(k) {
+  if (!ENC()) return true;
+  const d = encDroits(), voirS = ["voir", "noter"].includes(d.seances), voirA = ["voir", "modifier"].includes(d.archers);
+  return { accueil: true, seances: voirS, archers: voirA || voirS, exos: true, concours: voirA, parametres: true }[k] || false;
+}
+// ce que l'encadrant peut modifier sur l'écran ouvert (null = pas encadrant)
+function encEcrit() {
+  if (!ENC()) return null;
+  const d = encDroits();
+  if (S.seance || S.tab === "seances") return d.seances === "noter";
+  if (S.evaluation) return d.archers === "modifier" || d.seances === "noter";
+  if (S.archer || S.carnet || S.tab === "archers") return d.archers === "modifier";
+  return false;
+}
+{ let cw = S.canWrite; Object.defineProperty(S, "canWrite", { get() { const e = encEcrit(); return e === null ? cw : cw && e; }, set(v) { cw = v; }, enumerable: true }); }
+function go(tab) { if (!tabOk(tab)) tab = "accueil"; S.tab = tab; S.anim = null; S.quick = false; S.concoursId = null; S.seance = null; S.archer = null; S.suivi = null; S.tirOpen = null; S.evaluation = null; if (S.carnet) { S.carnet = null; carnetSubscribe(); } render(); window.scrollTo(0, 0); }
 try { const h = location.hash.slice(1); if (TABS.some((t) => t[0] === h)) S.tab = h; } catch (e) {}
 try { const c = localStorage.getItem("club"); if (c) S.club = c; } catch (e) {}
 
@@ -1915,7 +1933,7 @@ try { const c = localStorage.getItem("club"); if (c) S.club = c; } catch (e) {}
 let nouvCache = { at: 0, entries: [], enCours: false };
 async function chargerNouv() {
   // attendre que les paramètres soient chargés : sinon la mémoire « déjà regardé » est lue vide (et écrasée) au démarrage
-  if (!S.db || !S.loaded.parametres || nouvCache.enCours || Date.now() - nouvCache.at < 60000) return;
+  if (!S.db || ENC() || !S.loaded.parametres || nouvCache.enCours || Date.now() - nouvCache.at < 60000) return;
   nouvCache.enCours = true;
   try {
     const snap = await S.db.collection("carnetEntrees").where("saisiParArcher", "==", true).get();
@@ -1937,7 +1955,8 @@ function marquerVu(aid) {
 function renderTabs() {
   chargerNouv();
   const counts = { seances: S.seances.length, archers: S.archers.length, clubs: S.clubs.length, exos: S.documents.length, concours: S.concours.filter((c) => (c.dateFin || c.date) >= todayISO()).length };
-  $("#tabs").innerHTML = TABS.map(([k, l]) => `<button class="tab" role="tab" aria-selected="${S.tab === k && !S.seance && !S.archer}" data-tab="${k}">${l}${counts[k] ? `<span class="n">${counts[k]}</span>` : ""}${k === "archers" && nouvTotal() ? `<span class="bulle" title="Séances notées par tes archers, pas encore regardées">${nouvTotal()}</span>` : ""}</button>`).join("");
+  if (!tabOk(S.tab)) S.tab = "accueil";
+  $("#tabs").innerHTML = TABS.filter(([k]) => tabOk(k)).map(([k, l]) => `<button class="tab" role="tab" aria-selected="${S.tab === k && !S.seance && !S.archer}" data-tab="${k}">${l}${counts[k] ? `<span class="n">${counts[k]}</span>` : ""}${k === "archers" && nouvTotal() ? `<span class="bulle" title="Séances notées par tes archers, pas encore regardées">${nouvTotal()}</span>` : ""}</button>`).join("");
 }
 
 function clubChips() {
@@ -1968,15 +1987,15 @@ function render() {
   if (S.seance && S.suivi) { v.innerHTML = viewSuivi(); return; }
   if (S.seance) { v.innerHTML = viewSeance(); return; }
   if (S.archer) { v.innerHTML = viewArcher(); if ($("#acc-box")) fillAcces(S.archer); return; }
-  if (S.tab === "seances") { v.innerHTML = viewSeances(); if (S.clubs.length) { fab.hidden = false; fab.textContent = "+ Nouvelle séance"; fab.onclick = () => formSeance(); } }
-  if (S.tab === "archers") { v.innerHTML = viewArchers(); if (S.clubs.length) { fab.hidden = false; fab.textContent = "+ Nouvel archer"; fab.onclick = () => formArcher(); } }
+  if (S.tab === "seances") { v.innerHTML = viewSeances(); if (S.canWrite && S.clubs.length) { fab.hidden = false; fab.textContent = "+ Nouvelle séance"; fab.onclick = () => formSeance(); } }
+  if (S.tab === "archers") { v.innerHTML = viewArchers(); if (S.canWrite && S.clubs.length) { fab.hidden = false; fab.textContent = "+ Nouvel archer"; fab.onclick = () => formArcher(); } }
   if (S.tab === "clubs") { v.innerHTML = viewClubs(); fab.hidden = false; fab.textContent = "+ Nouveau club"; fab.onclick = () => formClub(); }
   if (S.tab === "accueil") v.innerHTML = viewAccueil();
   if (S.tab === "materiel") { v.innerHTML = viewMateriel(); if (S.canWrite && S.clubs.length) { fab.hidden = false; fab.textContent = "+ Nouveau matériel"; fab.onclick = () => formMat(); } }
   if (S.tab === "animations") { v.innerHTML = viewAnimations(); if (S.canWrite && !S.anim) { fab.hidden = false; fab.textContent = "+ Nouvelle animation"; fab.onclick = () => formAnimation(); } }
   if (S.tab === "concours") { v.innerHTML = S.concoursId ? viewConcours() : viewConcoursList(); if (S.canWrite && !S.concoursId) { fab.hidden = false; fab.textContent = "+ Nouveau concours"; fab.onclick = () => formConcours(); } }
   if (S.tab === "exos") { v.innerHTML = viewExos(); if (S.exMode === "fiches" && S.canWrite) { fab.hidden = false; fab.textContent = "+ Nouvelle fiche"; fab.onclick = () => formFiche(); } else if (S.assets && S.canWrite) { fab.hidden = false; fab.textContent = "+ Déposer des fichiers"; fab.onclick = () => $("#file-in").click(); } }
-  if (S.tab === "parametres") { v.innerHTML = viewData(); showStorage(); }
+  if (S.tab === "parametres") { if (ENC()) { v.innerHTML = viewParamEnc(); return; } v.innerHTML = viewData(); showStorage(); }
   if (!S.canWrite) fab.hidden = true;
 }
 
@@ -4247,10 +4266,10 @@ function viewAccueil() {
     return { a: S.archers.find((x) => x.id === aid), r, score: num(r.score), moy, n: prev.length };
   }).sort((p, q) => fullName(p.a).localeCompare(fullName(q.a), "fr")) : [];
   const card = (icon, cls, label, val, sub) => `<div class="hub-stat" data-carte="${icon === "cal" ? "statSeances" : "statMateriel"}"><div class="hub-stat-top"><span>${label}</span><i class="hub-ico ${cls}">${ICON[icon]}</i></div><b class="${cls}">${val}</b><small>${sub}</small></div>`;
-  let h = clubChips() + `<button class="btn primary dash-chrono" data-act="chrono">⏱ Lancer le chrono d'entraînement</button><div class="head"><span class="pill">Tableau de bord</span><h2>${prm().nom ? "Bonjour " + esc(prm().nom) : "Bonjour"}</h2><span class="m">${esc(fmtLong(today))}</span></div>${(() => { const k = feteActive(); return k ? banniereFete(k, prm().fetes, BLOB_BASE, prm().fetesMessage !== false) : ""; })()}
+  let h = clubChips() + `<button class="btn primary dash-chrono" data-act="chrono">⏱ Lancer le chrono d'entraînement</button><div class="head"><span class="pill">Tableau de bord</span><h2>${(ENC() ? ENC().nom : prm().nom) ? "Bonjour " + esc(ENC() ? ENC().nom : prm().nom) : "Bonjour"}</h2><span class="m">${esc(fmtLong(today))}</span></div>${(() => { const k = feteActive(); return k ? banniereFete(k, prm().fetes, BLOB_BASE, prm().fetesMessage !== false) : ""; })()}
     <div class="hub-stats">
       ${card("cal", "c-cyan", "Séances du mois", sessM.length, `${upcoming.length ? "prochaine : " + dObj(upcoming[0].date).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" }) : "aucune prévue"}`)}
-      ${card("wrench", aRep ? "c-red" : "c-green", "Matériel à réparer", aRep, `${mat.filter((m) => m.archerId).length} prêté${mat.filter((m) => m.archerId).length > 1 ? "s" : ""} sur ${mat.length}`)}
+      ${ENC() ? "" : card("wrench", aRep ? "c-red" : "c-green", "Matériel à réparer", aRep, `${mat.filter((m) => m.archerId).length} prêté${mat.filter((m) => m.archerId).length > 1 ? "s" : ""} sur ${mat.length}`)}
     </div>
     <div class="hub-grid">
       <div class="card" data-carte="seances"><div class="hub-bar"><h3 class="hub-h">Séances à venir</h3><button class="btn ghost" data-tab="seances">Tout voir</button></div>
@@ -4261,7 +4280,7 @@ function viewAccueil() {
         ${lastCo ? `<span class="tirline">${esc(fmtLong(lastCo.date))} · comparé à la moyenne de ses concours précédents${lastTypes.length ? " du même type" : ""}</span><div class="list">${lastRes.map(dashResRow).join("")}</div><button class="btn ghost" data-concours="${lastCo.id}">Voir le concours ›</button>` : `<p class="notice">Aucun score saisi pour l'instant.</p>`}` : ""}
       </div>` : ""}
     </div>
-    ${espaceArchersCard(inC)}
+    ${ENC() ? "" : espaceArchersCard(inC)}
     ${todoL.length ? `<details class="card hub-todo"><summary><i class="hub-ico c-cyan">${ICON.list}</i><b>${todoL.length} exercice${todoL.length > 1 ? "s" : ""} attribué${todoL.length > 1 ? "s" : ""} pas encore fait${todoL.length > 1 ? "s" : ""}</b><span class="grow"></span><span class="hub-chev" aria-hidden="true">›</span></summary>
       <div class="list">${todoL.map((x) => { const d = docOf(x.documentId), se = S.seances.find((y) => y.id === x.seanceId), a = S.archers.find((y) => y.id === x.archerId);
         return `<div class="row"><span class="main"><span class="t">${esc(fullName(a))} · ${d ? `<button class="lnk" data-doc="${d.id}">${esc(d.titre || d.nomFichier)}</button>` : "Fiche supprimée"}</span>
@@ -4762,7 +4781,7 @@ function viewArcher() {
     }).join("")}</div>` : ""}`,
     espace: () => `    ${window.CarnetArcherUI ? `<div class="bar"><span class="grow"></span><button class="btn" data-act="ar-preview">Aperçu de son espace archer</button>${window.CARNET_TEST ? `<button class="btn primary" data-act="ar-test">Jouer l'archer (test)</button>` : ""}</div>` : ""}
     ${roleOf(a) === "encadrant" ? "" : espaceCard(a)}
-    ${window.carnetAcces && S.canWrite ? `<h2 class="sec">Espace de l'archer</h2><div class="card" id="acc-box"><span class="tirline">Chargement des accès…</span></div>` : ""}
+    ${window.carnetAcces && S.canWrite && !ENC() ? `<h2 class="sec">Espace de l'archer</h2><div class="card" id="acc-box"><span class="tirline">Chargement des accès…</span></div>` : ""}
     ${equipCard(a)}`,
   };
   const corps = part[ft]().trim() || `<p class="empty">Rien pour l'instant dans cette rubrique.</p>`;
@@ -5765,6 +5784,7 @@ function distList(f) {
   return [...new Set(l.length ? l : DISTANCES)].sort((a, b) => a - b);
 }
 function setParam(obj) {
+  if (ENC()) return; // les réglages du carnet restent ceux de l'entraîneur
   const cur = S.parametres.find((x) => x.id === "general");
   const merge = (a, b) => { const o = { ...(a || {}) }; Object.entries(b).forEach(([k, v]) => { o[k] = v && typeof v === "object" && !Array.isArray(v) ? merge(o[k], v) : v; }); return o; };
   if (cur) { Object.assign(cur, merge(cur, obj)); patch("parametres", "general", obj); }
@@ -5856,10 +5876,26 @@ function feteCard(ro) {
       <span class="tirline">Le réglage clair ou sombre de chaque appareil reste valable. L'icône de l'appli sur l'écran d'accueil du téléphone ne change pas.</span>
     </div>`;
 }
+function viewParamEnc() {
+  const e = ENC(), d = e.droits || {}, ent = e.entraineur || prm().nom || "ton entraîneur";
+  const lib = { non: "pas d'accès", voir: "consulter", noter: "consulter, faire l'appel et noter", modifier: "consulter et modifier" };
+  return `<div class="head"><span class="pill">Paramètres</span><h2>Mon accès</h2></div>
+    <div class="card"><p style="margin:0">Tu es connecté au carnet de <b>${esc(ent)}</b>${e.nom ? ` en tant que <b>${esc(e.nom)}</b>` : ""}, avec un accès encadrant / animateur.</p>
+      <div class="hub-mini"><div><span>Clubs</span><b>${esc(S.clubs.map((c) => c.nom).join(", ") || "aucun")}</b></div>
+        <div><span>Séances et présences</span><b>${esc(lib[d.seances || "non"])}</b></div>
+        <div><span>Fiches des archers</span><b>${esc(lib[d.archers || "non"])}</b></div></div>
+      <span class="tirline">C'est ${esc(ent)} qui choisit ces droits. Pour les changer, demande-lui.</span></div>
+    ${window.carnetLogout ? `<div class="card"><div class="bar"><span class="tirline">Connecté sur cet appareil.</span><span class="grow"></span><button class="btn" data-act="logout">Se déconnecter</button></div></div>` : ""}
+    <h2 class="sec">Affichage sur cet appareil</h2>
+    <div class="card">
+      <div class="f">Thème${radioRow("theme", LS.get("theme", "auto"), [["auto", "Comme l'appareil"], ["light", "Clair"], ["dark", "Sombre"]])}</div>
+      <div class="f">Taille du texte${radioRow("taille", LS.get("taille", "normal"), [["normal", "Normale"], ["grand", "Grande"], ["tres-grand", "Très grande"]])}</div>
+    </div>`;
+}
 function viewData() {
   const p = prm(), ro = S.canWrite ? "" : "disabled";
   const nEnt = S.carnets.length;
-  const PT = [["general", "Général"], ["themes", "Thèmes et apparence"], ["seances", "Séances"], ["concours", "Concours"], ["archers", "Espace archers"], ["materiel", "Matériel"], ["donnees", "Données"]], pt = PT.some(([k]) => k === S.pTab) ? S.pTab : LS.get("ptab", "general");
+  const PT = [["general", "Général"], ["themes", "Thèmes et apparence"], ["seances", "Séances"], ["concours", "Concours"], ["archers", "Espace archers"], ["materiel", "Matériel"], ...(window.carnetEncadrants && !ENC() ? [["acces", "Accès"]] : []), ["donnees", "Données"]], pt = PT.some(([k]) => k === S.pTab) ? S.pTab : LS.get("ptab", "general");
   const part = { general: () => `    ${versionCard()}
     <h2 class="sec">Entraîneur</h2>
     <div class="card"><label class="f" for="pr-nom">Ton prénom ou nom (affiché en haut du carnet)<input type="text" id="pr-nom" data-prm="nom" value="${esc(p.nom)}" placeholder="Ex. Cédric" ${ro}></label></div>
@@ -5875,6 +5911,7 @@ function viewData() {
     ${animCodeCard()}
 `,
     materiel: () => remarquesCard(ro),
+    acces: () => accesCard(),
     themes: () => `    <p class="tirline" style="margin:0">Les thèmes de fête et ceux que tu crées (Octobre rose, Movember, Mars bleu…), et sur l'ordinateur le studio pour régler l'apparence du carnet.</p>
     ${feteCard(ro)}
     ${studioCard()}
@@ -5950,6 +5987,57 @@ function viewData() {
   return `<div class="head"><span class="m">Réglages du carnet</span><h2>Paramètres</h2></div>
     <div class="seg-mode ptabs" role="tablist" aria-label="Rubriques des paramètres">${PT.map(([k, l]) => `<button role="tab" data-ptab="${k}" aria-pressed="${pt === k}" aria-selected="${pt === k}">${l}</button>`).join("")}</div>
     ${(part[pt] || part.general)()}`;
+}
+// ---------- Paramètres › Accès (V.1.10) : qui a accès au carnet, et ce que chaque encadrant / animateur peut faire ----------
+let encListe = null, encCharge = false;
+async function chargerEnc(force = false) {
+  if (!window.carnetEncadrants || encCharge || (encListe && !force)) return;
+  encCharge = true;
+  try { encListe = await window.carnetEncadrants.lister(); } catch (e) { encListe = { erreur: /encadrants|relation|schema cache/i.test(e.message || "") ? "script" : e.message || "erreur" }; }
+  encCharge = false; if (S.tab === "parametres") render();
+}
+const ENC_SEANCES = [["non", "Pas d'accès"], ["voir", "Consulter"], ["noter", "Consulter, faire l'appel et noter"]];
+const ENC_ARCHERS = [["non", "Pas d'accès"], ["voir", "Consulter"], ["modifier", "Consulter et modifier"]];
+const encLib = (l, v) => (l.find(([k]) => k === (v || "non")) || l[0])[1];
+function accesCard() {
+  if (!encListe) { chargerEnc(); return `<p class="notice">Chargement des accès…</p>`; }
+  if (encListe.erreur) return `<p class="notice">${encListe.erreur === "script" ? "Pour donner des accès, lance d'abord le script <b>10-encadrants.sql</b> dans Supabase (SQL Editor), puis reviens ici." : "Impossible de charger les accès : " + esc(encListe.erreur)}</p><button class="btn" data-act="enc-reload">Réessayer</button>`;
+  const statut = (e) => !e.actif ? `<span class="tag">Suspendu</span>` : e.uid ? `<span class="tag ar-app">Actif</span>` : `<span class="tag">En attente</span>`;
+  const row = (e) => {
+    const cl = (e.droits?.clubs || []).map(clubName).filter(Boolean).join(", ") || "aucun club";
+    return `<button class="row" data-enc-edit="${esc(e.email)}"><span class="main"><span class="t">${esc(e.nom || e.email)} ${statut(e)}</span>
+      <span class="m">${esc(e.email)}${e.vu_le ? " · dernière ouverture le " + esc(new Date(e.vu_le).toLocaleDateString("fr-FR")) : e.uid ? "" : " · compte pas encore ouvert"}</span>
+      <span class="m">${esc(cl)} · séances : ${esc(encLib(ENC_SEANCES, e.droits?.seances).toLowerCase())} · fiches archers : ${esc(encLib(ENC_ARCHERS, e.droits?.archers).toLowerCase())}</span></span><span class="count" aria-hidden="true">›</span></button>`;
+  };
+  return `<h2 class="sec">Qui a accès à ton carnet</h2>
+    <div class="list"><div class="row"><span class="main"><span class="t">${esc(prm().nom || "Toi")} <span class="tag ar-app">Entraîneur</span></span><span class="m">Accès complet : tous les clubs, tous les réglages</span></span></div>
+    ${[...encListe].sort((a, b) => (a.nom || a.email).localeCompare(b.nom || b.email, "fr")).map(row).join("")}</div>
+    <div class="bar"><button class="btn primary" data-act="enc-new" ${S.clubs.length ? "" : "disabled"}>+ Donner un accès</button><span class="grow"></span></div>
+    <div class="card"><span class="tirline">Comment ça marche : tu donnes un accès à l'adresse e-mail d'un encadrant ou d'un animateur. Il ouvre le même lien que le carnet, choisit « Créer un compte » avec cette adresse et confirme son e-mail. Il arrive alors dans ton carnet, limité aux clubs et aux droits que tu as choisis. Il ne voit jamais le matériel, les animations, les réglages ni les autres clubs. Tu peux suspendre ou retirer son accès à tout moment.</span></div>`;
+}
+function formEncadrant(e = null) {
+  const d = e?.droits || { clubs: S.club !== "all" ? [S.club] : [], seances: "noter", archers: "voir" };
+  const radios = (name, list, v) => `<div class="radio">${list.map(([k, l]) => `<label><input type="radio" name="${name}" value="${k}" ${(v || "non") === k ? "checked" : ""}>${esc(l)}</label>`).join("")}</div>`;
+  sheet(e ? "Modifier l'accès" : "Donner un accès", `
+    <label class="f" for="en-nom">Nom<input type="text" id="en-nom" name="nom" value="${esc(e?.nom)}" placeholder="Ex. Paul Martin"></label>
+    <label class="f" for="en-mail">Adresse e-mail (celle de son compte)<input type="email" id="en-mail" name="email" required value="${esc(e?.email)}" placeholder="exemple@mail.fr" autocomplete="off"></label>
+    <div class="f">Clubs auxquels il a accès<div class="checks">${S.clubs.map((c) => `<label><input type="checkbox" name="club" value="${c.id}" ${(d.clubs || []).includes(c.id) ? "checked" : ""}>${esc(c.nom)}</label>`).join("")}</div></div>
+    <div class="f">Séances et présences${radios("seances", ENC_SEANCES, d.seances)}</div>
+    <div class="f">Fiches des archers (suivi, tirs, évaluations)${radios("archers", ENC_ARCHERS, d.archers)}</div>
+    <label class="checks"><label><input type="checkbox" name="actif" ${e?.actif === false ? "" : "checked"}>Accès actif (décoche pour le suspendre)</label></label>
+    <span class="tirline">Pour faire l'appel et noter une séance, il voit la liste des archers des clubs choisis.</span>`, {
+    onSave(fd) {
+      const droits = { clubs: fd.getAll("club"), seances: fd.get("seances") || "non", archers: fd.get("archers") || "non" };
+      if (!droits.clubs.length) { toast("Choisis au moins un club"); return false; }
+      const btn = $("#sheet-form [type=submit]"); if (btn) btn.disabled = true;
+      window.carnetEncadrants.enregistrer({ email: fd.get("email"), nom: fd.get("nom"), droits, actif: fd.get("actif") === "on" }, e?.email)
+        .then(() => { $("#sheet").innerHTML = ""; toast(e ? "Accès enregistré" : "Accès donné"); chargerEnc(true); })
+        .catch((er) => { if (btn) btn.disabled = false; toast(er.message || "Enregistrement impossible (réseau ?)"); });
+      return false;
+    },
+    onDelete: e ? () => { window.carnetEncadrants.supprimer(e.email).then(() => { toast("Accès retiré"); chargerEnc(true); }).catch((er) => toast(er.message || "Suppression impossible (réseau ?)")); } : null,
+    deleteLabel: "Retirer l'accès",
+  });
 }
 // ---------- Paramètres › Données › Carnets d'entraînement : export, saisons, nettoyage, compléter ----------
 let cdCache = null, cdLoading = false, cdClean = null;
@@ -6483,7 +6571,7 @@ function formSeance(s = null) {
 
 // ---------- Événements ----------
 document.addEventListener("click", (e) => {
-  const t = e.target.closest("[data-tab],[data-ftab],[data-mattri],[data-rqdel],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab],[data-qsort],[data-coptab],[data-com-edit],[data-fmtfed],[data-fmt-del],[data-type-del],[data-fete-ap],[data-fete-new],[data-fete-edit],[data-fete-imgdel],[data-mot-edit],[data-centry-open],[data-cd-exp],[data-cd-arch],[data-exmode],[data-ftheme],[data-fiche],[data-anim],[data-animvue],[data-animtri],[data-anim-saisie],[data-anim-essai-new],[data-anim-retenir],[data-anim-essai-del]");
+  const t = e.target.closest("[data-tab],[data-ftab],[data-mattri],[data-rqdel],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-enc-edit],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab],[data-qsort],[data-coptab],[data-com-edit],[data-fmtfed],[data-fmt-del],[data-type-del],[data-fete-ap],[data-fete-new],[data-fete-edit],[data-fete-imgdel],[data-mot-edit],[data-centry-open],[data-cd-exp],[data-cd-arch],[data-exmode],[data-ftheme],[data-fiche],[data-anim],[data-animvue],[data-animtri],[data-anim-saisie],[data-anim-essai-new],[data-anim-retenir],[data-anim-essai-del]");
   if (!t || t.closest("#sheet")) return;
   if (t.dataset.dashSuivi) { const [sid, aid] = t.dataset.dashSuivi.split("|"); S.seance = sid; S.suivi = aid; S.tirOpen = null; render(); window.scrollTo(0, 0); return; }
   if (t.dataset.tab) { go(t.dataset.tab); try { history.replaceState(null, "", "#" + t.dataset.tab); } catch (_) {} return; }
@@ -6650,6 +6738,7 @@ document.addEventListener("click", (e) => {
   if (t.dataset.suivi) { S.suivi = t.dataset.suivi; S.tirOpen = null; render(); window.scrollTo(0, 0); return; }
   if (t.dataset.openSuivi) { S.seance = t.dataset.openSuivi; S.suivi = S.archer; S.from = "archer-suivi"; S.tirOpen = null; render(); window.scrollTo(0, 0); return; }
   if (t.dataset.arrow) { addArrow(t.dataset.arrow); return; }
+  if (t.dataset.encEdit) { const e = (Array.isArray(encListe) ? encListe : []).find((x) => x.email === t.dataset.encEdit); if (e) formEncadrant(e); return; }
   if (t.dataset.ptab) { S.pTab = t.dataset.ptab; LS.set("ptab", S.pTab); render(); return; }
   if (t.dataset.saisie) { LS.set("saisie", t.dataset.saisie); render(); return; }
   if (t.dataset.act === "undo-arrow") {
@@ -6687,6 +6776,8 @@ document.addEventListener("click", (e) => {
   if (a === "export") exportData();
   if (a === "restore") startRestore();
   if (a === "logout" && window.carnetLogout) window.carnetLogout();
+  if (a === "enc-new") formEncadrant();
+  if (a === "enc-reload") { encListe = null; render(); }
   if (a === "maint" && window.carnetMaintenance) { const on = !maintEtat?.actif; window.carnetMaintenance.basculer(on).then((e) => { maintEtat = e || { actif: on }; toast(on ? "Appli en maintenance pour les archers" : "Maintenance terminée : les archers repassent en ligne"); render(); }).catch((err) => toast("Impossible : " + err.message)); }
   if (a === "new-annonce") formAnnonce();
   if (a === "prof-reset") { const k = t.dataset.profK; setParam({ profils: { [k]: null }, profilNoms: { [k]: null } }); toast("Profil remis à l'origine"); render(); }
