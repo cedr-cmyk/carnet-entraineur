@@ -1406,11 +1406,17 @@ function viewSuivi() {
     <div class="card"><label class="f" for="suivi-note">Note de l'entraîneur</label>
       <textarea id="suivi-note" placeholder="Ce qu'il a travaillé, tes observations, les points à reprendre…" ${S.canWrite ? "" : "readonly"}>${esc(v.note)}</textarea></div>
     ${attrBlock(s, a)}
-    <div class="bar"><h2 class="sec" style="margin:0">Scores</h2><span class="grow"></span>${S.canWrite ? `<button class="btn primary" data-act="new-tir">+ Nouveau tir</button>` : ""}</div>
+    <div class="bar"><h2 class="sec" style="margin:0">Scores</h2><span class="grow"></span>${S.canWrite ? `<button class="btn" data-act="new-cp">⛰ Parcours campagne</button><button class="btn primary" data-act="new-tir">+ Nouveau tir</button>` : ""}</div>
     ${v.tirs.length ? v.tirs.map((t) => tirCard(t)).join("") : `<p class="notice">Aucun score pour cette séance. « Nouveau tir » ouvre la feuille de marque : type de tir, distance, blason, puis saisie flèche par flèche ou du total. Les flèches comptent dans le volume du carnet.</p>`}
     ${carnetBlock(s, a)}`;
 }
 function tirCard(t) {
+  if (CC.est(t)) { // parcours campagne : feuille de marque FFTA
+    const cs = CC.stats(t);
+    return `<div class="card"><div class="bar"><div style="min-width:0"><b>${esc(CC.libelle(t))}</b><div style="color:var(--muted);font-size:.85rem">${TIR_TYPES.find(([k]) => k === tirType(t))[1]} · ${cs.cibles} / ${cs.prevues} cibles</div></div><span class="grow"></span>
+      <div class="score"><b>${cs.total}</b><span>pts · ${cs.n6} × 6 · ${cs.n5} × 5</span></div></div>${CC.feuille(t)}
+      ${S.canWrite ? `<div class="bar"><button class="btn" data-act="cp-edit" data-tir="${t.id}">Reprendre la saisie</button><span class="grow"></span><button class="btn danger" data-act="del-tir" data-tir="${t.id}">Supprimer ce parcours</button></div>` : ""}</div>`;
+  }
   const st = tirStats(t), open = S.tirOpen === t.id && t.mode !== "total" && S.canWrite;
   let body;
   if (t.mode === "total") {
@@ -1638,6 +1644,7 @@ const fmt1 = (v) => (v == null ? "—" : v.toFixed(1).replace(".", ","));
 // Une seule ligne de carnet par archer et par séance, à identifiant fixe : les deux écrans lisent et écrivent le même document.
 const linkId = (sid, aid) => `s_${sid}_${aid}`;
 const saisonOfDate = (d) => { const y = Number(d.slice(0, 4)), m = Number(d.slice(5, 7)); return m >= 9 ? y + 1 : y; };
+const CC = window.CarnetCampagne; // tir en campagne (archer.js, V.1.10)
 const TIR_TYPES = [["blason", "Blason (entraînement)"], ["compte", "Tir compté"], ["compet", "Compétition"]];
 const tirType = (t) => t.type || "compte";
 function computeAuto(s, aid) {
@@ -2165,7 +2172,8 @@ function formEntree(e = null) {
       ${e?.seanceId ? `<span class="tirline">Ligne liée à une séance du club : les flèches et scores des feuilles de marque s'ajoutent automatiquement.</span>` : ""}</div>
     <div class="grid2"><label class="f" for="ce-sc">Score tir compté<input type="number" inputmode="numeric" min="0" id="ce-sc" name="scoreCompte" value="${esc(e?.scoreCompte)}" placeholder="${e?.auto?.scoreCompte ?? ""}"></label>
       <label class="f" for="ce-scc">Score compétition<input type="number" inputmode="numeric" min="0" id="ce-scc" name="scoreCompet" value="${esc(e?.scoreCompet)}" placeholder="${e?.auto?.scoreCompet ?? ""}"></label></div>
-    ${e?.tcTir && (e.tcTir.volees || []).some((v) => v.length) ? `<details class="card"><summary><b>Tir compté sur la cible</b> <span class="tirline">noté par l'archer · ${esc(e.tcTir.distance || "")} m · ${esc(e.tcTir.blason || "")}</span></summary><div id="ce-tv">${tirViewer(e.tcTir, "all", "data-tv", S.centrees.filter((x) => x.id !== e.id && x.date <= e.date))}</div></details>` : ""}
+    ${CC.est(e?.tcTir) ? `<details class="card" open><summary><b>Parcours campagne</b> <span class="tirline">noté par l'archer · ${esc(CC.resume(e.tcTir))}</span></summary>${CC.feuille(e.tcTir)}</details>` : ""}
+    ${e?.tcTir && !CC.est(e.tcTir) && (e.tcTir.volees || []).some((v) => v.length) ? `<details class="card"><summary><b>Tir compté sur la cible</b> <span class="tirline">noté par l'archer · ${esc(e.tcTir.distance || "")} m · ${esc(e.tcTir.blason || "")}</span></summary><div id="ce-tv">${tirViewer(e.tcTir, "all", "data-tv", S.centrees.filter((x) => x.id !== e.id && x.date <= e.date))}</div></details>` : ""}
     <div class="grid2"><label class="f" for="ce-tcd">Distance du tir compté (m)<input type="number" inputmode="numeric" min="0" id="ce-tcd" name="tcDistance" list="ce-dl" value="${esc(e?.tcDistance)}" placeholder="${esc(e?.auto?.tcDistance ?? "")}"><datalist id="ce-dl">${DISTANCES.map((d) => `<option value="${d}">`).join("")}</datalist></label>
       <label class="f" for="ce-tcb">Blason du tir compté<select id="ce-tcb" name="tcBlason"><option value="">—</option>${blasonOpts(e?.tcBlason || "")}</select></label></div>
     <div class="f">Objectif atteint<div class="radio">${[["", "Non renseigné"], ["O", "Oui"], ["N", "Non"]].map(([v, l]) => `<label><input type="radio" name="atteint" value="${v}" ${(e?.atteint || "") === v ? "checked" : ""}> ${l}</label>`).join("")}</div></div>
@@ -2423,6 +2431,10 @@ function viewConcours() {
       <div class="grid3"><label class="f">Arc<select data-cr="${a.id}|arc" ${dis}><option value="">—</option>${ARCS.map((x) => `<option ${r.arc === x ? "selected" : ""}>${x}</option>`).join("")}</select></label>
         <label class="f">Place<input type="text" data-cr="${a.id}|place" value="${esc(r.place ?? "")}" placeholder="ex. 3/12" ${ro}></label>
         <label class="f">Remarque<input type="text" data-cr="${a.id}|remarque" value="${esc(r.remarque ?? "")}" ${ro}></label></div>
+      ${(c.types || []).includes("campagne") ? `<div class="grid3"><label class="f">Piquet<select data-cr="${a.id}|piquet" ${dis}><option value="">—</option>${CC.PIQUETS.map(([k, l]) => `<option value="${k}" ${r.piquet === k ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+        <label class="f">Nombre de 6<input type="number" inputmode="numeric" min="0" data-cr="${a.id}|n6" value="${esc(r.n6 ?? "")}" ${ro}></label>
+        <label class="f">Nombre de 5<input type="number" inputmode="numeric" min="0" data-cr="${a.id}|n5" value="${esc(r.n5 ?? "")}" ${ro}></label></div>
+        <span class="tirline">Campagne : à score égal, le départage se fait au plus grand nombre de 6, puis de 5. Piquet proposé : ${esc(CC.PIQUETS.find(([k]) => k === CC.piquet(catFFTA(a), r.arc || (a.arcs || [])[0]))?.[1] || "—")}.</span>` : ""}
     </div>`;
   }).join("")}</div>
     <span class="tirline">Le score total additionne les distances. Il s'ajoute au carnet d'entraînement de l'archer (volume « Compét » et score compétition) et à sa courbe de progression en concours.</span>`;
@@ -3934,7 +3946,7 @@ function coachTir(id) {
   const others = tcCache.list.filter((x) => x.id !== e.id && x.date <= e.date);
   sheet(`Tir compté du ${fmtLong(e.date)}`, `
     <span class="tirline">${esc(tirLab(e))} · ${esc(e.scoreCompte)} pts${e.compte ? ` en ${esc(e.compte)} flèches` : ""}${e.saisiParArcher ? " · noté par l'archer" : ""}</span>
-    ${e.tcTir ? `<div id="ct-tv">${tirViewer(e.tcTir, "all", "data-tv", others)}</div>` : ""}
+    ${CC.est(e.tcTir) ? `<span class="tirline">${esc(CC.libelle(e.tcTir))} · ${esc(CC.resume(e.tcTir))}</span>${CC.feuille(e.tcTir)}` : e.tcTir ? `<div id="ct-tv">${tirViewer(e.tcTir, "all", "data-tv", others)}</div>` : ""}
     ${e.commentaire ? `<div class="f">Ressenti de l'archer<p class="prev" style="color:var(--ink)">${esc(e.commentaire)}</p></div>` : ""}
     <label class="f" for="ct-com">Mot de l'entraîneur (l'archer le lit dans son espace)<textarea id="ct-com" name="commentaireCoach" placeholder="Ex. Beau groupement, garde ce placement d'épaule.">${esc(e.commentaireCoach)}</textarea></label>${motRepHtml(e)}`, {
     onSave(fd) { const v = (fd.get("commentaireCoach") || "").trim(); const chg = v !== (e.commentaireCoach || ""), up = chg ? { commentaireCoach: v, motArchive: false } : { commentaireCoach: v }; Object.assign(e, up); patch("carnetEntrees", e.id, up); toast(v ? "Mot envoyé à l'archer" : "Mot retiré"); render(); },
@@ -5970,6 +5982,15 @@ document.addEventListener("click", (e) => {
   if (t.dataset.act === "close-tir") { S.tirOpen = null; render(); return; }
   if (t.dataset.act === "open-tir") { S.tirOpen = t.dataset.tir; render(); return; }
   if (t.dataset.act === "new-tir") { formTir(); return; }
+  if (t.dataset.act === "new-cp" || t.dataset.act === "cp-edit") {
+    const s = S.seances.find((x) => x.id === S.seance), a = S.archers.find((x) => x.id === S.suivi); if (!s || !a) return;
+    const old = t.dataset.act === "cp-edit" ? getSuivi(s, a.id).tirs.find((x) => x.id === t.dataset.tir) : null;
+    CC.saisir({ tir: old, cat: catFFTA(a), arc: (a.arcs || [])[0] || "", federation: "FFTA", cle: old ? null : `co:${s.id}:${a.id}`, titre: `Parcours campagne · ${a.prenom || fullName(a)}` }, (nt) => {
+      editTirs((tirs) => { const k = tirs.findIndex((x) => x.id === nt.id); if (k >= 0) tirs[k] = nt; else tirs.push(nt); });
+      toast(`Parcours enregistré : ${CC.stats(nt).total} pts`);
+    });
+    return;
+  }
   if (t.dataset.act === "del-tir") {
     if (!t.dataset.confirm) { t.dataset.confirm = 1; t.textContent = "Confirmer la suppression";  return; }
     const id = t.dataset.tir; if (S.tirOpen === id) S.tirOpen = null;
