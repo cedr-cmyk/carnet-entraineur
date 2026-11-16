@@ -179,7 +179,7 @@ window.CarnetRun = (() => {
     return { temps: r.temps ?? (segs.length ? segs.reduce((s, x) => s + x, 0) : null), touchees, cibles, penal: cibles - touchees, fleches: tirs.reduce((s, x) => s + (Number(x.fleches) || 0), 0),
       course: tps("course") || null, tir: tps("tir") || null, tirMoyen: nTir ? tps("tir") / nTir : null, fini: !!r.fini };
   }
-  const libelle = (t) => `Run-archery · ${FORMATS[t.run?.format]?.nom || "libre"} · ${t.run?.boucles} × ${t.run?.long} m`;
+  const libelle = (t) => `Run-archery · ${FORMATS[t.run?.format]?.nom || "libre"} · ${t.run?.boucles} × ${t.run?.long} m${t.run?.cible ? ` · cible ${t.run.cible}` : ""}`;
   const resume = (t) => { const s = stats(t); return `${mmss(s.temps)} · ${s.touchees}/${s.cibles} cibles · ${s.penal} pénalité${s.penal > 1 ? "s" : ""}`; };
   function feuille(t) {
     const r = t.run || {}, segs = r.segs || [], et = etapes(r), s = stats(t);
@@ -271,47 +271,64 @@ window.CarnetRun = (() => {
         if (b.hasAttribute("data-rquit")) { garder(); return quitter(); }
       });
     }
-    // 3) entraîneur : plusieurs archers en même temps, départ groupé, chacun avance à son rythme
+    // 3) entraîneur : plusieurs archers en même temps, départ groupé, chacun avance à son rythme.
+    //    Au pas de tir on ne touche que « Repartir » ; les cibles touchées se notent ensuite, cible (couloir) par cible.
     function groupe() {
       const r = G.conf, et = etapes(r), now = Date.now(), nom = (id) => (o.groupe.find((a) => a.id === id) || {}).nom || "?";
-      const ecoule = (A) => (G.depart ? now - G.depart - A.segs.reduce((s, x) => s + x, 0) : 0);
+      G.cible = G.cible || Object.fromEntries(G.ordre.map((id, k) => [id, k + 1]));
+      const aNoter = () => G.ordre.flatMap((id) => G.a[id].tirs.map((x, n) => (x && x.touchees == null ? { id, n } : null)).filter(Boolean));
+      const finiA = (A) => A.segs.length >= et.length || A.stop;
       const carte = (id) => {
-        const A = G.a[id], i = A.segs.length, e = et[i], fin = i >= et.length || A.stop, tot = fin ? A.segs.reduce((s, x) => s + x, 0) : G.depart ? now - G.depart : 0;
-        const tirN = !fin && e?.k === "tir" ? A.tirs[e.n] || (A.tirs[e.n] = { touchees: null, fleches: null }) : null;
-        const pen = e?.k === "course" && e.n > 0 ? r.cibles - (Number(A.tirs[e.n - 1]?.touchees) || 0) : 0;
-        return `<div class="card run-g" data-g="${esc(id)}" style="gap:8px;${fin ? "opacity:.75" : ""}"><div class="bar"><b>${esc(nom(id))}</b><span class="grow"></span><b style="font-size:1.4rem;font-variant-numeric:tabular-nums" ${fin ? "" : `data-gt="${esc(id)}"`}>${mmss(tot)}</b></div>
-          <span class="tirline">${fin ? (A.stop && i < et.length ? "Arrêté" : "🏁 Arrivé") + ` · ${A.tirs.reduce((s, x) => s + (Number(x.touchees) || 0), 0)}/${A.tirs.length * r.cibles} cibles` : !G.depart ? "Prêt" : e.k === "course" ? `🏃 Boucle ${e.n + 1}/${r.boucles}${pen ? ` (+${pen} pénalité${pen > 1 ? "s" : ""})` : ""}` : `🎯 Tir ${e.n + 1} · ${POS[r.positions[e.n]]}`}</span>
-          ${tirN ? `<div class="seg-mode" role="group" aria-label="Cibles touchées">${Array.from({ length: r.cibles + 1 }, (_, k) => `<button type="button" data-gtc="${k}" aria-pressed="${tirN.touchees === k}">${k}</button>`).join("")}</div>
-            ${r.fleches > r.cibles ? `<div class="seg-mode" role="group" aria-label="Flèches tirées"><small style="align-self:center;padding:0 6px">flèches</small>${Array.from({ length: r.fleches - r.cibles + 1 }, (_, k) => k + r.cibles).map((k) => `<button type="button" data-gfl="${k}" aria-pressed="${tirN.fleches === k}">${k}</button>`).join("")}</div>` : ""}` : ""}
-          ${G.depart && !fin ? `<div class="bar"><button type="button" class="btn primary grow" data-gnext ${tirN && tirN.touchees == null ? "disabled" : ""}>${e.k === "course" ? (e.n === r.boucles - 1 ? "🏁 Arrivée" : "Au pas de tir") : "Repartir"}</button><button type="button" class="btn" data-gundo aria-label="Annuler la dernière étape de ${esc(nom(id))}">↶</button></div>` : G.depart && fin ? `<div class="bar"><span class="grow"></span><button type="button" class="btn" data-gundo>↶ Annuler l'arrivée</button></div>` : ""}</div>`;
+        const A = G.a[id], i = A.segs.length, e = et[i], fin = finiA(A), tot = fin ? A.segs.reduce((s, x) => s + x, 0) : G.depart ? now - G.depart : 0;
+        const prev = e?.k === "course" && e.n > 0 ? A.tirs[e.n - 1] : null, pen = prev && prev.touchees != null ? r.cibles - prev.touchees : null;
+        return `<div class="card run-g" data-g="${esc(id)}" style="gap:8px;${fin ? "opacity:.75" : ""}"><div class="bar"><b>${esc(nom(id))}</b>
+            ${G.depart ? `<span class="tag">cible ${G.cible[id]}</span>` : `<label class="tirline" style="display:flex;gap:6px;align-items:center">cible <input type="number" min="1" max="40" data-gcible value="${G.cible[id]}" style="width:64px;padding:4px 6px"></label>`}
+            <span class="grow"></span><b style="font-size:1.4rem;font-variant-numeric:tabular-nums" ${fin ? "" : `data-gt="${esc(id)}"`}>${mmss(tot)}</b></div>
+          <span class="tirline">${fin ? "🏁 Arrivé" : !G.depart ? "Prêt" : e.k === "course" ? `🏃 Boucle ${e.n + 1}/${r.boucles}${prev ? pen == null ? " (pénalités : tir à noter)" : pen ? ` (+${pen} pénalité${pen > 1 ? "s" : ""})` : "" : ""}` : `🎯 Au pas de tir · tir ${e.n + 1} · ${POS[r.positions[e.n]]}`}</span>
+          ${G.depart && !fin ? `<div class="bar"><button type="button" class="btn primary grow" data-gnext style="min-height:56px;font-size:1.1rem">${e.k === "course" ? (e.n === r.boucles - 1 ? "🏁 Arrivée" : "Au pas de tir") : "Repartir"}</button><button type="button" class="btn" data-gundo aria-label="Annuler la dernière étape de ${esc(nom(id))}">↶</button></div>` : G.depart && fin ? `<div class="bar"><span class="grow"></span><button type="button" class="btn" data-gundo>↶ Annuler l'arrivée</button></div>` : ""}</div>`;
       };
-      const tous = G.ordre.every((id) => G.a[id].segs.length >= et.length || G.a[id].stop);
-      const box = sheet(`<div class="bar"><b style="font-size:1.15rem">${esc(o.titre || "Run-archery")} · ${esc(FORMATS[r.format]?.nom || "")}</b><span class="grow"></span>${G.depart ? `<b id="run-tot" style="font-variant-numeric:tabular-nums">${mmss(now - G.depart)}</b>` : ""}</div>
-        ${G.depart ? "" : `<button type="button" class="btn primary" data-gdep style="min-height:72px;font-size:1.3rem">▶ Départ groupé (${G.ordre.length} archers)</button>`}
-        <div style="display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(250px,1fr))">${G.ordre.map(carte).join("")}</div>
-        <div class="acts"><button type="button" class="btn danger left" data-rab>Abandonner</button><button type="button" class="btn" data-rquit>Plus tard</button><button type="button" class="btn ${tous ? "primary" : ""}" data-gfin ${G.ordre.some((id) => G.a[id].segs.length) ? "" : "disabled"}>${tous ? "Enregistrer pour chacun" : "Arrêter et enregistrer"}</button></div>
-        <span class="tirline">Le chrono continue si tu fermes : « Plus tard » le retrouve. Une boucle de pénalité par cible manquée, comptée dans la boucle suivante.</span>`);
+      const tous = G.depart && G.ordre.every((id) => finiA(G.a[id])), reste = aNoter();
+      let corps;
+      if (G.vue === "tirs") {
+        // tirs à noter, rangés par cible
+        const lignes = G.ordre.slice().sort((x, y) => G.cible[x] - G.cible[y] || nom(x).localeCompare(nom(y), "fr")).flatMap((id) => G.a[id].tirs.map((x, n) => (x ? { id, n, x } : null)).filter(Boolean));
+        corps = `<div class="bar"><button type="button" class="btn ghost" data-gvue="chrono">← Chrono</button><span class="grow"></span><span class="tirline">${reste.length ? `${reste.length} tir${reste.length > 1 ? "s" : ""} à noter` : "Tous les tirs sont notés"}</span></div>
+          ${G.fin && reste.length ? `<p class="notice">Il reste ${reste.length} tir${reste.length > 1 ? "s" : ""} à noter. Tu peux les noter maintenant ou enregistrer quand même (ils compteront comme non notés).</p>` : ""}
+          ${lignes.length ? lignes.map(({ id, n, x }) => `<div class="card" data-g="${esc(id)}" data-gtir="${n}" style="gap:6px;${x.touchees != null ? "opacity:.8" : ""}"><div class="bar"><span class="tag">cible ${G.cible[id]}</span><b>${esc(nom(id))}</b><span class="grow"></span><span class="tirline">tir ${n + 1} · ${POS[r.positions[n]]}</span></div>
+            <div class="seg-mode" role="group" aria-label="Cibles touchées">${Array.from({ length: r.cibles + 1 }, (_, k) => `<button type="button" data-gtc="${k}" aria-pressed="${x.touchees === k}">${k}</button>`).join("")}</div>
+            ${r.fleches > r.cibles ? `<div class="seg-mode" role="group" aria-label="Flèches tirées"><small style="align-self:center;padding:0 6px">flèches</small>${Array.from({ length: r.fleches - r.cibles + 1 }, (_, k) => k + r.cibles).map((k) => `<button type="button" data-gfl="${k}" aria-pressed="${(x.fleches ?? r.cibles) === k}">${k}</button>`).join("")}</div>` : ""}</div>`).join("") : `<p class="notice">Aucun archer n'est encore reparti du pas de tir.</p>`}`;
+      } else {
+        corps = `${G.depart ? `<button type="button" class="btn" data-gvue="tirs" ${G.ordre.some((id) => G.a[id].tirs.length) ? "" : "disabled"}>🎯 Noter les tirs${reste.length ? ` (${reste.length} à noter)` : ""}</button>` : `<button type="button" class="btn primary" data-gdep style="min-height:72px;font-size:1.3rem">▶ Départ groupé (${G.ordre.length} archers)</button><span class="tirline">Indique la cible de chaque archer : tu noteras ses tirs cible par cible.</span>`}
+          <div style="display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(250px,1fr))">${G.ordre.map(carte).join("")}</div>`;
+      }
+      const box = sheet(`<div class="bar"><b style="font-size:1.15rem">${esc(o.titre || "Run-archery")} · ${esc(FORMATS[r.format]?.nom || "")}</b><span class="grow"></span>${G.depart ? `<b id="run-tot" style="font-variant-numeric:tabular-nums">${mmss(tous ? Math.max(...G.ordre.map((id) => G.a[id].segs.reduce((s, x) => s + x, 0))) : now - G.depart)}</b>` : ""}</div>
+        ${corps}
+        <div class="acts"><button type="button" class="btn danger left" data-rab>Abandonner</button><button type="button" class="btn" data-rquit>Plus tard</button><button type="button" class="btn ${tous && !reste.length ? "primary" : ""}" data-gfin ${G.ordre.some((id) => G.a[id].segs.length) ? "" : "disabled"}>${G.fin && reste.length ? "Enregistrer quand même" : tous ? "Enregistrer pour chacun" : "Arrêter et enregistrer"}</button></div>
+        <span class="tirline">Au pas de tir, touche seulement « Repartir » : les cibles touchées se notent dans « Noter les tirs », quand tu as le temps. Le chrono continue si tu fermes : « Plus tard » le retrouve.</span>`);
       clearInterval(tick);
       if (G.depart && !tous) tick = setInterval(() => {
         if (ferme) return clearInterval(tick); const n = Date.now(), a = box.querySelector("#run-tot"); if (a) a.textContent = mmss(n - G.depart);
         box.querySelectorAll("[data-gt]").forEach((x) => { x.textContent = mmss(n - G.depart); });
       }, 100);
+      box.addEventListener("change", (ev) => { const x = ev.target.closest("[data-gcible]"); if (!x) return; const g = x.closest("[data-g]"); G.cible[g.dataset.g] = Math.max(1, Number(x.value) || 1); garder(); });
       box.addEventListener("click", (ev) => {
         const b = ev.target.closest("button"); if (!b) return;
         if (b.hasAttribute("data-gdep")) { G.depart = Date.now(); garder(); return groupe(); }
+        if (b.dataset.gvue) { G.vue = b.dataset.gvue; garder(); return groupe(); }
         if (b.hasAttribute("data-rab")) return abandon(b);
         if (b.hasAttribute("data-rquit")) { garder(); return quitter(); }
         if (b.hasAttribute("data-gfin")) {
+          if (aNoter().length && !G.fin) { G.fin = true; G.vue = "tirs"; garder(); return groupe(); }
           const res = G.ordre.filter((id) => G.a[id].segs.length).map((id) => { const A = G.a[id], fini = A.segs.length >= et.length;
             return { id, tir: { id: "r" + Date.now().toString(36) + id.slice(-3), type: "compte", discipline: "run", federation: "FFTA", distance: String(r.dist), blason: "Run-archery", volees: [],
-              run: { ...JSON.parse(JSON.stringify(r)), segs: A.segs, tirs: A.tirs.filter((x) => x && x.touchees != null), fini, temps: A.segs.reduce((s, x) => s + x, 0) } } }; });
+              run: { ...JSON.parse(JSON.stringify(r)), cible: G.cible[id], segs: A.segs, tirs: A.tirs.filter((x) => x && x.touchees != null), fini, temps: A.segs.reduce((s, x) => s + x, 0) } } }; });
           oublier(); fermer(); fini(res); return;
         }
-        const g = b.closest("[data-g]"); if (!g) return; const A = G.a[g.dataset.g], i = A.segs.length, e = et[i];
-        if (b.dataset.gtc) { A.tirs[e.n].touchees = Number(b.dataset.gtc); if (A.tirs[e.n].fleches == null) A.tirs[e.n].fleches = r.cibles; garder(); return groupe(); }
-        if (b.dataset.gfl) { A.tirs[e.n].fleches = Number(b.dataset.gfl); garder(); return groupe(); }
-        if (b.hasAttribute("data-gnext")) { A.segs.push(Date.now() - G.depart - A.segs.reduce((s, x) => s + x, 0)); garder(); return groupe(); }
-        if (b.hasAttribute("data-gundo")) { if (A.stop) delete A.stop; else if (A.segs.length) { const k = A.segs.length - 1; A.segs.pop(); if (et[k + 1]?.k === "tir") A.tirs.length = Math.min(A.tirs.length, et[k + 1].n); } garder(); return groupe(); }
+        const g = b.closest("[data-g]"); if (!g) return; const A = G.a[g.dataset.g];
+        if (g.dataset.gtir != null) { const x = A.tirs[Number(g.dataset.gtir)]; if (b.dataset.gtc) { x.touchees = Number(b.dataset.gtc); if (x.fleches == null) x.fleches = r.cibles; } if (b.dataset.gfl) x.fleches = Number(b.dataset.gfl); garder(); return groupe(); }
+        const i = A.segs.length, e = et[i];
+        if (b.hasAttribute("data-gnext")) { if (e?.k === "tir") A.tirs[e.n] = A.tirs[e.n] || { touchees: null, fleches: null }; A.segs.push(Date.now() - G.depart - A.segs.reduce((s, x) => s + x, 0)); G.fin = false; garder(); return groupe(); }
+        if (b.hasAttribute("data-gundo")) { if (A.stop) delete A.stop; else if (A.segs.length) { const k = A.segs.length - 1; A.segs.pop(); if (et[k]?.k === "tir" && A.tirs[et[k].n]?.touchees == null) A.tirs.length = et[k].n; } garder(); return groupe(); }
       });
     }
     function abandon(b) {
