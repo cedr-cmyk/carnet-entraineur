@@ -7,8 +7,18 @@
 window.CarnetCampagne = (() => {
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const PIQUETS = [["rose", "Rose", "#ec4899"], ["blanc", "Blanc", "#f1f5f9"], ["orange", "Orange", "#f97316"], ["bleu", "Bleu", "#2563eb"], ["rouge", "Rouge", "#dc2626"]];
+  // UFOLEP (règlement d'arbitrage 4.4) : zones 5 à 1, 24 buttes (ou 2 × 12) à distances connues, piquet selon l'âge
+  const PIQUETS_UF = [["vert", "Vert", "#16a34a"], ["bleu", "Bleu", "#2563eb"], ["rouge", "Rouge", "#dc2626"], ["jaune", "Jaune", "#eab308"]];
+  // exemple de parcours de 12 cibles du règlement UFOLEP : blason et distance par piquet (repris pour les cibles 13 à 24)
+  const UF12 = [[80, 10, 20, 25, 30], [60, 6, 15, 20, 25], [40, 5, 10, 10, 15], [20, 3, 5, 5, 5], [80, 12, 22, 30, 35], [60, 8, 15, 25, 30],
+    [40, 6, 10, 15, 20], [20, 4, 8, 15, 15], [80, 15, 25, 35, 40], [60, 10, 20, 25, 30], [40, 8, 15, 20, 20], [20, 5, 10, 10, 10]];
+  const ufCible = (i, p) => { const r = UF12[i % 12], k = ["vert", "bleu", "rouge", "jaune"].indexOf(p); return { b: r[0], d: k >= 0 ? String(r[1 + k]) : "" }; };
+  const piquetUf = (age) => (age == null ? "jaune" : age <= 12 ? "vert" : age <= 14 ? "bleu" : age <= 16 ? "rouge" : "jaune");
+  const uf = (t) => (t?.federation || "FFTA") === "UFOLEP";
+  const piquetsDe = (fed) => (fed === "UFOLEP" ? PIQUETS_UF : PIQUETS);
   const BLASONS = [20, 40, 60, 80];
-  const KEYS = ["6", "5", "4", "3", "2", "1", "M"];
+  const keysDe = (t) => (uf(t) ? ["5", "4", "3", "2", "1", "M"] : ["6", "5", "4", "3", "2", "1", "M"]);
+  const colsDe = (t) => (uf(t) ? ["5", "4"] : ["6", "5"]); // décompte affiché sur la feuille (FFTA : départage aux 6 puis aux 5)
   // A.7.4.2 : distances connues, 3 cibles par blason et par unité de 12 cibles
   const CONNUES = { rose: { 20: [5, 5, 10], 40: [10, 10, 15], 60: [15, 15, 20], 80: [20, 20, 20] }, blanc: { 20: [5, 10, 15], 40: [10, 15, 20], 60: [20, 25, 30], 80: [30, 35, 40] },
     orange: { 20: [5, 10, 15], 40: [10, 15, 20], 60: [20, 25, 30], 80: [30, 30, 30] }, bleu: { 20: [5, 10, 15], 40: [15, 20, 25], 60: [30, 35, 40], 80: [40, 45, 50] },
@@ -29,31 +39,35 @@ window.CarnetCampagne = (() => {
   }
   const val = (x) => (x === "M" ? 0 : Number(x) || 0);
   const kcls = (x) => (x === "M" ? "k-miss" : val(x) >= 5 ? "k-gold" : "k-black");
-  const pqNom = (p) => (PIQUETS.find(([k]) => k === p) || [, p || "—"])[1];
-  const pqCoul = (p) => (PIQUETS.find(([k]) => k === p) || [, , "#94a3b8"])[2];
+  const TOUS = [...PIQUETS, ...PIQUETS_UF];
+  const pqNom = (p) => (TOUS.find(([k]) => k === p) || [, p || "—"])[1];
+  const pqCoul = (p) => (TOUS.find(([k]) => k === p) || [, , "#94a3b8"])[2];
+  const inconnue = (t, i) => { const c = t.campagne?.connues; return c === false || (c === "mixte" && !!(t.campagne.cibles[i] || {}).i); };
+  const modeDist = (t) => (t.campagne?.connues === "mixte" ? "mixtes" : t.campagne?.connues === false ? "inconnues" : "connues");
   const est = (t) => !!(t && t.campagne);
   function stats(t) {
-    const fl = (t.volees || []).flat();
-    return { total: fl.reduce((s, x) => s + val(x), 0), n: fl.length, n6: fl.filter((x) => x === "6").length, n5: fl.filter((x) => x === "5").length,
+    const fl = (t.volees || []).flat(), [ca, cb] = colsDe(t);
+    return { total: fl.reduce((s, x) => s + val(x), 0), n: fl.length, n6: fl.filter((x) => x === "6").length, n5: fl.filter((x) => x === "5").length, n4: fl.filter((x) => x === "4").length,
+      ca: fl.filter((x) => x === ca).length, cb: fl.filter((x) => x === cb).length, la: ca, lb: cb,
       cibles: (t.volees || []).filter((v) => v.length >= 3).length, prevues: Number(t.nbVolees) || (t.campagne?.cibles || []).length };
   }
-  const libelle = (t) => `Campagne · ${t.nbVolees || "?"} cibles ${t.campagne?.connues === false ? "inconnues" : "connues"} · piquet ${pqNom(t.campagne?.piquet).toLowerCase()}`;
+  const libelle = (t) => `Campagne ${uf(t) ? "UFOLEP" : "FFTA"} · ${t.nbVolees || "?"} cibles ${modeDist(t)} · piquet ${pqNom(t.campagne?.piquet).toLowerCase()}`;
   const aide = (p, connues, b) => { const r = (connues ? CONNUES : INCONNUES)[p]?.[b]; return r ? (connues ? r : null) : null; };
   const plage = (p, b) => INCONNUES[p]?.[b] || null;
   // Feuille de marque FFTA (B.12) : cible, 3 flèches, volée, cumul, nombre de 6 et de 5 ; data-cc = cible à rouvrir
   function feuille(t, opts = {}) {
-    const cb = t.campagne?.cibles || [], vs = t.volees || [], N = Math.max(Number(t.nbVolees) || 0, vs.length);
+    const cb = t.campagne?.cibles || [], vs = t.volees || [], N = Math.max(Number(t.nbVolees) || 0, vs.length), [ca, cbb] = colsDe(t);
     let cum = 0, t6 = 0, t5 = 0;
     const rows = Array.from({ length: N }, (_, i) => {
-      const v = vs[i] || [], s = v.reduce((a, x) => a + val(x), 0), n6 = v.filter((x) => x === "6").length, n5 = v.filter((x) => x === "5").length, c = cb[i] || {};
+      const v = vs[i] || [], s = v.reduce((a, x) => a + val(x), 0), n6 = v.filter((x) => x === ca).length, n5 = v.filter((x) => x === cbb).length, c = cb[i] || {};
       cum += s; t6 += n6; t5 += n5;
       const cur = opts.courante === i ? ' style="outline:2px solid var(--accent);outline-offset:-2px"' : "";
-      return `<tr${opts.clic ? ` data-cc="${i}" class="sc-click"` : ""}${cur}><th>${i + 1}<small style="display:block;font-weight:500;font-size:.7rem">${c.b ? c.b + " cm" : ""}${c.d ? " · " + esc(c.d) + " m" : ""}</small></th>${[0, 1, 2].map((k) => `<td class="${v[k] !== undefined ? kcls(v[k]) : ""}">${v[k] ?? ""}</td>`).join("")}<td class="vs">${v.length ? s : ""}</td><td class="cum">${v.length ? cum : ""}</td><td>${v.length ? n6 : ""}</td><td>${v.length ? n5 : ""}</td></tr>`;
+      return `<tr${opts.clic ? ` data-cc="${i}" class="sc-click"` : ""}${cur}><th>${i + 1}<small style="display:block;font-weight:500;font-size:.7rem">${c.b ? c.b + " cm" : ""}${c.d ? " · " + esc(c.d) + " m" : ""}${inconnue(t, i) && t.campagne?.connues === "mixte" ? " · inc." : ""}</small></th>${[0, 1, 2].map((k) => `<td class="${v[k] !== undefined ? kcls(v[k]) : ""}">${v[k] ?? ""}</td>`).join("")}<td class="vs">${v.length ? s : ""}</td><td class="cum">${v.length ? cum : ""}</td><td>${v.length ? n6 : ""}</td><td>${v.length ? n5 : ""}</td></tr>`;
     }).join("");
-    return `<div class="scroll"><table class="vol cp-feuille"><thead><tr><th>Cible</th><th>1</th><th>2</th><th>3</th><th>Volée</th><th>Cumul</th><th>6</th><th>5</th></tr></thead><tbody>${rows}</tbody>
+    return `<div class="scroll"><table class="vol cp-feuille"><thead><tr><th>Cible</th><th>1</th><th>2</th><th>3</th><th>Volée</th><th>Cumul</th><th>${ca}</th><th>${cbb}</th></tr></thead><tbody>${rows}</tbody>
       <tfoot><tr><th colspan="5" style="text-align:right">Totaux</th><td class="vs">${cum}</td><td class="vs">${t6}</td><td class="vs">${t5}</td></tr></tfoot></table></div>`;
   }
-  function resume(t) { const st = stats(t); return `${st.total} pts · ${st.cibles}/${st.prevues} cibles · ${st.n6} × 6 · ${st.n5} × 5`; }
+  function resume(t) { const st = stats(t); return `${st.total} pts · ${st.cibles}/${st.prevues} cibles · ${st.ca} × ${st.la} · ${st.cb} × ${st.lb}`; }
   // Saisie du parcours dans #sheet. o = { tir (à reprendre), cat, arc, federation, cle (brouillon), titre } ; fini(tir) à l'enregistrement
   function saisir(o, fini) {
     const el = document.querySelector("#sheet"), LSK = o.cle ? "carnet-campagne:" + o.cle : null;
@@ -63,41 +77,52 @@ window.CarnetCampagne = (() => {
     let t = o.tir ? JSON.parse(JSON.stringify(o.tir)) : lire();
     let i = 0, vueFeuille = false;
     if (t && t.campagne) { const k = (t.volees || []).findIndex((v) => v.length < 3); i = Math.max(0, Math.min(k >= 0 ? k : (t.volees || []).length, (t.nbVolees || 1) - 1)); }
-    const fermer = () => { el.innerHTML = ""; };
+    let ferme = false;
+    const fermer = () => { ferme = true; el.innerHTML = ""; };
     function reglage() {
-      const p0 = piquet(o.cat, o.arc);
+      const fed0 = o.federation === "UFOLEP" ? "UFOLEP" : "FFTA";
+      const pqHtml = (fed) => { const p0 = fed === "UFOLEP" ? piquetUf(o.age) : piquet(o.cat, o.arc); return piquetsDe(fed).map(([k, l, c]) => `<label><input type="radio" name="piquet" value="${k}" ${k === p0 ? "checked" : ""}> <span class="dot" style="background:${c}"></span> ${l}</label>`).join(""); };
+      const aideP = (fed) => fed === "UFOLEP" ? `Proposé d'après l'âge${o.age != null ? " (" + o.age + " ans dans la saison)" : ""}, selon le règlement UFOLEP. Tu peux le changer.` : `Proposé d'après ${o.cat ? "la catégorie (" + esc(o.cat) + ")" : "la catégorie"} et l'arc${o.arc ? " (" + esc(o.arc) + ")" : ""}, selon le règlement FFTA. Tu peux le changer.`;
       el.innerHTML = `<div class="sheet-bg" data-close><form class="sheet" id="cp-set"><h3>${esc(o.titre || "Parcours campagne")}</h3>
+        <div class="f">Fédération<div class="radio">${["FFTA", "UFOLEP"].map((f) => `<label><input type="radio" name="fed" value="${f}" ${f === fed0 ? "checked" : ""}> ${f}</label>`).join("")}</div></div>
         <div class="f">Nombre de cibles<div class="radio">${[12, 24].map((n) => `<label><input type="radio" name="nb" value="${n}" ${n === 24 ? "checked" : ""}> ${n} cibles</label>`).join("")}<label><input type="radio" name="nb" value="autre"> Autre</label></div>
           <input type="number" inputmode="numeric" min="1" max="48" name="nbAutre" placeholder="Nombre de cibles" hidden></div>
-        <div class="f">Distances<div class="radio"><label><input type="radio" name="connues" value="1" checked> Connues</label><label><input type="radio" name="connues" value="0"> Inconnues</label></div></div>
-        <div class="f">Piquet<div class="radio">${PIQUETS.map(([k, l, c]) => `<label><input type="radio" name="piquet" value="${k}" ${k === p0 ? "checked" : ""}> <span class="dot" style="background:${c}"></span> ${l}</label>`).join("")}</div>
-          <span class="tirline">Proposé d'après ${o.cat ? "la catégorie (" + esc(o.cat) + ")" : "la catégorie"} et l'arc${o.arc ? " (" + esc(o.arc) + ")" : ""}, selon le règlement FFTA. Tu peux le changer.</span></div>
+        <div class="f" id="cp-dist" ${fed0 === "UFOLEP" ? "hidden" : ""}>Distances<div class="radio"><label><input type="radio" name="connues" value="1" checked> Connues</label><label><input type="radio" name="connues" value="0"> Inconnues</label><label><input type="radio" name="connues" value="mixte"> Mixtes</label></div>
+          <span class="tirline">Mixtes : tu indiques pour chaque cible si la distance est connue ou inconnue.</span></div>
+        <div class="f">Piquet<div class="radio" id="cp-pq">${pqHtml(fed0)}</div><span class="tirline" id="cp-pqa">${aideP(fed0)}</span></div>
         <div class="acts"><button type="button" class="btn" data-close>Annuler</button><button class="btn primary">Commencer le parcours</button></div></form></div>`;
       el.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", (ev) => { if (ev.target === b) fermer(); }));
       const f = el.querySelector("#cp-set");
-      f.addEventListener("change", () => { f.nbAutre.hidden = f.nb.value !== "autre"; });
+      let fedV = fed0;
+      f.addEventListener("change", (ev) => {
+        f.nbAutre.hidden = f.nb.value !== "autre";
+        if (ev.target.name === "fed" && f.fed.value !== fedV) { fedV = f.fed.value; el.querySelector("#cp-pq").innerHTML = pqHtml(fedV); el.querySelector("#cp-pqa").innerHTML = aideP(fedV); el.querySelector("#cp-dist").hidden = fedV === "UFOLEP"; }
+      });
       f.addEventListener("submit", (ev) => {
         ev.preventDefault();
         const nb = f.nb.value === "autre" ? Math.round(Number(f.nbAutre.value)) : Number(f.nb.value);
         if (!(nb >= 1 && nb <= 48)) { f.nbAutre.focus(); return; }
-        t = { id: o.id || "t" + Date.now().toString(36), type: "compte", discipline: "campagne", federation: o.federation || "FFTA", distance: "", blason: "Campagne", fpv: 3, nbVolees: nb, mode: "fleches", volees: [],
-          campagne: { piquet: f.piquet.value, connues: f.connues.value === "1", cibles: [] } };
+        const fed = f.fed.value, cn = fed === "UFOLEP" ? true : f.connues.value === "mixte" ? "mixte" : f.connues.value === "1";
+        t = { id: o.id || "t" + Date.now().toString(36), type: "compte", discipline: "campagne", federation: fed, distance: "", blason: "Campagne", fpv: 3, nbVolees: nb, mode: "fleches", volees: [],
+          campagne: { piquet: f.piquet.value, connues: cn, cibles: [] } };
         i = 0; garder(); parcours();
       });
     }
     function parcours() {
-      const cb = t.campagne.cibles, c = cb[i] || (cb[i] = { b: (cb[i - 1] || {}).b || 40, d: "" }), v = t.volees[i] || (t.volees[i] = []);
-      const st = stats(t), N = t.nbVolees, p = t.campagne.piquet, cn = t.campagne.connues !== false;
-      const sug = cn ? aide(p, true, c.b) : null, pl = !cn ? plage(p, c.b) : null;
+      const cb = t.campagne.cibles, p = t.campagne.piquet;
+      const c = cb[i] || (cb[i] = uf(t) ? ufCible(i, p) : { b: (cb[i - 1] || {}).b || 40, d: "", ...(t.campagne.connues === "mixte" ? { i: !!(cb[i - 1] || {}).i } : {}) }), v = t.volees[i] || (t.volees[i] = []);
+      const st = stats(t), N = t.nbVolees, cn = !inconnue(t, i), mx = t.campagne.connues === "mixte";
+      const sug = cn && !uf(t) ? aide(p, true, c.b) : null, pl = !cn && !uf(t) ? plage(p, c.b) : null;
       el.innerHTML = `<div class="sheet-bg"><div class="sheet cp-sheet" role="dialog" aria-label="Parcours campagne">
-        <div class="bar"><b style="font-size:1.2rem">Cible ${i + 1} / ${N}</b><span class="grow"></span><span class="dot" style="background:${pqCoul(p)}" title="Piquet ${pqNom(p)}"></span><span class="tirline">piquet ${pqNom(p).toLowerCase()} · ${cn ? "connues" : "inconnues"}</span></div>
-        <div class="score"><b>${st.total}</b><span>pts · ${st.cibles} cible${st.cibles > 1 ? "s" : ""} · ${st.n6} × 6 · ${st.n5} × 5</span></div>
+        <div class="bar"><b style="font-size:1.2rem">Cible ${i + 1} / ${N}</b><span class="grow"></span><span class="dot" style="background:${pqCoul(p)}" title="Piquet ${pqNom(p)}"></span><span class="tirline">${uf(t) ? "UFOLEP" : "FFTA"} · piquet ${pqNom(p).toLowerCase()} · ${modeDist(t)}</span></div>
+        <div class="score"><b>${st.total}</b><span>pts · ${st.cibles} cible${st.cibles > 1 ? "s" : ""} · ${st.ca} × ${st.la} · ${st.cb} × ${st.lb}</span></div>
         ${vueFeuille ? feuille(t, { clic: true, courante: i }) + `<span class="tirline">Touche une cible pour la corriger.</span>` : `
         <div class="f">Blason<div class="seg-mode" role="group">${BLASONS.map((b) => `<button type="button" data-cb="${b}" aria-pressed="${c.b === b}">${b} cm</button>`).join("")}</div></div>
+        ${mx ? `<div class="f">Cette cible<div class="seg-mode" role="group"><button type="button" data-ci="0" aria-pressed="${cn}">Distance connue</button><button type="button" data-ci="1" aria-pressed="${!cn}">Distance inconnue</button></div></div>` : ""}
         <label class="f">Distance de la cible (m)${cn ? "" : " — estimée"}<input type="number" inputmode="decimal" min="0" max="80" step="0.5" id="cp-d" value="${esc(c.d)}" placeholder="${pl ? pl[0] + " à " + pl[1] : "facultatif"}"></label>
-        ${sug ? `<div class="chips">${[...new Set(sug)].map((d) => `<button type="button" class="chip" data-cd="${d}" aria-pressed="${String(c.d) === String(d)}">${d} m</button>`).join("")}</div><span class="tirline">Distances du piquet ${pqNom(p).toLowerCase()} pour un blason de ${c.b} cm (règlement FFTA).</span>` : pl ? `<span class="tirline">Piquet ${pqNom(p).toLowerCase()}, blason de ${c.b} cm : entre ${pl[0]} et ${pl[1]} m.</span>` : ""}
+        ${sug && !uf(t) ? `<div class="chips">${[...new Set(sug)].map((d) => `<button type="button" class="chip" data-cd="${d}" aria-pressed="${String(c.d) === String(d)}">${d} m</button>`).join("")}</div><span class="tirline">Distances du piquet ${pqNom(p).toLowerCase()} pour un blason de ${c.b} cm (règlement FFTA).</span>` : pl ? `<span class="tirline">Piquet ${pqNom(p).toLowerCase()}, blason de ${c.b} cm : entre ${pl[0]} et ${pl[1]} m.</span>` : uf(t) ? `<span class="tirline">Blason et distance repris de l'exemple de parcours du règlement UFOLEP (cible ${(i % 12) + 1}) : corrige-les si ton parcours est différent.</span>` : ""}
         <div class="cp-fl" style="display:flex;gap:8px;justify-content:center">${[0, 1, 2].map((k) => `<span class="key ${v[k] !== undefined ? kcls(v[k]) : "k-miss"}" style="display:grid;place-items:center;width:64px;min-height:56px">${v[k] ?? "·"}</span>`).join("")}</div>
-        <div class="pad" style="grid-template-columns:repeat(7,minmax(0,1fr))">${KEYS.map((k) => `<button type="button" class="key ${kcls(k)}" data-ck="${k}" ${v.length >= 3 ? "disabled" : ""} aria-label="Flèche ${k === "M" ? "manquée" : k}">${k}</button>`).join("")}</div>`}
+        <div class="pad" style="grid-template-columns:repeat(${keysDe(t).length},minmax(0,1fr))">${keysDe(t).map((k) => `<button type="button" class="key ${kcls(k)}" data-ck="${k}" ${v.length >= 3 ? "disabled" : ""} aria-label="Flèche ${k === "M" ? "manquée" : k}">${k}</button>`).join("")}</div>`}
         <div style="display:grid;grid-template-columns:auto 1fr 1fr auto;gap:8px"><button type="button" class="btn" data-cnav="-1" ${i ? "" : "disabled"} aria-label="Cible précédente">‹</button><button type="button" class="btn" data-cundo ${v.length || i ? "" : "disabled"}>↶ Annuler</button>
           <button type="button" class="btn" data-cfeuille>${vueFeuille ? "Saisie" : "Feuille de marque"}</button><button type="button" class="btn" data-cnav="1" ${i < N - 1 ? "" : "disabled"} aria-label="Cible suivante">›</button></div>
         <div class="acts"><button type="button" class="btn" data-cquit>Plus tard</button><button type="button" class="btn primary" data-cfin ${st.n ? "" : "disabled"}>${st.cibles >= N ? "Enregistrer le parcours" : "Terminer ici"}</button></div>
@@ -106,9 +131,10 @@ window.CarnetCampagne = (() => {
       el.querySelector(".cp-sheet").addEventListener("click", (ev) => {
         const b = ev.target.closest("button,[data-cc]"); if (!b) return;
         if (b.dataset.cb) { c.b = Number(b.dataset.cb); garder(); return parcours(); }
+        if (b.dataset.ci) { c.i = b.dataset.ci === "1"; garder(); return parcours(); }
         if (b.dataset.cd) { c.d = b.dataset.cd; garder(); return parcours(); }
         if (b.dataset.cc != null) { i = Number(b.dataset.cc); vueFeuille = false; return parcours(); }
-        if (b.dataset.ck) { if (v.length >= 3) return; v.push(b.dataset.ck); garder(); if (v.length >= 3 && i < N - 1) { parcours(); setTimeout(() => { if (t.volees[i] === v) { i++; parcours(); } }, 450); return; } return parcours(); }
+        if (b.dataset.ck) { if (v.length >= 3) return; v.push(b.dataset.ck); garder(); if (v.length >= 3 && i < N - 1) { parcours(); setTimeout(() => { if (!ferme && t.volees[i] === v) { i++; parcours(); } }, 450); return; } return parcours(); }
         if (b.hasAttribute("data-cundo")) { if (v.length) v.pop(); else if (i) { i--; t.volees[i].pop(); } garder(); return parcours(); }
         if (b.dataset.cnav) { i = Math.min(N - 1, Math.max(0, i + Number(b.dataset.cnav))); return parcours(); }
         if (b.hasAttribute("data-cfeuille")) { vueFeuille = !vueFeuille; return parcours(); }
@@ -122,7 +148,7 @@ window.CarnetCampagne = (() => {
     if (t && t.campagne) parcours(); else reglage();
   }
   const enCours = (cle) => { try { return !!localStorage.getItem("carnet-campagne:" + cle); } catch (e) { return false; } };
-  return { piquet, stats, feuille, resume, libelle, saisir, enCours, est, val, PIQUETS, CONNUES, INCONNUES };
+  return { piquet, piquetUf, piquetsDe, stats, feuille, resume, libelle, saisir, enCours, est, val, PIQUETS, PIQUETS_UF, CONNUES, INCONNUES };
 })();
 window.CarnetArcherUI = (API, opts = {}) => {
   const API0 = API;
@@ -515,7 +541,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
   function campagneProfil() {
     const a = St.data.archer || {}, y = Number(String(a.naissance || "").slice(0, 4)), age = y ? saisonOf(today()) - y : null;
     const cat = age == null ? "" : age <= 10 ? "U11" : age <= 12 ? "U13" : age <= 14 ? "U15" : age <= 17 ? "U18" : age <= 20 ? "U21" : "Senior";
-    return { cat, arc: (a.arcs || [])[0] || "", federation: "FFTA" };
+    return { cat, age, arc: (a.arcs || [])[0] || "", federation: (a.federations || []).includes("FFTA") || !(a.federations || []).length ? "FFTA" : a.federations[0] };
   }
   const cpCle = () => "ar:" + (who()?.archer_id || "");
   function tirCampagne() {

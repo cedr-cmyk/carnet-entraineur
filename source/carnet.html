@@ -1300,7 +1300,7 @@ function viewSeance() {
       if (!fol.length) return `<p class="notice">Pointe les présents pour noter leur suivi et leurs scores.</p>`;
       return `<div class="list">${fol.map((a) => {
         const v = getSuivi(s, a.id), last = v.tirs[v.tirs.length - 1], nx = attrsFor(a.id, s.id).length;
-        return `<button class="row" data-suivi="${a.id}"><span class="main"><span class="t">${esc(fullName(a))}${nx ? ` <span class="tag fed">${nx} exercice${nx > 1 ? "s" : ""}</span>` : ""} ${pretTag(a.id)}</span>
+        return `<button class="row" data-suivi="${a.id}"><span class="main"><span class="t">${esc(fullName(a))}${nx ? ` <span class="tag fed">${nx} exercice${nx > 1 ? "s" : ""}</span>` : ""}${CC.enCours(`co:${s.id}:${a.id}`) ? ` <span class="tag today">⛰ parcours en cours</span>` : ""} ${pretTag(a.id)}</span>
           <span class="m">${esc(v.note ? v.note.slice(0, 90) + (v.note.length > 90 ? "…" : "") : "Aucune note")}</span>
           ${last ? `<span class="tirline">${esc(tirSum(last))}${v.tirs.length > 1 ? ` · ${v.tirs.length} tirs` : ""}</span>` : ""}</span>
           <span class="count" aria-hidden="true">›</span></button>`;
@@ -1406,7 +1406,7 @@ function viewSuivi() {
     <div class="card"><label class="f" for="suivi-note">Note de l'entraîneur</label>
       <textarea id="suivi-note" placeholder="Ce qu'il a travaillé, tes observations, les points à reprendre…" ${S.canWrite ? "" : "readonly"}>${esc(v.note)}</textarea></div>
     ${attrBlock(s, a)}
-    <div class="bar"><h2 class="sec" style="margin:0">Scores</h2><span class="grow"></span>${S.canWrite ? `<button class="btn" data-act="new-cp">⛰ Parcours campagne</button><button class="btn primary" data-act="new-tir">+ Nouveau tir</button>` : ""}</div>
+    <div class="bar"><h2 class="sec" style="margin:0">Scores</h2><span class="grow"></span>${S.canWrite ? `<button class="btn" data-act="new-cp">${CC.enCours(`co:${s.id}:${a.id}`) ? "⛰ Reprendre le parcours en cours" : "⛰ Parcours campagne"}</button><button class="btn primary" data-act="new-tir">+ Nouveau tir</button>` : ""}</div>
     ${v.tirs.length ? v.tirs.map((t) => tirCard(t)).join("") : `<p class="notice">Aucun score pour cette séance. « Nouveau tir » ouvre la feuille de marque : type de tir, distance, blason, puis saisie flèche par flèche ou du total. Les flèches comptent dans le volume du carnet.</p>`}
     ${carnetBlock(s, a)}`;
 }
@@ -1414,7 +1414,7 @@ function tirCard(t) {
   if (CC.est(t)) { // parcours campagne : feuille de marque FFTA
     const cs = CC.stats(t);
     return `<div class="card"><div class="bar"><div style="min-width:0"><b>${esc(CC.libelle(t))}</b><div style="color:var(--muted);font-size:.85rem">${TIR_TYPES.find(([k]) => k === tirType(t))[1]} · ${cs.cibles} / ${cs.prevues} cibles</div></div><span class="grow"></span>
-      <div class="score"><b>${cs.total}</b><span>pts · ${cs.n6} × 6 · ${cs.n5} × 5</span></div></div>${CC.feuille(t)}
+      <div class="score"><b>${cs.total}</b><span>pts · ${cs.ca} × ${cs.la} · ${cs.cb} × ${cs.lb}</span></div></div>${CC.feuille(t)}
       ${S.canWrite ? `<div class="bar"><button class="btn" data-act="cp-edit" data-tir="${t.id}">Reprendre la saisie</button><span class="grow"></span><button class="btn danger" data-act="del-tir" data-tir="${t.id}">Supprimer ce parcours</button></div>` : ""}</div>`;
   }
   const st = tirStats(t), open = S.tirOpen === t.id && t.mode !== "total" && S.canWrite;
@@ -2431,10 +2431,11 @@ function viewConcours() {
       <div class="grid3"><label class="f">Arc<select data-cr="${a.id}|arc" ${dis}><option value="">—</option>${ARCS.map((x) => `<option ${r.arc === x ? "selected" : ""}>${x}</option>`).join("")}</select></label>
         <label class="f">Place<input type="text" data-cr="${a.id}|place" value="${esc(r.place ?? "")}" placeholder="ex. 3/12" ${ro}></label>
         <label class="f">Remarque<input type="text" data-cr="${a.id}|remarque" value="${esc(r.remarque ?? "")}" ${ro}></label></div>
-      ${(c.types || []).includes("campagne") ? `<div class="grid3"><label class="f">Piquet<select data-cr="${a.id}|piquet" ${dis}><option value="">—</option>${CC.PIQUETS.map(([k, l]) => `<option value="${k}" ${r.piquet === k ? "selected" : ""}>${l}</option>`).join("")}</select></label>
-        <label class="f">Nombre de 6<input type="number" inputmode="numeric" min="0" data-cr="${a.id}|n6" value="${esc(r.n6 ?? "")}" ${ro}></label>
+      ${(c.types || []).includes("campagne") ? (() => { const ufo = c.federation === "UFOLEP", pqs = CC.piquetsDe(ufo ? "UFOLEP" : "FFTA"), prop = ufo ? CC.piquetUf(ageSaison(a)) : CC.piquet(catFFTA(a), r.arc || (a.arcs || [])[0]);
+        return `<div class="grid3"><label class="f">Piquet<select data-cr="${a.id}|piquet" ${dis}><option value="">—</option>${pqs.map(([k, l]) => `<option value="${k}" ${r.piquet === k ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+        ${ufo ? "" : `<label class="f">Nombre de 6<input type="number" inputmode="numeric" min="0" data-cr="${a.id}|n6" value="${esc(r.n6 ?? "")}" ${ro}></label>`}
         <label class="f">Nombre de 5<input type="number" inputmode="numeric" min="0" data-cr="${a.id}|n5" value="${esc(r.n5 ?? "")}" ${ro}></label></div>
-        <span class="tirline">Campagne : à score égal, le départage se fait au plus grand nombre de 6, puis de 5. Piquet proposé : ${esc(CC.PIQUETS.find(([k]) => k === CC.piquet(catFFTA(a), r.arc || (a.arcs || [])[0]))?.[1] || "—")}.</span>` : ""}
+        <span class="tirline">${ufo ? "Campagne UFOLEP : zones de 5 à 1, 360 points au maximum sur 24 cibles." : "Campagne FFTA : à score égal, le départage se fait au plus grand nombre de 6, puis de 5."} Piquet proposé : ${esc(pqs.find(([k]) => k === prop)?.[1] || "—")}.</span>`; })() : ""}
     </div>`;
   }).join("")}</div>
     <span class="tirline">Le score total additionne les distances. Il s'ajoute au carnet d'entraînement de l'archer (volume « Compét » et score compétition) et à sa courbe de progression en concours.</span>`;
@@ -5985,7 +5986,7 @@ document.addEventListener("click", (e) => {
   if (t.dataset.act === "new-cp" || t.dataset.act === "cp-edit") {
     const s = S.seances.find((x) => x.id === S.seance), a = S.archers.find((x) => x.id === S.suivi); if (!s || !a) return;
     const old = t.dataset.act === "cp-edit" ? getSuivi(s, a.id).tirs.find((x) => x.id === t.dataset.tir) : null;
-    CC.saisir({ tir: old, cat: catFFTA(a), arc: (a.arcs || [])[0] || "", federation: "FFTA", cle: old ? null : `co:${s.id}:${a.id}`, titre: `Parcours campagne · ${a.prenom || fullName(a)}` }, (nt) => {
+    CC.saisir({ tir: old, cat: catFFTA(a), age: ageSaison(a), arc: (a.arcs || [])[0] || "", federation: defaultFed(a, s), cle: old ? null : `co:${s.id}:${a.id}`, titre: `Parcours campagne · ${a.prenom || fullName(a)}`, surFermer: render }, (nt) => {
       editTirs((tirs) => { const k = tirs.findIndex((x) => x.id === nt.id); if (k >= 0) tirs[k] = nt; else tirs.push(nt); });
       toast(`Parcours enregistré : ${CC.stats(nt).total} pts`);
     });
