@@ -815,6 +815,16 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
 .evo.down { color: var(--danger); background: color-mix(in srgb, var(--danger) 13%, transparent); }
 .hub-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .hub-bar .btn { padding: 6px 10px; font-size: .88rem; }
+/* Téléphone : l'accueil ne déborde plus sur les bords (cartes qui ne s'élargissent pas avec leur contenu, lignes qui passent à la ligne) */
+.hub-grid { grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); }
+.hub-grid > *, .hub-stats > *, .wrap > * { min-width: 0; }
+.hub-bar { flex-wrap: wrap; } .hub-bar .hub-h { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .hub-grid .row, .wrap > .card .list > .row { flex-wrap: wrap; row-gap: 6px; }
+  .hub-grid .row .main { flex: 1 1 150px; }
+  .hub-grid .row .evo { margin-left: auto; }
+  .hub-grid .row .count { white-space: normal; }
+}
 .hub-stat b { font-size: clamp(1.7rem, 4vw, 2.2rem); }
 .eq-h { display: flex; gap: 10px; align-items: center; margin-bottom: 6px; }
 .eq-h b { display: block; font-size: 1.02rem; } .eq-h small { color: var(--muted); font-size: .82rem; }
@@ -843,7 +853,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
 <div id="toast" class="toast" hidden></div>
 <input type="file" id="file-in" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.mp4,.webm,.txt,.md,.csv,application/pdf,image/*,video/mp4,video/webm,text/plain,text/markdown,text/csv">
 
-<script>window.CARNET_VERSION = { v: "1.9.78", date: "2026-11-16", site: "1.9.78", test: false };</script>
+<script>window.CARNET_VERSION = { v: "1.9.79", date: "2026-11-16", site: "1.9.79", test: false };</script>
 <script>
 // Espace archer : l'archer (ou son parent) voit uniquement ses propres informations,
 // telles que les renvoie la base (fonction espace_archer), et remplit son carnet.
