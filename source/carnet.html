@@ -1272,7 +1272,7 @@ function viewSeance() {
   const pres = new Set(s.presents || []);
   const roster = S.archers.filter((a) => (a.clubIds || []).includes(s.clubId) && (a.actif !== false || pres.has(a.id))).sort(byName);
   return `<div class="bar"><button class="btn ghost" data-act="back">← Séances</button><span class="grow"></span>
-      <button class="btn" data-act="chrono">⏱ Chrono</button><button class="btn" data-act="print-sheet">Imprimer les fiches</button>
+      <button class="btn" data-act="chrono">⏱ Chrono</button>${S.canWrite && (s.presents || []).some((id) => RA.ouvert(S.archers.find((a) => a.id === id))) ? `<button class="btn" data-act="run-groupe">${RA.enCours(`grp:${s.id}`) ? "🏃 Reprendre le run en cours" : "🏃 Run-archery en groupe"}</button>` : ""}<button class="btn" data-act="print-sheet">Imprimer les fiches</button>
       ${S.canWrite ? `<button class="btn" data-act="quick-entry">Saisir la feuille papier</button><button class="btn" data-act="edit-seance">Modifier</button>` : ""}</div>
     <div class="head club-edge" style="--club:${esc(clubColor(s.clubId))}"><span class="m" style="display:flex;gap:6px;align-items:center"><span class="dot" style="background:${esc(clubColor(s.clubId))}"></span>${esc(clubName(s.clubId))}</span>
       <h2>${esc(s.theme || "Entraînement")}</h2>
@@ -5993,6 +5993,16 @@ document.addEventListener("click", (e) => {
   if (t.dataset.act === "close-tir") { S.tirOpen = null; render(); return; }
   if (t.dataset.act === "open-tir") { S.tirOpen = t.dataset.tir; render(); return; }
   if (t.dataset.act === "new-tir") { formTir(); return; }
+  if (t.dataset.act === "run-groupe") {
+    const s = S.seances.find((x) => x.id === S.seance); if (!s) return;
+    const ars = (s.presents || []).map((id) => S.archers.find((a) => a.id === id)).filter((a) => RA.ouvert(a)).sort(byName);
+    const ages = ars.map(ageSaison);
+    RA.saisir({ groupe: ars.map((a) => ({ id: a.id, nom: fullName(a) })), cle: `grp:${s.id}`, titre: "Run-archery", kids: ages.length && ages.every((x) => x != null && x < 15), surFermer: render }, (res) => {
+      res.forEach(({ id, tir }) => setTirs(s.id, id, [...getSuivi(s, id).tirs, tir]));
+      toast(`Run enregistré pour ${res.length} archer${res.length > 1 ? "s" : ""}`); render();
+    });
+    return;
+  }
   if (t.dataset.act === "new-run" || t.dataset.act === "run-edit") {
     const s = S.seances.find((x) => x.id === S.seance), a = S.archers.find((x) => x.id === S.suivi); if (!s || !a) return;
     const old = t.dataset.act === "run-edit" ? getSuivi(s, a.id).tirs.find((x) => x.id === t.dataset.tir) : null, age = ageSaison(a);
