@@ -213,7 +213,6 @@ window.CarnetRun = (() => {
   function placer(box, r, x0, ok) {
     let imps = (x0?.imp || []).slice(), cur = 0;
     const touche = (k) => imps.some((p) => p && p[0] === k && Math.hypot(p[1], p[2]) <= 1);
-    const suivante = () => { for (let d = 1; d <= r.cibles; d++) { const k = (cur + d) % r.cibles; if (!touche(k)) return k; } return cur; };
     const BR = 150;
     const dessiner = () => {
       const t = touche(cur), pts = imps.map((p, i) => (p && p[0] === cur ? `<circle cx="${200 + p[1] * BR}" cy="${200 + p[2] * BR}" r="14" fill="#06B6D4" stroke="#0B0F19" stroke-width="3"/><text x="${200 + p[1] * BR}" y="${200 + p[2] * BR + 6}" text-anchor="middle" font-size="16" font-weight="800" fill="#0B0F19">${i + 1}</text>` : "")).join("");
@@ -223,12 +222,12 @@ window.CarnetRun = (() => {
           <circle cx="200" cy="200" r="${BR}" fill="${t ? "#F8FAFC" : "#1E293B"}" stroke="${t ? "#22C55E" : "#64748B"}" stroke-width="${t ? 8 : 3}"/><circle cx="200" cy="200" r="${(BR * 3) / 16}" fill="${t ? "#CBD5E1" : "#334155"}"/><path d="M192 200h16M200 192v16" stroke="#94A3B8" stroke-width="2"/>${pts}</svg>
         <div class="bar"><span class="tirline">${imps.length}/${r.fleches} flèche${imps.length > 1 ? "s" : ""} · ${touchees(imps)} cible${touchees(imps) > 1 ? "s" : ""} touchée${touchees(imps) > 1 ? "s" : ""}</span><span class="grow"></span>
           <button type="button" class="btn" data-rpundo ${imps.length ? "" : "disabled"}>↶ Annuler</button><button type="button" class="btn primary" data-rpok>OK</button></div>
-        <span class="tirline">Touche là où la flèche est passée : sur la cible (elle tombe) ou à côté. Une fois la cible touchée, on passe à la suivante.</span></div>`;
+        <span class="tirline">Choisis la cible visée (1 à ${r.cibles}), puis touche là où la flèche est passée : sur la cible (elle tombe) ou à côté.</span></div>`;
       box.querySelectorAll("[data-rpk]").forEach((b) => b.addEventListener("click", () => { cur = Number(b.dataset.rpk); dessiner(); }));
       box.querySelector("[data-rdisq]").addEventListener("click", (ev) => {
         if (imps.length >= r.fleches) return; const sv = ev.currentTarget, pt = sv.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
         const q = pt.matrixTransform(sv.getScreenCTM().inverse()), x = Math.round(((q.x - 200) / BR) * 100) / 100, y = Math.round(((q.y - 200) / BR) * 100) / 100;
-        imps.push([cur, x, y]); if (Math.hypot(x, y) <= 1) cur = suivante(); dessiner();
+        imps.push([cur, x, y]); dessiner();
       });
       box.querySelector("[data-rpundo]").addEventListener("click", () => { const p = imps.pop(); if (p) cur = p[0]; dessiner(); });
       box.querySelector("[data-rpok]").addEventListener("click", () => ok({ imp: imps, touchees: touchees(imps), fleches: Math.max(imps.length, 1) }));
