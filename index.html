@@ -2457,7 +2457,7 @@ function encEcrit() {
   return false;
 }
 { let cw = S.canWrite; Object.defineProperty(S, "canWrite", { get() { const e = encEcrit(); return e === null ? cw : cw && e; }, set(v) { cw = v; }, enumerable: true }); }
-function go(tab) { if (!tabOk(tab)) tab = "accueil"; S.tab = tab; S.anim = null; S.quick = false; S.concoursId = null; S.seance = null; S.archer = null; S.suivi = null; S.tirOpen = null; S.evaluation = null; if (S.carnet) { S.carnet = null; carnetSubscribe(); } render(); window.scrollTo(0, 0); }
+function go(tab) { if (!tabOk(tab)) tab = "accueil"; S.tab = tab; S.moveSel = null; S.anim = null; S.quick = false; S.concoursId = null; S.seance = null; S.archer = null; S.suivi = null; S.tirOpen = null; S.evaluation = null; if (S.carnet) { S.carnet = null; carnetSubscribe(); } render(); window.scrollTo(0, 0); }
 try { const h = location.hash.slice(1); if (TABS.some((t) => t[0] === h)) S.tab = h; } catch (e) {}
 try { const c = localStorage.getItem("club"); if (c) S.club = c; } catch (e) {}
 
@@ -5399,12 +5399,13 @@ function formVideo(d = null) {
     <span class="tirline">Sur YouTube, mets la vidéo en « Non répertoriée » : seuls ceux qui ont le lien peuvent la voir. Puis « Partager » › « Copier le lien ».</span>
     <label class="f" for="yt-t">Titre<input type="text" id="yt-t" name="titre" value="${esc(d?.titre || "")}" placeholder="Ex. Ancrage : les 3 points de contact"></label>
     <label class="f" for="yt-d">Description<textarea id="yt-d" name="description" style="min-height:60px">${esc(d?.description || "")}</textarea></label>
+    <label class="f" for="yt-dos">Dossier<select id="yt-dos" name="dossierId">${folderOptions(d ? d.dossierId : S.folder)}</select></label>
     <div id="yt-prev"></div>`, {
     onSave(fd) {
       const id = ytId(fd.get("lien")); if (!id) { toast("Ce lien n'est pas un lien YouTube valide"); return false; }
-      const data = { titre: fd.get("titre").trim() || "Vidéo", description: fd.get("description").trim(), video: id, contentType: "video/youtube", nomFichier: "", taille: 0, updatedAt: Date.now() };
+      const data = { titre: fd.get("titre").trim() || "Vidéo", description: fd.get("description").trim(), video: id, contentType: "video/youtube", nomFichier: "", taille: 0, dossierId: fd.get("dossierId") || null, updatedAt: Date.now() };
       if (d) { Object.assign(d, data); patch("documents", d.id, data); toast("Vidéo enregistrée"); }
-      else { const nid = newId("documents"), doc = { ...data, dossierId: S.folder || null, createdAt: Date.now() }; S.documents.push({ id: nid, ...doc }); save("documents", nid, doc); toast("Vidéo ajoutée"); }
+      else { const nid = newId("documents"), doc = { ...data, createdAt: Date.now() }; S.documents.push({ id: nid, ...doc }); save("documents", nid, doc); toast("Vidéo ajoutée"); }
       render();
     },
     onDelete: d ? () => { S.documents = S.documents.filter((x) => x.id !== d.id); remove("documents", d.id); render(); toast("Vidéo retirée du carnet (elle reste sur YouTube)"); } : null,
@@ -6093,12 +6094,27 @@ function viewExos() {
   if (S.exMode === "fiches") return modes + viewFiches();
   return modes + viewFichiers();
 }
+// V.1.10 : déplacer plusieurs documents (fichiers, vidéos, liens, fiches Canva) et dossiers d'un coup
+function viewDeplacer(subs, docs) {
+  const sel = S.moveSel, n = sel.size, exclus = [...sel].filter((k) => k.startsWith("f:")).flatMap((k) => [k.slice(2), ...descendants(k.slice(2))]);
+  const ligne = (key, ico, titre, meta) => `<label class="row" style="cursor:pointer"><input type="checkbox" data-msel="${key}" ${sel.has(key) ? "checked" : ""} style="width:22px;height:22px;accent-color:var(--accent);flex:none">${ico}<span class="main"><span class="t">${esc(titre)}</span><span class="m">${esc(meta)}</span></span></label>`;
+  return `<div class="card" style="position:sticky;top:calc(env(safe-area-inset-top,0px) + 96px);z-index:3;gap:10px"><b>Déplacer : ${n ? `${n} élément${n > 1 ? "s" : ""} coché${n > 1 ? "s" : ""}` : "coche ce que tu veux déplacer"}</b>
+      <div class="grid2"><label class="f" for="mv-to">Vers le dossier<select id="mv-to">${folderOptions(S.moveTo ?? S.folder, exclus)}</select></label>
+      <div class="bar" style="align-self:end"><button class="btn primary" data-act="move-go" ${n ? "" : "disabled"}>Déplacer ici</button><button class="btn" data-act="move-all">Tout cocher</button><button class="btn ghost" data-act="move-cancel">Annuler</button></div></div>
+      <span class="tirline">Tu peux ouvrir un autre dossier (fil en haut) et cocher d'autres éléments : la sélection est gardée.</span></div>
+    ${subs.length ? `<div class="list">${subs.map((f) => ligne("f:" + f.id, FOLDER_SVG, f.nom, "Dossier, avec tout son contenu")).join("")}</div>
+      <div class="folders">${subs.map((f) => `<button class="fold" data-folder="${f.id}">${FOLDER_SVG}<span class="t">Ouvrir ${esc(f.nom)}</span></button>`).join("")}</div>` : ""}
+    ${docs.length ? `<div class="list">${docs.map((d) => { const k = kind(d.contentType); return ligne("d:" + d.id, `<span class="thumb">${KIND_LAB[k]}</span>`, d.titre || d.nomFichier, k === "yt" ? "Vidéo YouTube" : d.canva?.designId ? "Fiche Canva" : d.nomFichier || ""); }).join("")}</div>` : ""}
+    ${!subs.length && !docs.length ? `<p class="notice">Ce dossier est vide.</p>` : ""}`;
+}
 function viewFichiers() {
   if (S.folder && !S.dossiers.some((d) => d.id === S.folder)) S.folder = null;
   const path = folderPath(S.folder), subs = subFolders(S.folder), docs = docsIn(S.folder);
   const crumbs = `<nav class="crumbs" aria-label="Dossier">${S.folder ? `<button data-folder="">Documents</button>` : `<b>Documents</b>`}
     ${path.map((f, i) => `<span>›</span>${i === path.length - 1 ? `<b>${esc(f.nom)}</b>` : `<button data-folder="${f.id}">${esc(f.nom)}</button>`}`).join("")}</nav>`;
+  if (S.canWrite && S.moveSel) return crumbs + viewDeplacer(subs, docs);
   const acts = S.canWrite ? `<div class="bar"><button class="btn" data-act="new-folder">+ Nouveau dossier</button><button class="btn" data-act="new-video">▶ Vidéo YouTube</button>
+      ${subs.length || docs.length ? `<button class="btn" data-act="move-mode">↔ Déplacer…</button>` : ""}
       ${S.folder ? `<button class="btn" data-act="edit-folder">Renommer ou déplacer</button>` : ""}<span class="grow"></span>
       ${window.CARNET_STANDALONE ? `<button class="btn" data-act="canva">🎨 Fiches Canva</button>` : ""}
       ${S.assets ? `<button class="btn primary" data-act="upload">Déposer des fichiers</button>` : ""}</div>` : "";
@@ -7379,6 +7395,19 @@ document.addEventListener("click", (e) => {
   if (a === "restore") startRestore();
   if (a === "logout" && window.carnetLogout) window.carnetLogout();
   if (a === "enc-new") formEncadrant();
+  if (a === "move-mode") { S.moveSel = new Set(); S.moveTo = null; render(); }
+  if (a === "move-cancel") { S.moveSel = null; render(); }
+  if (a === "move-all" && S.moveSel) { subFolders(S.folder).forEach((f) => S.moveSel.add("f:" + f.id)); docsIn(S.folder).forEach((d) => S.moveSel.add("d:" + d.id)); render(); }
+  if (a === "move-go" && S.moveSel?.size) {
+    const to = $("#mv-to")?.value || null; let nd = 0, nf = 0;
+    S.moveSel.forEach((k) => {
+      const id = k.slice(2);
+      if (k.startsWith("d:")) { const d = S.documents.find((x) => x.id === id); if (d && (d.dossierId || null) !== to) { d.dossierId = to; patch("documents", id, { dossierId: to }); nd++; } }
+      else { const f = S.dossiers.find((x) => x.id === id); if (f && id !== to && !descendants(id).includes(to) && (f.parentId || null) !== to) { f.parentId = to; patch("dossiers", id, { parentId: to }); nf++; } }
+    });
+    S.moveSel = null; S.folder = to; render();
+    toast(nd || nf ? `Déplacé vers « ${to ? folderName(to) : "Documents"} » : ${[nd ? `${nd} document${nd > 1 ? "s" : ""}` : "", nf ? `${nf} dossier${nf > 1 ? "s" : ""}` : ""].filter(Boolean).join(" et ")}` : "Rien à déplacer : déjà dans ce dossier");
+  }
   if (a === "enc-reload") { encListe = null; render(); }
   if (a === "maint" && window.carnetMaintenance) { const on = !maintEtat?.actif; window.carnetMaintenance.basculer(on).then((e) => { maintEtat = e || { actif: on }; toast(on ? "Appli en maintenance pour les archers" : "Maintenance terminée : les archers repassent en ligne"); render(); }).catch((err) => toast("Impossible : " + err.message)); }
   if (a === "new-annonce") formAnnonce();
@@ -7465,6 +7494,8 @@ document.addEventListener("change", (e) => {
     const v = { ...(a.espace || {}), profil: e.target.value }; if (v.profil === "perso" && !Array.isArray(v.modules)) v.modules = [...arModules(a, nbConcoursOf(a.id))].filter((k) => k !== "evals");
     a.espace = v; patch("archers", a.id, { espace: v }); toast(`${fullName(a)} : ${profilNom(v.profil)}`); render(); return;
   }
+  if (e.target.dataset?.msel && S.moveSel) { const k = e.target.dataset.msel; e.target.checked ? S.moveSel.add(k) : S.moveSel.delete(k); render(); return; }
+  if (e.target.id === "mv-to" && S.moveSel) { S.moveTo = e.target.value || ""; return; }
   const esp = e.target.dataset?.esp, espm = e.target.dataset?.espm;
   if (e.target.dataset?.espdisc && S.archer && S.canWrite) { majDiscipline(S.archer, e.target.dataset.espdisc, e.target.checked ? true : null); toast("Espace de l'archer mis à jour"); return; }
   if ((esp || espm) && S.archer && S.canWrite) {
