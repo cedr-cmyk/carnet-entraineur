@@ -125,8 +125,8 @@ window.CarnetCampagne = (() => {
         <div class="pad" style="grid-template-columns:repeat(${keysDe(t).length},minmax(0,1fr))">${keysDe(t).map((k) => `<button type="button" class="key ${kcls(k)}" data-ck="${k}" ${v.length >= 3 ? "disabled" : ""} aria-label="Flèche ${k === "M" ? "manquée" : k}">${k}</button>`).join("")}</div>`}
         <div style="display:grid;grid-template-columns:auto 1fr 1fr auto;gap:8px"><button type="button" class="btn" data-cnav="-1" ${i ? "" : "disabled"} aria-label="Cible précédente">‹</button><button type="button" class="btn" data-cundo ${v.length || i ? "" : "disabled"}>↶ Annuler</button>
           <button type="button" class="btn" data-cfeuille>${vueFeuille ? "Saisie" : "Feuille de marque"}</button><button type="button" class="btn" data-cnav="1" ${i < N - 1 ? "" : "disabled"} aria-label="Cible suivante">›</button></div>
-        <div class="acts"><button type="button" class="btn" data-cquit>Plus tard</button><button type="button" class="btn primary" data-cfin ${st.n ? "" : "disabled"}>${st.cibles >= N ? "Enregistrer le parcours" : "Terminer ici"}</button></div>
-        <span class="tirline">${o.cle ? "Ta saisie est gardée sur cet appareil : « Plus tard » la retrouve au prochain parcours." : ""}</span></div></div>`;
+        <div class="acts"><button type="button" class="btn danger left" data-cabandon>${o.tir ? "Annuler les modifications" : "Abandonner"}</button><button type="button" class="btn" data-cquit>Plus tard</button><button type="button" class="btn primary" data-cfin ${st.n ? "" : "disabled"}>${st.cibles >= N ? "Enregistrer le parcours" : "Terminer ici"}</button></div>
+        <span class="tirline">« Terminer ici » enregistre le parcours avec les cibles déjà tirées. ${o.cle ? "« Plus tard » garde la saisie sur cet appareil pour la reprendre. " : ""}« ${o.tir ? "Annuler les modifications" : "Abandonner"} » ${o.tir ? "ferme sans rien changer" : "efface ce parcours"}.</span></div></div>`;
       const dIn = el.querySelector("#cp-d"); if (dIn) dIn.addEventListener("input", () => { c.d = dIn.value; garder(); });
       el.querySelector(".cp-sheet").addEventListener("click", (ev) => {
         const b = ev.target.closest("button,[data-cc]"); if (!b) return;
@@ -138,6 +138,11 @@ window.CarnetCampagne = (() => {
         if (b.hasAttribute("data-cundo")) { if (v.length) v.pop(); else if (i) { i--; t.volees[i].pop(); } garder(); return parcours(); }
         if (b.dataset.cnav) { i = Math.min(N - 1, Math.max(0, i + Number(b.dataset.cnav))); return parcours(); }
         if (b.hasAttribute("data-cfeuille")) { vueFeuille = !vueFeuille; return parcours(); }
+        if (b.hasAttribute("data-cabandon")) {
+          // deux appuis : le premier demande confirmation
+          if (!b.dataset.sur) { b.dataset.sur = "1"; b.textContent = o.tir ? "Sûr ? Rien ne sera changé" : "Sûr ? Le parcours sera effacé"; setTimeout(() => { if (b.isConnected) { delete b.dataset.sur; b.textContent = o.tir ? "Annuler les modifications" : "Abandonner"; } }, 4000); return; }
+          oublier(); fermer(); if (o.surFermer) o.surFermer(); return;
+        }
         if (b.hasAttribute("data-cquit")) { garder(); fermer(); if (o.surFermer) o.surFermer(); return; }
         if (b.hasAttribute("data-cfin")) {
           while (t.volees.length && !t.volees[t.volees.length - 1].length) { t.volees.pop(); t.campagne.cibles.length = Math.min(t.campagne.cibles.length, t.volees.length); }
