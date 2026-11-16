@@ -81,7 +81,7 @@
       const go = async (create) => {
         const email = f.email.value.trim(), password = f.pw.value; if (!email || password.length < 6) { m.textContent = "E-mail et mot de passe (6 caractères minimum)"; return; }
         m.textContent = "…";
-        const r = create ? await sb.auth.signUp({ email, password }) : await sb.auth.signInWithPassword({ email, password });
+        const r = create ? await sb.auth.signUp({ email, password, options: { emailRedirectTo: location.origin + location.pathname } }) /* le lien de confirmation ramène sur le carnet */ : await sb.auth.signInWithPassword({ email, password });
         if (r.error) { m.textContent = r.error.message.includes("Invalid login") ? "E-mail ou mot de passe incorrect" : r.error.message; return; }
         if (!r.data.session) { m.textContent = "Compte créé : ouvre le lien reçu par e-mail pour le confirmer, puis reconnecte-toi ici."; return; }
         el.remove(); resolve(r.data.session);
@@ -233,6 +233,7 @@
     inviter: (archerId) => rpc("creer_invitation", { p_archer: archerId }),
     liste: (archerId) => rpc("acces_archer", { p_archer: archerId }),
     retirer: (userId, archerId) => rpc("retirer_acces", { p_user: userId, p_archer: archerId }),
+    tous: () => rpc("acces_tous"),
     // V.1.7.4 : l'entraîneur qui est aussi archer relie sa propre fiche à son compte, puis passe d'un mode à l'autre sur le même appareil
     moi: () => rpc("mes_acces"),
     relierMoi: async (archerId) => { const c = await rpc("creer_invitation", { p_archer: archerId }); await rpc("utiliser_invitation", { p_code: c }); return rpc("mes_acces"); },
@@ -274,6 +275,8 @@
       ecrire: (a, id, data) => rpc("archer_ecrire_entree", { p_owner: a.owner, p_archer: a.archer_id, p_id: id, p_data: data }),
       supprimer: (a, id) => rpc("archer_supprimer_entree", { p_owner: a.owner, p_archer: a.archer_id, p_id: id }),
       repondre: (a, seance, reponse) => rpc("archer_repondre", { p_owner: a.owner, p_archer: a.archer_id, p_seance: seance, p_reponse: reponse }),
+      mot: (a, id, action, texte) => rpc("archer_mot", { p_owner: a.owner, p_archer: a.archer_id, p_id: id, p_action: action, p_texte: texte || "" }),
+      avatar: (a, v) => rpc("archer_avatar", { p_owner: a.owner, p_archer: a.archer_id, p_avatar: v }),
       fichiers: (a) => { filesOwner = a.owner; tellSW(); },
       ajouterCode: async (code) => { await rpc("utiliser_invitation", { p_code: code }); return rpc("mes_acces"); },
       deconnexion: () => window.carnetLogout(),
@@ -287,7 +290,7 @@
       try { const d = await withTimeout(lire(a), net ? 8000 : 2500); ls.set(k, d); horsLigne(false); return d; }
       catch (e) { const d = ls.get(k, null); if (d) { horsLigne(true, "archer"); return d; } throw netErr(e) ? new Error("Pas de réseau. Ouvre ton espace une fois avec internet : il sera ensuite gardé sur ce téléphone.") : e; }
     };
-    ["ecrire", "supprimer", "repondre", "ajouterCode"].forEach((n) => { if (API[n]) API[n] = envoi(API[n]); });
+    ["ecrire", "supprimer", "repondre", "avatar", "mot", "ajouterCode"].forEach((n) => { if (API[n]) API[n] = envoi(API[n]); });
     // Hors connexion : une séance ou un tir noté sans réseau est gardé sur le téléphone, apparaît tout de suite dans le carnet, et part tout seul dès que le réseau revient
     const ecrireNet = API.ecrire, chargerNet = API.charger, kAtt = "ar-attente";
     const fusion = (a, d) => { if (!d || !Array.isArray(d.entrees)) return d; Object.values(ls.get(kAtt, {})).filter((w) => w.a.owner === a.owner && w.a.archer_id === a.archer_id).forEach((w) => { const i = d.entrees.findIndex((x) => x.id === w.id), e = { ...(i >= 0 ? d.entrees[i] : {}), ...w.data, id: w.id }; if (i >= 0) d.entrees[i] = e; else d.entrees.push(e); }); return d; };
@@ -354,4 +357,37 @@
       return { db, assets: session.offline ? null : assets, downloads, user, sample: null }[name] ?? null;
     },
   };
+})();
+
+// Bouton retour du téléphone (V.1.7.10) : au lieu de quitter l'appli, il ferme la fenêtre ouverte (feuille, cible, chrono…),
+// sinon revient à la page précédente (« ← … »), sinon à l'accueil. À l'accueil, il faut appuyer deux fois pour quitter.
+(() => {
+  if (window.__carnetRetour) return; window.__carnetRetour = true;
+  const garde = () => { try { history.pushState({ carnetGarde: Date.now() }, ""); } catch (e) { /* rien */ } };
+  const visible = (x) => !!x && x.getClientRects().length > 0;
+  const msg = (t) => { const el = document.querySelector("#toast"); if (!el) return; el.textContent = t; el.hidden = false; clearTimeout(msg.h); msg.h = setTimeout(() => (el.hidden = true), 2400); };
+  function reculer() {
+    const ch = [...document.querySelectorAll(".chrono")].filter(visible).pop();
+    if (ch) {
+      const x = ch.querySelector('[data-ch="close"]'), arret = !!ch.querySelector('[data-ch="set"]');
+      if (x && !arret) { msg("Chrono en cours : touche ✕ pour l'arrêter"); return true; }
+      if (x) x.click(); else ch.remove(); return true;
+    }
+    const bg = [...document.querySelectorAll(".sheet-bg")].filter(visible).pop();
+    if (bg) { const non = bg.querySelector("#tg-no") || [...bg.querySelectorAll(".acts [data-close]")].pop(); if (non) non.click(); else bg.remove(); return true; }
+    const pv = [...document.querySelectorAll(".ar-preview")].filter(visible).pop();
+    if (pv) { const b = [...pv.querySelectorAll("button")].find((x) => /Fermer|Quitter|Retour/i.test(x.textContent)); if (b) b.click(); else pv.remove(); return true; }
+    const back = [...document.querySelectorAll('[data-act="back"]')].find(visible);
+    if (back) { back.click(); return true; }
+    const tabs = [...document.querySelectorAll("[data-atab], #tabs [data-tab]")].filter(visible);
+    if (tabs.length && tabs[0].getAttribute("aria-selected") !== "true") { tabs[0].click(); scrollTo(0, 0); return true; }
+    return false;
+  }
+  addEventListener("popstate", () => {
+    if (reculer()) { garde(); return; }
+    // à l'accueil : on laisse le prochain appui quitter l'appli, et on se remet en garde après quelques secondes
+    msg("Appuie encore sur retour pour quitter l'appli");
+    setTimeout(() => { if (!history.state?.carnetGarde) garde(); }, 2500);
+  });
+  if (!history.state?.carnetGarde) garde();
 })();
