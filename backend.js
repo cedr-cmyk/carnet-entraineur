@@ -334,6 +334,7 @@
       mot: (a, id, action, texte) => rpc("archer_mot", { p_owner: a.owner, p_archer: a.archer_id, p_id: id, p_action: action, p_texte: texte || "" }),
       animEssai: (a, anim, jeu, essai, cible, compte) => rpc("archer_anim_essai", { p_owner: a.owner, p_archer: a.archer_id, p_anim: anim, p_jeu: jeu, p_essai: essai, p_cible: cible, p_compte: compte }),
       avatar: (a, v) => rpc("archer_avatar", { p_owner: a.owner, p_archer: a.archer_id, p_avatar: v }),
+      demander: (a, quoi) => rpc("archer_demander", { p_owner: a.owner, p_archer: a.archer_id, p_quoi: quoi }),
       fichiers: (a) => { filesOwner = a.owner; tellSW(); },
       ajouterCode: async (code) => { await rpc("utiliser_invitation", { p_code: code }); return rpc("mes_acces"); },
       deconnexion: () => window.carnetLogout(),

@@ -1406,7 +1406,7 @@ function viewSuivi() {
     <div class="card"><label class="f" for="suivi-note">Note de l'entraîneur</label>
       <textarea id="suivi-note" placeholder="Ce qu'il a travaillé, tes observations, les points à reprendre…" ${S.canWrite ? "" : "readonly"}>${esc(v.note)}</textarea></div>
     ${attrBlock(s, a)}
-    <div class="bar"><h2 class="sec" style="margin:0">Scores</h2><span class="grow"></span>${S.canWrite ? `<button class="btn" data-act="new-cp">${CC.enCours(`co:${s.id}:${a.id}`) ? "⛰ Reprendre le parcours en cours" : "⛰ Parcours campagne"}</button>${RA.ouvert(a) ? `<button class="btn" data-act="new-run">${RA.enCours(`co:${s.id}:${a.id}`) ? "🏃 Reprendre le run en cours" : "🏃 Run-archery"}</button>` : ""}<button class="btn primary" data-act="new-tir">+ Nouveau tir</button>` : ""}</div>
+    <div class="bar"><h2 class="sec" style="margin:0">Scores</h2><span class="grow"></span>${S.canWrite ? `${CC.ouvert(a) || CC.enCours(`co:${s.id}:${a.id}`) ? `<button class="btn" data-act="new-cp">${CC.enCours(`co:${s.id}:${a.id}`) ? "⛰ Reprendre le parcours en cours" : "⛰ Parcours campagne"}</button>` : ""}${RA.ouvert(a) ? `<button class="btn" data-act="new-run">${RA.enCours(`co:${s.id}:${a.id}`) ? "🏃 Reprendre le run en cours" : "🏃 Run-archery"}</button>` : ""}<button class="btn primary" data-act="new-tir">+ Nouveau tir</button>` : ""}</div>
     ${v.tirs.length ? v.tirs.map((t) => tirCard(t)).join("") : `<p class="notice">Aucun score pour cette séance. « Nouveau tir » ouvre la feuille de marque : type de tir, distance, blason, puis saisie flèche par flèche ou du total. Les flèches comptent dans le volume du carnet.</p>`}
     ${carnetBlock(s, a)}`;
 }
@@ -3222,6 +3222,22 @@ function profilOptions(cur, withAuto = true, a = null, court = false) {
   const auto = a && !court ? ` (ici : ${esc(profilNom(arProfilAuto(a, nbConcoursOf(a.id))))})` : "";
   return `${withAuto ? `<option value="auto" ${cur === "auto" ? "selected" : ""}>Automatique${auto}</option>` : ""}${profilsList().map((p) => `<option value="${p.id}" ${cur === p.id ? "selected" : ""}>${esc(p.nom)}</option>`).join("")}${a ? `<option value="perso" ${cur === "perso" ? "selected" : ""}>Personnalisé</option>` : ""}`;
 }
+// V.1.10 : disciplines ouvertes à l'archer (parcours campagne, run-archery) et ses demandes d'accès (script 11)
+const DISCIPLINES = [["campagne", "⛰ Parcours campagne", "Noter ses parcours cible par cible (feuille de marque, piquet, où vont les flèches)"], ["run", "🏃 Run-archery", "Chrono du run et tirs à l'arrivée"]];
+const demandesDe = (a) => DISCIPLINES.filter(([k]) => a.espace?.demandes?.[k]?.statut === "attente" && a.espace?.[k] !== true);
+function disciplinesHtml(a, dis) {
+  const e = a.espace || {};
+  return `<div class="f">Disciplines<div class="esp-mods">${DISCIPLINES.map(([k, l, d]) => `<label class="esp-m${e[k] === true ? " on" : ""}"><input type="checkbox" data-espdisc="${k}" ${e[k] === true ? "checked" : ""} ${dis}><span><b>${l}</b><small>${d}</small></span></label>`).join("")}</div></div>
+    ${demandesDe(a).map(([k, l]) => `<div class="notice bar" style="align-items:center"><span>${esc(a.prenom || fullName(a))} demande l'accès à <b>${l}</b> (le ${esc(fmtDateL(a.espace.demandes[k].date))}).</span><span class="grow"></span>${S.canWrite ? `<button class="btn primary" data-disc-ok="${k}" data-aid="${a.id}">Accepter</button><button class="btn" data-disc-non="${k}" data-aid="${a.id}">Refuser</button>` : ""}</div>`).join("")}
+    <span class="tirline">Ces disciplines ne s'ouvrent qu'aux archers qui les pratiquent (avec le tir compté). L'archer peut en demander l'accès depuis ses paramètres.</span>`;
+}
+function majDiscipline(aid, k, ouvrir) {
+  const a = S.archers.find((x) => x.id === aid); if (!a || !S.canWrite) return;
+  const v = { ...(a.espace || {}) }, dm = { ...(v.demandes || {}) };
+  // (l'enregistrement fusionne les objets : on marque les clés au lieu de les supprimer)
+  if (ouvrir === true) { v[k] = true; if (dm[k]) dm[k] = { ...dm[k], statut: "acceptee" }; } else { v[k] = false; if (ouvrir === false && dm[k]) dm[k] = { ...dm[k], statut: "refusee" }; }
+  v.demandes = dm; a.espace = v; patch("archers", a.id, { espace: v }); render();
+}
 function espaceCard(a) {
   const e = a.espace || {}, def = prm().profilDefaut || "auto", p = e.profil || def, m = arModules(a, nbConcoursOf(a.id)), dis = S.canWrite ? "" : "disabled";
   return `<h2 class="sec">Ce que l'archer voit dans son espace</h2><div class="card esp-card">
@@ -3229,8 +3245,7 @@ function espaceCard(a) {
     <span class="tirline">L'accueil et ses paramètres restent toujours visibles. Ses évaluations apparaissent dès que vous en partagez une${S.evaluations.some((x) => x.archerId === a.id && x.partage === true) ? " (c'est le cas)" : ""}. Les profils et les règles automatiques se règlent dans Paramètres › Espace archers.</span>
     ${modsGrid(m, (k) => `data-espm="${k}"`, p === "perso" && S.canWrite)}
     ${p === "perso" ? "" : `<span class="tirline">Choisissez « Personnalisé » pour cocher vous-même chaque partie.</span>`}
-    <label class="f" for="esp-run">Run-archery<select id="esp-run" data-esprun ${dis}>${[["auto", `Automatique (${(a.federations || []).includes("FFTA") ? "oui, archer FFTA" : "non, pas FFTA"})`], ["oui", "Oui"], ["non", "Non"]].map(([k, l]) => `<option value="${k}" ${(e.run === true ? "oui" : e.run === false ? "non" : "auto") === k ? "selected" : ""}>${l}</option>`).join("")}</select></label>
-    <span class="tirline">Le run-archery est proposé d'office aux archers FFTA (avec le tir compté). Choisissez « Oui » pour un archer d'une autre fédération.</span></div>`;
+    ${disciplinesHtml(a, dis)}</div>`;
 }
 // Paramètres › Espace archers : trois rubriques
 let accTous = null;
@@ -3521,6 +3536,8 @@ function viewAccueil() {
         ${lastCo ? `<span class="tirline">${esc(fmtLong(lastCo.date))} · comparé à la moyenne de ses concours précédents${lastTypes.length ? " du même type" : ""}</span><div class="list">${lastRes.map(dashResRow).join("")}</div><button class="btn ghost" data-concours="${lastCo.id}">Voir le concours ›</button>` : `<p class="notice">Aucun score saisi pour l'instant.</p>`}` : ""}
       </div>` : ""}
     </div>
+    ${ENC() ? "" : (() => { const l = S.archers.filter((x) => !x.archive).flatMap((x) => demandesDe(x).map((d) => [x, d])).sort((p, q) => byName(p[0], q[0]));
+      return l.length ? `<div class="card" data-carte="demandes"><div class="hub-bar"><h3 class="hub-h">🙋 Demandes d'accès des archers</h3></div><div class="list">${l.map(([x, [k, lib]]) => `<div class="row" style="flex-wrap:wrap"><span class="main"><span class="t">${esc(fullName(x))}</span><span class="m">demande ${lib}</span></span>${S.canWrite ? `<button class="btn primary" data-disc-ok="${k}" data-aid="${x.id}">Accepter</button><button class="btn" data-disc-non="${k}" data-aid="${x.id}">Refuser</button>` : ""}</div>`).join("")}</div></div>` : ""; })()}
     ${ENC() ? "" : espaceArchersCard(inC)}
     ${todoL.length ? `<details class="card hub-todo"><summary><i class="hub-ico c-cyan">${ICON.list}</i><b>${todoL.length} exercice${todoL.length > 1 ? "s" : ""} attribué${todoL.length > 1 ? "s" : ""} pas encore fait${todoL.length > 1 ? "s" : ""}</b><span class="grow"></span><span class="hub-chev" aria-hidden="true">›</span></summary>
       <div class="list">${todoL.map((x) => { const d = docOf(x.documentId), se = S.seances.find((y) => y.id === x.seanceId), a = S.archers.find((y) => y.id === x.archerId);
@@ -5812,7 +5829,7 @@ function formSeance(s = null) {
 
 // ---------- Événements ----------
 document.addEventListener("click", (e) => {
-  const t = e.target.closest("[data-tab],[data-ftab],[data-mattri],[data-rqdel],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-enc-edit],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab],[data-qsort],[data-coptab],[data-com-edit],[data-fmtfed],[data-fmt-del],[data-type-del],[data-fete-ap],[data-fete-new],[data-fete-edit],[data-fete-imgdel],[data-mot-edit],[data-centry-open],[data-cd-exp],[data-cd-arch],[data-exmode],[data-ftheme],[data-fiche],[data-anim],[data-animvue],[data-animtri],[data-anim-saisie],[data-anim-essai-new],[data-anim-retenir],[data-anim-essai-del]");
+  const t = e.target.closest("[data-disc-ok],[data-disc-non],[data-tab],[data-ftab],[data-mattri],[data-rqdel],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-enc-edit],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab],[data-qsort],[data-coptab],[data-com-edit],[data-fmtfed],[data-fmt-del],[data-type-del],[data-fete-ap],[data-fete-new],[data-fete-edit],[data-fete-imgdel],[data-mot-edit],[data-centry-open],[data-cd-exp],[data-cd-arch],[data-exmode],[data-ftheme],[data-fiche],[data-anim],[data-animvue],[data-animtri],[data-anim-saisie],[data-anim-essai-new],[data-anim-retenir],[data-anim-essai-del]");
   if (!t || t.closest("#sheet")) return;
   if (t.dataset.dashSuivi) { const [sid, aid] = t.dataset.dashSuivi.split("|"); S.seance = sid; S.suivi = aid; S.tirOpen = null; render(); window.scrollTo(0, 0); return; }
   if (t.dataset.tab) { go(t.dataset.tab); try { history.replaceState(null, "", "#" + t.dataset.tab); } catch (_) {} return; }
@@ -5993,6 +6010,7 @@ document.addEventListener("click", (e) => {
   if (t.dataset.act === "close-tir") { S.tirOpen = null; render(); return; }
   if (t.dataset.act === "open-tir") { S.tirOpen = t.dataset.tir; render(); return; }
   if (t.dataset.act === "new-tir") { formTir(); return; }
+  if (t.dataset.discOk || t.dataset.discNon) { const k = t.dataset.discOk || t.dataset.discNon, ok = !!t.dataset.discOk; majDiscipline(t.dataset.aid, k, ok); toast(ok ? "Discipline ouverte à l'archer" : "Demande refusée"); return; }
   if (t.dataset.act === "run-groupe") {
     const s = S.seances.find((x) => x.id === S.seance); if (!s) return;
     const ars = (s.presents || []).map((id) => S.archers.find((a) => a.id === id)).filter((a) => RA.ouvert(a)).sort(byName);
@@ -6133,11 +6151,7 @@ document.addEventListener("change", (e) => {
     a.espace = v; patch("archers", a.id, { espace: v }); toast(`${fullName(a)} : ${profilNom(v.profil)}`); render(); return;
   }
   const esp = e.target.dataset?.esp, espm = e.target.dataset?.espm;
-  if (e.target.hasAttribute?.("data-esprun") && S.archer && S.canWrite) {
-    const a = S.archers.find((x) => x.id === S.archer); if (!a) return;
-    const v = { ...(a.espace || {}) }; if (e.target.value === "auto") delete v.run; else v.run = e.target.value === "oui";
-    a.espace = v; patch("archers", a.id, { espace: v }); toast("Espace de l'archer mis à jour"); render(); return;
-  }
+  if (e.target.dataset?.espdisc && S.archer && S.canWrite) { majDiscipline(S.archer, e.target.dataset.espdisc, e.target.checked ? true : null); toast("Espace de l'archer mis à jour"); return; }
   if ((esp || espm) && S.archer && S.canWrite) {
     const a = S.archers.find((x) => x.id === S.archer); if (!a) return;
     const nbc = S.concours.filter((c) => c.resultats && c.resultats[a.id] && typeof c.resultats[a.id] === "object").length;

@@ -45,6 +45,7 @@ window.CarnetCampagne = (() => {
   const inconnue = (t, i) => { const c = t.campagne?.connues; return c === false || (c === "mixte" && !!(t.campagne.cibles[i] || {}).i); };
   const modeDist = (t) => (t.campagne?.connues === "mixte" ? "mixtes" : t.campagne?.connues === false ? "inconnues" : "connues");
   const est = (t) => !!(t && t.campagne);
+  const ouvert = (a) => a?.espace?.campagne === true; // ouvert par l'entraîneur sur la fiche de l'archer
   // Blason de campagne : spot jaune (6 au centre, puis 5) et 4 zones noires de même largeur ; r normalisé (1 = bord du blason)
   const RAY = [[0.1, "6"], [0.2, "5"], [0.4, "4"], [0.6, "3"], [0.8, "2"], [1, "1"]];
   const valeurA = (r, ufo) => { if (r > 1) return "M"; const z = RAY.find(([x]) => r <= x)[1]; return ufo && z === "6" ? "5" : z; };
@@ -185,10 +186,10 @@ window.CarnetCampagne = (() => {
     if (t && t.campagne) parcours(); else reglage();
   }
   const enCours = (cle) => { try { return !!localStorage.getItem("carnet-campagne:" + cle); } catch (e) { return false; } };
-  return { blasonSvg, tendance, ouVont, piquet, piquetUf, piquetsDe, stats, feuille, resume, libelle, saisir, enCours, est, val, PIQUETS, PIQUETS_UF, CONNUES, INCONNUES };
+  return { ouvert, blasonSvg, tendance, ouVont, piquet, piquetUf, piquetsDe, stats, feuille, resume, libelle, saisir, enCours, est, val, PIQUETS, PIQUETS_UF, CONNUES, INCONNUES };
 })();
 // V.1.10 : run-archery (guide FFTA) — course en boucles + tirs sur 4 cibles à 18 m ; chaque cible manquée = une boucle de pénalité.
-// Proposé aux archers FFTA ; pour les autres, l'entraîneur l'active sur la fiche de l'archer (espace.run).
+// Ouvert archer par archer par l'entraîneur (fiche › espace.run) ; l'archer peut le demander (script 11).
 // Le tir est rangé avec les autres : t.discipline = "run", t.run = { format, boucles, long, penal, dist, cibles, fleches, positions, tirs: [{ touchees, fleches }], segs: [ms…], manuel, temps }.
 window.CarnetRun = (() => {
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -241,7 +242,7 @@ window.CarnetRun = (() => {
     return `<div class="card" style="gap:8px"><b>Où vont les flèches</b><svg viewBox="0 0 240 240" style="width:min(100%,260px);height:auto;display:block;margin:0 auto" role="img" aria-label="Impacts ramenés sur une cible"><rect width="240" height="240" rx="14" fill="#0F172A"/><circle cx="120" cy="120" r="90" fill="#F8FAFC"/><circle cx="120" cy="120" r="17" fill="#CBD5E1"/>${pts}</svg>
       <span class="tirline">${imps.length} flèche${imps.length > 1 ? "s" : ""} placée${imps.length > 1 ? "s" : ""}, ramenées sur une seule cible (en rouge : à côté). ${tc}</span></div>`;
   }
-  const ouvert = (a) => !!a && (a.espace?.run === true || (a.espace?.run !== false && (a.federations || []).includes("FFTA")));
+  const ouvert = (a) => a?.espace?.run === true; // ouvert par l'entraîneur sur la fiche de l'archer
   const mmss = (ms) => { if (ms == null || !isFinite(ms)) return "—"; const s = Math.max(0, ms) / 1000, m = Math.floor(s / 60); return `${m}:${String(Math.floor(s % 60)).padStart(2, "0")}${s < 600 ? "," + Math.floor((s * 10) % 10) : ""}`; };
   const lireTemps = (x) => { const m = String(x || "").trim().match(/^(?:(\d+)[:h'])?(\d{1,2})(?:[,.](\d))?$/) || String(x || "").trim().match(/^(\d+)[:'](\d{1,2})(?:[:'"](\d{1,2}))?$/); if (!m) return null; return ((Number(m[1] || 0) * 60) + Number(m[2])) * 1000 + Number(m[3] || 0) * 100; };
   // étapes : course 1, tir 1, course 2, tir 2… dernière course jusqu'à l'arrivée
@@ -609,7 +610,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     const ent = St.data.entrainements, prenom = St.data.archer?.prenom || "";
     const tousMots = motsListe(), mots = tousMots.filter((x) => !x.archive), motsArch = tousMots.filter((x) => x.archive);
     const nouv = nouveautes();
-    const m = M(), q = [TC() ? `<button class="btn primary ar-big" data-act="tc-new">${tirEnCours() ? "🎯 Reprendre mon tir en cours" : "🎯 Nouveau tir compté"}</button>` : "", TC() ? `<button class="btn ar-big" data-act="cp-new">${window.CarnetCampagne?.enCours(cpCle()) ? "⛰ Reprendre mon parcours campagne" : "⛰ Parcours campagne"}</button>` : "", RUN() ? `<button class="btn ar-big" data-act="run-new">${window.CarnetRun.enCours(runCle()) ? "🏃 Reprendre mon run-archery" : "🏃 Run-archery"}</button>` : "", window.CarnetChrono && m.has("chrono") ? `<button class="btn ar-big" data-act="chrono">⏱ Chrono</button>` : ""].filter(Boolean);
+    const m = M(), q = [TC() ? `<button class="btn primary ar-big" data-act="tc-new">${tirEnCours() ? "🎯 Reprendre mon tir en cours" : "🎯 Nouveau tir compté"}</button>` : "", CAMP() ? `<button class="btn ar-big" data-act="cp-new">${window.CarnetCampagne?.enCours(cpCle()) ? "⛰ Reprendre mon parcours campagne" : "⛰ Parcours campagne"}</button>` : "", RUN() ? `<button class="btn ar-big" data-act="run-new">${window.CarnetRun.enCours(runCle()) ? "🏃 Reprendre mon run-archery" : "🏃 Run-archery"}</button>` : "", window.CarnetChrono && m.has("chrono") ? `<button class="btn ar-big" data-act="chrono">⏱ Chrono</button>` : ""].filter(Boolean);
     const RE = St.data.reglagesEspace || {}, fk = window.CarnetFete ? window.CarnetFete.jour(RE.fetes) : "";
     let h = fk ? `<div class="ar-fete">${window.CarnetFete.banniere(fk, RE.fetes, BLOB, RE.fetesMessage !== false)}</div>` : "";
     h += q.length ? `<div class="ar-quick${q.length === 1 ? " one" : ""}">${q.join("")}</div>` : "";
@@ -673,7 +674,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     const tot = VOL.map(([k, l]) => [l, list.reduce((n, e) => n + volOf(e, k), 0)]), all = tot.reduce((n, [, v]) => n + v, 0);
     const notes = list.map((e) => num(e.note)).filter((v) => v != null), moy = notes.length ? (notes.reduce((a, b) => a + b, 0) / notes.length).toFixed(1).replace(".", ",") : "—";
     const c = St.data.carnets.find((x) => x.saison === key), o = c?.objectifs || {};
-    let h = `<div class="bar"><button class="btn" data-saison="-1" aria-label="Saison précédente">‹</button><b>Saison ${end - 1}-${end}</b><button class="btn" data-saison="1" aria-label="Saison suivante">›</button><span class="grow"></span>${TC() ? `<button class="btn" data-act="tc-new">${tirEnCours() ? "🎯 Reprendre mon tir" : "🎯 Tir compté"}</button><button class="btn" data-act="cp-new">${window.CarnetCampagne?.enCours(cpCle()) ? "⛰ Reprendre mon parcours" : "⛰ Parcours campagne"}</button>${RUN() ? `<button class="btn" data-act="run-new">${window.CarnetRun.enCours(runCle()) ? "🏃 Reprendre mon run" : "🏃 Run-archery"}</button>` : ""}` : ""}${M().has("carnet") ? `<button class="btn primary" data-act="new">+ Noter une séance</button>` : ""}</div>
+    let h = `<div class="bar"><button class="btn" data-saison="-1" aria-label="Saison précédente">‹</button><b>Saison ${end - 1}-${end}</b><button class="btn" data-saison="1" aria-label="Saison suivante">›</button><span class="grow"></span>${TC() ? `<button class="btn" data-act="tc-new">${tirEnCours() ? "🎯 Reprendre mon tir" : "🎯 Tir compté"}</button>${CAMP() ? `<button class="btn" data-act="cp-new">${window.CarnetCampagne?.enCours(cpCle()) ? "⛰ Reprendre mon parcours" : "⛰ Parcours campagne"}</button>` : ""}${RUN() ? `<button class="btn" data-act="run-new">${window.CarnetRun.enCours(runCle()) ? "🏃 Reprendre mon run" : "🏃 Run-archery"}</button>` : ""}` : ""}${M().has("carnet") ? `<button class="btn primary" data-act="new">+ Noter une séance</button>` : ""}</div>
       <div class="hub-stats"><div class="hub-stat"><div class="hub-stat-top"><span>Flèches de la saison</span></div><b class="c-gold">${all.toLocaleString("fr-FR")}</b><small>${tot.filter(([, v]) => v).map(([l, v]) => `${l} ${v}`).join(" · ") || "aucune pour l'instant"}</small></div>
       <div class="hub-stat"><div class="hub-stat-top"><span>Séances notées</span></div><b class="c-cyan">${list.length}</b><small>ressenti moyen ${moy} / 10</small></div></div>`;
     if (archivee(end)) h += `<p class="notice">🔒 Saison archivée par ton entraîneur : tu peux tout relire, mais plus rien modifier.</p>`;
@@ -852,6 +853,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
   }
   // Run-archery (V.1.10) : archers FFTA, ou activé par l'entraîneur sur la fiche
   const RUN = () => TC() && !!window.CarnetRun?.ouvert(St.data.archer);
+  const CAMP = () => TC() && !!window.CarnetCampagne?.ouvert(St.data.archer);
   const runCle = () => "ar:" + (who()?.archer_id || "");
   const runData = (t) => { const st = window.CarnetRun.stats(t); return { tcDistance: String(t.run.dist), tcBlason: "Run-archery", compte: String(st.fleches), scoreCompte: "", tcTir: t }; };
   function tirRun() {
@@ -959,7 +961,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
           <label class="f" style="font-weight:500">Score<input type="number" inputmode="numeric" min="0" name="scoreCompte" id="ar-tcs" value="${esc(d.scoreCompte)}" placeholder="${esc(d.auto?.scoreCompte ?? "")}"></label></div>
         <span class="tirline" id="ar-tcm"></span>
         ${window.CarnetRun.est(d.tcTir) ? `<button type="button" class="btn primary" id="ar-run">🏃 Voir / modifier mon run-archery</button>${window.CarnetRun.feuille(d.tcTir)}` : ""}
-        ${window.CarnetRun.est(d.tcTir) ? "" : window.CarnetCampagne.est(d.tcTir) ? `<button type="button" class="btn primary" id="ar-cp">⛰ Voir / modifier mon parcours campagne</button>${window.CarnetCampagne.feuille(d.tcTir)}` : `<button type="button" class="btn" id="ar-cp">⛰ Noter un parcours campagne</button>${RUN() ? `<button type="button" class="btn" id="ar-run">🏃 Noter un run-archery</button>` : ""}`}
+        ${window.CarnetRun.est(d.tcTir) ? "" : window.CarnetCampagne.est(d.tcTir) ? `<button type="button" class="btn primary" id="ar-cp">⛰ Voir / modifier mon parcours campagne</button>${window.CarnetCampagne.feuille(d.tcTir)}` : `${CAMP() ? `<button type="button" class="btn" id="ar-cp">⛰ Noter un parcours campagne</button>` : ""}${RUN() ? `<button type="button" class="btn" id="ar-run">🏃 Noter un run-archery</button>` : ""}`}
         ${window.CarnetCible && M().has("impacts") && !window.CarnetCampagne.est(d.tcTir) && !window.CarnetRun.est(d.tcTir) ? `<button type="button" class="btn primary" id="ar-cible">🎯 ${tirEnCours(e?.id) ? "Reprendre mon tir en cours" : d.tcTir ? "Voir / modifier mon tir sur la cible" : "Saisir mon tir sur la cible"}</button>` : ""}
         <input type="hidden" name="tcTir" id="ar-tctir" value="${esc(d.tcTir ? JSON.stringify(d.tcTir) : "")}"></div>
       <input type="hidden" name="scoreCompet" value="${esc(d.scoreCompet)}">`}
@@ -1072,6 +1074,14 @@ window.CarnetArcherUI = (API, opts = {}) => {
       <section class="card"><h3 class="hub-h">Mon avatar</h3>
         <div class="av-prev">${window.CarnetAvatar ? window.CarnetAvatar.svg(a, 72) : ""}<div style="display:grid;gap:6px"><b>${esc(name(a))}</b><button class="btn" data-act="avatar">Changer d'avatar</button></div></div>
         <span class="tirline">Un dessin à choisir, ou tes initiales. Ton entraîneur le voit sur ses listes.</span></section>
+      ${TC() && API.demander ? (() => {
+        const esp = a.espace || {}, dm = esp.demandes || {};
+        const ligne = ([k, l, d]) => `<div class="bar" style="align-items:flex-start"><div style="min-width:0;flex:1"><b>${l}</b><span class="tirline" style="display:block">${d}</span></div>
+          ${esp[k] === true ? `<span class="tag ar-app">Ouvert</span>` : dm[k]?.statut === "attente" ? `<span class="tag">Demande envoyée</span>` : `<button class="btn" data-demande="${k}">${dm[k]?.statut === "refusee" ? "Redemander" : "Demander l'accès"}</button>`}</div>
+          ${dm[k]?.statut === "refusee" && esp[k] !== true ? `<span class="tirline">Ton entraîneur n'a pas ouvert cette discipline pour l'instant.</span>` : ""}`;
+        return `<section class="card"><h3 class="hub-h">Mes disciplines</h3>${[["campagne", "⛰ Parcours campagne", "Noter tes parcours cible par cible, avec ta feuille de marque."], ["run", "🏃 Run-archery", "Chrono de ton run et tes tirs à l'arrivée."]].map(ligne).join("")}
+          <span class="tirline">Ton entraîneur ouvre ces disciplines. Tu peux lui en demander l'accès ici.</span></section>`;
+      })() : ""}
       <section class="card"><h3 class="hub-h">Accueil</h3>
         <label class="f">Entraînements proposés affichés<select data-pref="nbEnt">${nbs.map(([v, l]) => `<option value="${v}" ${Number(P.nbEnt ?? 3) === v ? "selected" : ""}>${l}</option>`).join("")}</select></label>
         <span class="tirline">Les suivants restent accessibles avec « Voir les autres ».</span></section>
@@ -1214,7 +1224,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     if (t.hasAttribute("data-pref-chrono")) { chronoStore.setLast(t.value); toast("Réglage du chrono enregistré"); }
   });
   root.addEventListener("click", async (ev) => {
-    const t = ev.target.closest("[data-an-ouv],[data-an-jeu],[data-an-saisie],[data-an-essai],[data-an-del],[data-an-garder],[data-atab],[data-who],[data-act],[data-saison],[data-entry],[data-eval],[data-arcombo],[data-rep],[data-artc],[data-artcp],[data-asub],[data-seance-ar],[data-mot-rep],[data-mot-arch],#ar-out,#ar-coach"); if (!t) return;
+    const t = ev.target.closest("[data-demande],[data-an-ouv],[data-an-jeu],[data-an-saisie],[data-an-essai],[data-an-del],[data-an-garder],[data-atab],[data-who],[data-act],[data-saison],[data-entry],[data-eval],[data-arcombo],[data-rep],[data-artc],[data-artcp],[data-asub],[data-seance-ar],[data-mot-rep],[data-mot-arch],#ar-out,#ar-coach"); if (!t) return;
     ev.stopPropagation();
     if (t.dataset.act === "close-preview") { root.remove(); return; }
     if (t.id === "ar-out") return API.deconnexion();
@@ -1241,6 +1251,13 @@ window.CarnetArcherUI = (API, opts = {}) => {
     if (t.dataset.act === "tc-new") { tirDirect(); return; }
     if (t.dataset.act === "cp-new") { tirCampagne(); return; }
     if (t.dataset.act === "run-new") { tirRun(); return; }
+    if (t.dataset.demande) {
+      if (PREVIEW) { toast("Aperçu : c'est l'archer qui fait la demande"); return; }
+      const k = t.dataset.demande; t.disabled = true;
+      API.demander(who(), k).then(() => { const e = (St.data.archer.espace = { ...(St.data.archer.espace || {}) }); e.demandes = { ...(e.demandes || {}), [k]: { date: today(), statut: "attente" } }; toast("Demande envoyée à ton entraîneur"); render(); })
+        .catch((err) => { t.disabled = false; toast(/archer_demander|function/i.test(err.message) ? "Ton entraîneur doit d'abord mettre l'appli à jour (script 11)." : "Demande non envoyée : " + err.message); });
+      return;
+    }
     if (t.dataset.asub) { St.sub = t.dataset.asub; render(); return; }
     if (t.dataset.seanceAr) {
       const x = (St.data.seances || []).find((y) => y.id === t.dataset.seanceAr); if (!x) return;
