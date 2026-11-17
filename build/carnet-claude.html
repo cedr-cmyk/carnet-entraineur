@@ -2459,6 +2459,20 @@ const vuMap = () => { try { return JSON.parse(prm().vuSeancesJson || "{}") || {}
 function nouvDe(aid) { const vu = vuMap(), dep = vu[aid] || vu._debut || Date.now() - 14 * 864e5; return nouvCache.entries.filter((e) => e.archerId === aid && e.saisiParArcher && (e.majArcher || e.createdAt || 0) > dep).length; }
 const bulleNouv = (aid) => { const n = nouvDe(aid); return n ? ` <span class="bulle" title="${n} séance${n > 1 ? "s" : ""} ou tir${n > 1 ? "s" : ""} noté${n > 1 ? "s" : ""} que tu n'as pas encore regardé${n > 1 ? "s" : ""}">${n}</span>` : ""; };
 const nouvTotal = () => S.archers.filter((a) => a.actif !== false).reduce((t, a) => t + nouvDe(a.id), 0);
+// V.1.10 : en ouvrant la fiche, un encadré dit à quoi correspondait la bulle (ce que l'archer a noté depuis ta dernière visite)
+function nouveautes(aid) {
+  const vu = vuMap(), dep = vu[aid] || vu._debut || Date.now() - 14 * 864e5;
+  return nouvCache.entries.filter((e) => e.archerId === aid && e.saisiParArcher && (e.majArcher || e.createdAt || 0) > dep)
+    .map((e) => ({ ...e, modif: (e.createdAt || 0) && e.createdAt <= dep })).sort((x, y) => (y.date || "").localeCompare(x.date || ""));
+}
+function nouvFicheCard(a) {
+  const l = S.nouvFiche?.aid === a.id ? S.nouvFiche.list : []; if (!l.length) return "";
+  const quoi = (e) => RA.est(e.tcTir) ? `Run-archery · ${RA.resume(e.tcTir)}` : CC.est(e.tcTir) ? `Parcours campagne · ${CC.resume(e.tcTir)}`
+    : e.objectif === "Tir compté" || e.tcTir ? `Tir compté${e.scoreCompte ? " · " + e.scoreCompte + " pts" : ""}${e.compte ? " · " + e.compte + " flèches" : ""}` : `Séance notée${e.objectif ? " · " + e.objectif : ""}${e.compte ? " · " + e.compte + " flèches" : ""}`;
+  return `<div class="card" style="border-color:color-mix(in srgb,#DC2626 55%,var(--line));gap:8px"><div class="bar"><b>🔔 Nouveau depuis ta dernière visite</b><span class="grow"></span><button class="btn ghost" data-act="nouv-ok">OK, vu</button></div>
+    <span class="tirline">${esc(a.prenom || fullName(a))} a noté ${l.length > 1 ? `ces ${l.length} éléments` : "ceci"} dans son carnet :</span>
+    <div class="list">${l.map((e) => `<div class="row"><span class="main"><span class="t">${esc(fmtDateL(e.date))}${e.modif ? ` <span class="tag">modifié</span>` : ""}</span><span class="m">${esc(quoi(e))}${e.ressenti || e.note ? " · " + esc(String(e.ressenti || e.note).slice(0, 80)) : ""}</span></span><button class="btn" data-nouv-open="${e.id}">Voir</button></div>`).join("")}</div></div>`;
+}
 function marquerVu(aid) {
   if (!S.loaded.parametres || !nouvDe(aid)) return;
   // au moins l'heure de la dernière séance notée (si l'horloge du téléphone de l'archer est en avance)
@@ -5346,6 +5360,7 @@ function viewArcher() {
         const cat = catOf(a, f), lic = (a.licences || {})[f];
         return `<span>${fedTags([f])} ${esc([cat, lic ? "licence " + lic : ""].filter(Boolean).join(" · "))}</span>`;
       }).join("") || "Fédération non renseignée"}</span></div>
+    ${nouvFicheCard(a)}
     <div class="seg-mode ptabs ftabs" role="tablist" aria-label="Rubriques de la fiche">${FT.map(([k, l]) => `<button role="tab" data-ftab="${k}" aria-pressed="${ft === k}" aria-selected="${ft === k}">${l}</button>`).join("")}</div>
     ${corps}`;
 }
@@ -7189,7 +7204,7 @@ function formSeance(s = null) {
 
 // ---------- Événements ----------
 document.addEventListener("click", (e) => {
-  const t = e.target.closest("[data-docar-retirer],[data-docar-rendre],[data-docar-attr],[data-disc-ok],[data-disc-non],[data-tab],[data-ftab],[data-mattri],[data-rqdel],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-enc-edit],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab],[data-qsort],[data-coptab],[data-com-edit],[data-fmtfed],[data-fmt-del],[data-type-del],[data-fete-ap],[data-fete-new],[data-fete-edit],[data-fete-imgdel],[data-mot-edit],[data-centry-open],[data-cd-exp],[data-cd-arch],[data-exmode],[data-ftheme],[data-fiche],[data-anim],[data-animvue],[data-animtri],[data-anim-saisie],[data-anim-essai-new],[data-anim-retenir],[data-anim-essai-del]");
+  const t = e.target.closest("[data-nouv-open],[data-docar-retirer],[data-docar-rendre],[data-docar-attr],[data-disc-ok],[data-disc-non],[data-tab],[data-ftab],[data-mattri],[data-rqdel],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-enc-edit],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab],[data-qsort],[data-coptab],[data-com-edit],[data-fmtfed],[data-fmt-del],[data-type-del],[data-fete-ap],[data-fete-new],[data-fete-edit],[data-fete-imgdel],[data-mot-edit],[data-centry-open],[data-cd-exp],[data-cd-arch],[data-exmode],[data-ftheme],[data-fiche],[data-anim],[data-animvue],[data-animtri],[data-anim-saisie],[data-anim-essai-new],[data-anim-retenir],[data-anim-essai-del]");
   if (!t || t.closest("#sheet")) return;
   if (t.dataset.dashSuivi) { const [sid, aid] = t.dataset.dashSuivi.split("|"); S.seance = sid; S.suivi = aid; S.tirOpen = null; render(); window.scrollTo(0, 0); return; }
   if (t.dataset.tab) { go(t.dataset.tab); try { history.replaceState(null, "", "#" + t.dataset.tab); } catch (_) {} return; }
@@ -7331,6 +7346,8 @@ document.addEventListener("click", (e) => {
   if (t.dataset.act === "mot-new") { const a = S.archers.find((x) => x.id === S.archer); if (a) formMot(a); return; }
   if (t.dataset.motEdit) { const a = S.archers.find((x) => x.id === S.archer), m = S.mots.find((x) => x.id === t.dataset.motEdit); if (a && m) formMot(a, m); return; }
   if (t.dataset.act === "mots-tout") { S.motsTout = !S.motsTout; render(); return; }
+  if (t.dataset.act === "nouv-ok") { S.nouvFiche = null; render(); return; }
+  if (t.dataset.nouvOpen) { const e = nouvCache.entries.find((x) => x.id === t.dataset.nouvOpen); if (!e || !e.date) return; openCarnet(S.archer); S.cSaison = saisonOfDate(e.date); S.cMonth = Number(e.date.slice(5, 7)); S.cTab = "mois"; carnetSubscribe(); render(); setTimeout(() => { const x = S.centrees.find((y) => y.id === e.id) || e; if (S.canWrite) formEntree(x); }, 300); return; }
   if (t.dataset.centryOpen) { const e = (tcCache.list || []).find((x) => x.id === t.dataset.centryOpen); if (!e || !e.date) return; openCarnet(S.archer); S.cSaison = saisonOfDate(e.date); S.cMonth = Number(e.date.slice(5, 7)); S.cTab = "mois"; carnetSubscribe(); render(); if (S.canWrite) formEntree(e); return; }
   if (t.dataset.act === "open-carnet-from-suivi") {
     const s = S.seances.find((x) => x.id === S.seance), aid = S.suivi; if (!s) return;
@@ -7412,7 +7429,7 @@ document.addEventListener("click", (e) => {
   if (t.dataset.club && t.classList.contains("chip")) { S.club = t.dataset.club; try { localStorage.setItem("club", S.club); } catch (_) {} render(); return; }
   if (t.dataset.seance) { S.seance = t.dataset.seance; S.from = S.archer ? "archer" : null; render(); window.scrollTo(0, 0); return; }
   if (t.dataset.ftab) { S.fTab = t.dataset.ftab; render(); return; }
-  if (t.dataset.archer) { if (S.archer !== t.dataset.archer) S.fTab = "suivi"; S.archer = t.dataset.archer; marquerVu(S.archer); render(); window.scrollTo(0, 0); return; }
+  if (t.dataset.archer) { if (S.archer !== t.dataset.archer) S.fTab = "suivi"; S.archer = t.dataset.archer; S.nouvFiche = ENC() ? null : { aid: S.archer, list: nouveautes(S.archer) }; marquerVu(S.archer); render(); window.scrollTo(0, 0); return; }
   if (t.dataset.clubEdit) { formClub(club(t.dataset.clubEdit)); return; }
   const a = t.dataset.act;
   if (a === "back" && S.suivi) { if (S.from === "archer-suivi") { S.seance = null; S.from = null; } S.suivi = null; S.tirOpen = null; render(); window.scrollTo(0, 0); return; }
