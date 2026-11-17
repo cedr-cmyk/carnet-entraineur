@@ -3799,7 +3799,9 @@ const concerne = (s, a) => (a.clubIds || []).includes(s.clubId) && a.actif !== f
 const repsOf = (sid) => S.reponses.filter((r) => r.seanceId === sid && S.archers.some((a) => a.id === r.archerId));
 const clubsLab = (ids) => (!ids || !ids.length || ids.includes("*") ? "Tous les clubs" : ids.map(clubName).join(", "));
 const addDaysISO = (iso, n) => { const d = dObj(iso); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
-const annActive = (n) => !n.jusquau || n.jusquau >= todayISO();
+const annActive = (n) => (!n.jusquau || n.jusquau >= todayISO()) && !annProg(n);
+// V.1.10 (script 13) : info programmée, visible chez les archers à partir de publieLe
+const annProg = (n) => !!n.publieLe && n.publieLe > todayISO();
 function reponsesBlock(s) {
   const rs = repsOf(s.id), who = (r) => S.archers.find((a) => a.id === r.archerId);
   const pres = rs.filter((r) => r.reponse === "present").map(who).sort(byName), abs = rs.filter((r) => r.reponse === "absent").map(who).sort(byName);
@@ -3815,12 +3817,12 @@ function reponsesBlock(s) {
 }
 function espaceArchersCard(inC) {
   const today = todayISO();
-  const ann = S.annonces.filter((n) => S.club === "all" || !(n.clubIds || []).length || n.clubIds.includes(S.club)).sort((a, b) => (annActive(b) ? 1 : 0) - (annActive(a) ? 1 : 0) || (b.important ? 1 : 0) - (a.important ? 1 : 0) || (b.date || "").localeCompare(a.date || ""));
+  const ann = S.annonces.filter((n) => S.club === "all" || !(n.clubIds || []).length || n.clubIds.includes(S.club)).sort((a, b) => (annActive(b) ? 2 : annProg(b) ? 1 : 0) - (annActive(a) ? 2 : annProg(a) ? 1 : 0) || (b.important ? 1 : 0) - (a.important ? 1 : 0) || (b.date || "").localeCompare(a.date || ""));
   const docs = S.documents.filter((d) => (d.partageClubs || []).length && (S.club === "all" || d.partageClubs.includes("*") || d.partageClubs.includes(S.club))).sort((a, b) => (b.partageLe || 0) - (a.partageLe || 0));
   const prop = S.seances.filter((s) => s.public && s.date >= today && inC(s.clubId)).sort((a, b) => (a.date + (a.heure || "")).localeCompare(b.date + (b.heure || ""))).slice(0, 6);
   return `<h2 class="sec">Espace des archers</h2><div class="hub-grid">
     <div class="card"><div class="hub-bar"><h3 class="hub-h">Infos importantes</h3>${S.canWrite ? `<button class="btn" data-act="new-annonce">+ Nouvelle info</button>` : ""}</div>
-      ${ann.length ? `<div class="list">${ann.map((n) => `<button class="row ann-row${annActive(n) ? "" : " past"}" data-annonce="${n.id}"><span class="main"><span class="t">${n.important ? '<span class="tag imp">Important</span> ' : ""}${esc(n.titre || "Info")}</span>
+      ${ann.length ? `<div class="list">${ann.map((n) => `<button class="row ann-row${annActive(n) ? "" : " past"}" data-annonce="${n.id}"><span class="main"><span class="t">${annProg(n) ? `<span class="tag today">⏰ Programmée le ${esc(dObj(n.publieLe).toLocaleDateString("fr-FR"))}</span> ` : ""}${n.important ? '<span class="tag imp">Important</span> ' : ""}${esc(n.titre || "Info")}</span>
         ${n.texte ? `<span class="m">${esc(n.texte.slice(0, 120))}${n.texte.length > 120 ? "…" : ""}</span>` : ""}<span class="m">${esc(clubsLab(n.clubIds))}${n.jusquau ? ` · ${annActive(n) ? "jusqu'au" : "terminée le"} ${esc(dObj(n.jusquau).toLocaleDateString("fr-FR"))}` : ""}</span></span><span class="count" aria-hidden="true">›</span></button>`).join("")}</div>`
         : `<p class="notice">Les infos que tu écris ici s'affichent en haut de l'accueil des archers de chaque club concerné (date du concours du club, fermeture du gymnase, licences à renouveler…).</p>`}
       <div class="hub-bar" style="margin-top:6px"><h3 class="hub-h">Documents partagés</h3>${S.canWrite ? `<button class="btn" data-act="new-partage">+ Partager un document</button>` : ""}</div>
@@ -3855,16 +3857,19 @@ function formAnnonce(n = null) {
     <label class="f" for="an-t">Titre<input type="text" id="an-t" name="titre" required value="${esc(n?.titre)}" placeholder="Ex. Concours du club le 15 novembre"></label>
     <label class="f" for="an-x">Message<textarea id="an-x" name="texte" placeholder="Ex. Nous cherchons des bénévoles pour l'installation le samedi matin.">${esc(n?.texte)}</textarea></label>
     <div class="f">Clubs concernés<div class="checks">${S.clubs.map((c) => `<label><input type="checkbox" name="club" value="${c.id}" ${ids.includes(c.id) ? "checked" : ""}>${esc(c.nom)}</label>`).join("")}</div><span class="tirline">Aucun club coché : l'info s'affiche dans tous les clubs.</span></div>
-    <div class="grid2"><label class="f" for="an-j">Afficher jusqu'au (facultatif)<input type="date" id="an-j" name="jusquau" value="${esc(n?.jusquau)}"></label>
+    <div class="grid2"><label class="f" for="an-p">Visible par les archers à partir du<input type="date" id="an-p" name="publieLe" value="${esc(n?.publieLe || todayISO())}" min="${todayISO()}"><span class="tirline">Aujourd'hui = tout de suite. Une date plus tard : l'info est programmée, seul toi la vois d'ici là.</span></label>
+      <label class="f" for="an-j">Afficher jusqu'au (facultatif)<input type="date" id="an-j" name="jusquau" value="${esc(n?.jusquau)}"></label></div>
+    <div class="grid2">
       <div class="f">Mise en avant<div class="checks"><label><input type="checkbox" name="important" ${n?.important ? "checked" : ""}>Important</label></div></div></div>
     <div class="bar"><button type="button" class="btn ghost" id="an-save-mod">Enregistrer comme modèle</button>${mesModeles().length ? `<button type="button" class="btn ghost" id="an-del-mod">Gérer mes modèles</button>` : ""}</div>`, {
     onSave(fd) {
       const titre = fd.get("titre").trim(); if (!titre) { toast("Donne un titre à l'info"); return false; }
       const reste = /\[[^\]]+\]/.test(titre + " " + fd.get("texte"));
       if (reste && !$("#an-t").dataset.ok) { $("#an-t").dataset.ok = 1; toast("Il reste des passages entre [crochets] à compléter. Enregistre à nouveau pour publier quand même."); return false; }
-      const id = n?.id || newId("annonces");
-      save("annonces", id, { titre, texte: fd.get("texte").trim(), clubIds: fd.getAll("club"), jusquau: fd.get("jusquau") || "", important: !!fd.get("important"), date: n?.date || todayISO(), createdAt: n?.createdAt || Date.now() });
-      toast(n ? "Info enregistrée" : "Info publiée pour les archers"); render();
+      const id = n?.id || newId("annonces"), pub = fd.get("publieLe") || "", prog = pub > todayISO();
+      if (fd.get("jusquau") && pub && fd.get("jusquau") < pub) { toast("La date de fin est avant la date de publication"); return false; }
+      save("annonces", id, { titre, texte: fd.get("texte").trim(), clubIds: fd.getAll("club"), jusquau: fd.get("jusquau") || "", important: !!fd.get("important"), publieLe: prog ? pub : "", date: prog ? pub : n?.date && !n.publieLe ? n.date : todayISO(), createdAt: n?.createdAt || Date.now() });
+      toast(prog ? `Info programmée : les archers la verront le ${dObj(pub).toLocaleDateString("fr-FR")}` : n ? "Info enregistrée" : "Info publiée pour les archers"); render();
     },
     onDelete: n ? () => { remove("annonces", n.id); toast("Info supprimée"); render(); } : null, deleteLabel: "Supprimer l'info",
   });
