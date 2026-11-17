@@ -857,7 +857,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
 <div id="toast" class="toast" hidden></div>
 <input type="file" id="file-in" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.mp4,.webm,.txt,.md,.csv,application/pdf,image/*,video/mp4,video/webm,text/plain,text/markdown,text/csv">
 
-<script>window.CARNET_VERSION = { v: "1.10.17", date: "2026-11-16", site: "1.7.4", test: true };</script>
+<script>window.CARNET_VERSION = { v: "1.10.18", date: "2026-11-17", site: "1.7.4", test: true };</script>
 <script>
 // Espace archer : l'archer (ou son parent) voit uniquement ses propres informations,
 // telles que les renvoie la base (fonction espace_archer), et remplit son carnet.
@@ -5017,7 +5017,7 @@ async function previewArcher(aid, testWrite = false) {
       seances: S.seances.filter((x) => (x.presents || []).includes(aid)).map((x) => ({ id: x.id, date: x.date, heure: x.heure, groupe: x.groupe, theme: x.theme, lieu: x.lieu, clubId: x.clubId, exercices: (x.exercices || []).map((d) => docOf(d)?.titre).filter(Boolean) })),
       annonces: S.annonces.filter((n) => annActive(n) && (!(n.clubIds || []).length || n.clubIds.some((id) => (a.clubIds || []).includes(id)))),
       animations: S.animations.filter((n) => (n.partage && (n.participants || []).includes(aid)) || animEquipes(n).some((e) => e.chefId === aid || (arModules(S.archers.find((x) => x.id === aid), nbConcoursOf(aid)).has("animations") && e.membres.includes(aid)))).sort((x, y) => (y.date || "").localeCompare(x.date || "")).map((n) => animPourArcher(n, aid)),
-      documents: S.documents.filter((d) => (d.partageClubs || []).some((id) => id === "*" || (a.clubIds || []).includes(id)) || (d.partageArchers || []).includes(a.id)).map((d) => ({ id: d.id, titre: d.titre, description: d.description, assetId: d.assetId, contentType: d.contentType, nomFichier: d.nomFichier, video: d.video, partageLe: d.partageLe })),
+      documents: S.documents.filter((d) => (d.partageArchers || []).includes(a.id) || ((d.partageClubs || []).some((id) => id === "*" || (a.clubIds || []).includes(id)) && !(d.partageExclus || []).includes(a.id))).map((d) => ({ id: d.id, titre: d.titre, description: d.description, assetId: d.assetId, contentType: d.contentType, nomFichier: d.nomFichier, video: d.video, partageLe: d.partageLe })),
       entrainements: S.seances.filter((s) => s.public && s.date >= todayISO() && s.date <= addDaysISO(todayISO(), 42) && concerne(s, a)).sort((p, q) => (p.date + (p.heure || "")).localeCompare(q.date + (q.heure || ""))).map((s) => {
         const rs = repsOf(s.id), names = (v) => rs.filter((r) => r.reponse === v).map((r) => S.archers.find((x) => x.id === r.archerId)).sort(byName).map(fullName);
         return { id: s.id, date: s.date, heure: s.heure, groupe: s.groupe, theme: s.theme, lieu: s.lieu, clubId: s.clubId, public: s.public, reponse: rs.find((r) => r.archerId === aid)?.reponse || null,
@@ -5295,7 +5295,7 @@ function viewArcher() {
   const evs = evalsOf(a.id);
   // V.1.9 : la fiche est rangée en rubriques (une seule visible à la fois) au lieu de tout empiler sur une page
   const nHist = S.seances.filter((s) => hasSuivi(s, a.id)).length;
-  const FT = [["suivi", "Suivi"], ["seances", "Séances" + (nHist ? ` <span class="n">${nHist}</span>` : "")], ["concours", "Concours et scores"], ["technique", "Technique" + (evs.length ? ` <span class="n">${evs.length}</span>` : "")], ["espace", "Espace et matériel"]];
+  const FT = [["suivi", "Suivi"], ["seances", "Séances" + (nHist ? ` <span class="n">${nHist}</span>` : "")], ["concours", "Concours et scores"], ["technique", "Technique" + (evs.length ? ` <span class="n">${evs.length}</span>` : "")], ["docs", "Documents" + (docsArcher(a).vus.length ? ` <span class="n">${docsArcher(a).vus.length}</span>` : "")], ["espace", "Espace et matériel"]];
   const ft = FT.some(([k]) => k === S.fTab) ? S.fTab : "suivi";
   const part = {
     suivi: () => `    ${(() => {
@@ -5336,6 +5336,7 @@ function viewArcher() {
       return `<button class="row" data-eval="${e.id}"><span class="main" style="display:grid;gap:6px"><span class="t">${esc(fmtLong(e.date))}</span>
         ${sbar(st)}${legend(st)}</span><span class="count" aria-hidden="true">›</span></button>`;
     }).join("")}</div>` : ""}`,
+    docs: () => docsArcherCard(a),
     espace: () => `    ${window.CarnetArcherUI ? `<div class="bar"><span class="grow"></span><button class="btn" data-act="ar-preview">Aperçu de son espace archer</button>${window.CARNET_TEST ? `<button class="btn primary" data-act="ar-test">Jouer l'archer (test)</button>` : ""}</div>` : ""}
     ${roleOf(a) === "encadrant" ? "" : espaceCard(a)}
     ${window.carnetAcces && S.canWrite && !ENC() ? `<h2 class="sec">Espace de l'archer</h2><div class="card" id="acc-box"><span class="tirline">Chargement des accès…</span></div>` : ""}
@@ -5351,6 +5352,54 @@ function viewArcher() {
       }).join("") || "Fédération non renseignée"}</span></div>
     <div class="seg-mode ptabs ftabs" role="tablist" aria-label="Rubriques de la fiche">${FT.map(([k, l]) => `<button role="tab" data-ftab="${k}" aria-pressed="${ft === k}" aria-selected="${ft === k}">${l}</button>`).join("")}</div>
     ${corps}`;
+}
+
+// ---------- Fiche de l'archer › Documents (V.1.10, script 12) : ce qu'il voit dans son espace, et pourquoi ----------
+// Mêmes règles que Supabase (doc_partage_archer) : donné à lui seul, ou partagé à son club (sauf s'il en est retiré) ; plus les fiches attribuées visibles.
+function docsArcher(a) {
+  const cl = a.clubIds || [], vus = [], retires = [];
+  S.documents.forEach((d) => {
+    const pc = d.partageClubs || [], club = pc.includes("*") || pc.some((c) => cl.includes(c)), seul = (d.partageArchers || []).includes(a.id), exclu = (d.partageExclus || []).includes(a.id);
+    const viaClub = club ? (pc.includes("*") ? "Partagé à tous les archers" : "Partagé au club " + pc.filter((c) => cl.includes(c)).map(clubName).join(", ")) : "";
+    if (seul) vus.push({ d, pourquoi: "Donné à " + (a.prenom || "lui"), seul: true, club: viaClub });
+    else if (club && !exclu) vus.push({ d, pourquoi: viaClub, club: viaClub });
+    else if (club && exclu) retires.push({ d, pourquoi: viaClub });
+  });
+  const attr = S.attributions.filter((x) => x.archerId === a.id).map((x) => ({ x, d: S.documents.find((y) => y.id === x.documentId) })).filter((o) => o.d);
+  const tri = (p, q) => (p.d.titre || p.d.nomFichier || "").localeCompare(q.d.titre || q.d.nomFichier || "", "fr");
+  return { vus: vus.sort(tri), retires: retires.sort(tri), attr: attr.sort(tri) };
+}
+function docsArcherCard(a) {
+  const { vus, retires, attr } = docsArcher(a), w = S.canWrite, nom = esc(a.prenom || fullName(a));
+  const ico = (d) => `<span class="thumb">${KIND_LAB[kind(d.contentType)] || "DOC"}</span>`;
+  const ligne = (o, bouton) => `<div class="row">${ico(o.d)}<span class="main"><button class="lnk" data-doc="${o.d.id}">${esc(o.d.titre || o.d.nomFichier)}</button><span class="m">${esc(o.pourquoi)}${o.d.dossierId ? " · " + esc(folderName(o.d.dossierId)) : ""}</span></span>${w ? bouton : ""}</div>`;
+  return `<div class="bar"><h2 class="sec" style="margin:0">Documents que ${nom} voit</h2><span class="grow"></span>${w ? `<button class="btn primary" data-act="docar-add">+ Lui donner un document</button>` : ""}</div>
+    ${vus.length ? `<div class="list">${vus.map((o) => ligne(o, `<button class="btn ghost" data-docar-retirer="${o.d.id}">Retirer</button>`)).join("")}</div>` : `<p class="notice">Aucun document partagé avec ${nom} pour l'instant.</p>`}
+    ${attr.length ? `<h2 class="sec">Fiches attribuées</h2><div class="list">${attr.map(({ x, d }) => ligne({ d, pourquoi: (x.visible ? "Visible dans son espace" : "Masquée dans son espace") + (x.fait ? " · faite" : "") }, `<button class="btn ghost" data-docar-attr="${x.id}">${x.visible ? "Masquer" : "Montrer"}</button>`)).join("")}</div>` : ""}
+    ${retires.length ? `<h2 class="sec">Retirés pour ${nom}</h2><span class="tirline">Partagés à son club, mais pas à lui.</span><div class="list">${retires.map((o) => ligne(o, `<button class="btn" data-docar-rendre="${o.d.id}">Lui rendre</button>`)).join("")}</div>` : ""}
+    <span class="tirline">« Retirer » enlève le document de son espace seulement : il reste pour les autres archers du club. Les fiches attribuées se gèrent aussi depuis ses séances.</span>`;
+}
+function docArcherMaj(d, aid, donner) {
+  const pa = (d.partageArchers || []).filter((x) => x !== aid), ex = (d.partageExclus || []).filter((x) => x !== aid);
+  const a = S.archers.find((x) => x.id === aid), pc = d.partageClubs || [], viaClub = !!a && (pc.includes("*") || pc.some((c) => (a.clubIds || []).includes(c)));
+  if (donner) { if (!viaClub) pa.push(aid); } else if (viaClub) ex.push(aid);
+  d.partageArchers = pa; d.partageExclus = ex;
+  const up = { partageArchers: pa, partageExclus: ex }; if (donner && !d.partageLe) up.partageLe = d.partageLe = Date.now();
+  patch("documents", d.id, up); render();
+}
+function formDocArcher(a) {
+  const { vus } = docsArcher(a), deja = new Set(vus.map((o) => o.d.id));
+  const dispo = S.documents.filter((d) => !deja.has(d.id)).sort((p, q) => (folderName(p.dossierId) || "").localeCompare(folderName(q.dossierId) || "", "fr") || (p.titre || "").localeCompare(q.titre || "", "fr"));
+  const groupes = [...new Set(dispo.map((d) => d.dossierId || ""))];
+  sheet(`Donner un document à ${a.prenom || fullName(a)}`, `
+    <input type="search" id="docar-q" placeholder="Rechercher un document…" aria-label="Rechercher un document">
+    ${dispo.length ? groupes.map((g) => `<details class="pick" open data-docar-g><summary>${esc(g ? folderPath(g).map((f) => f.nom).join(" › ") : "Documents")}</summary>
+      ${dispo.filter((d) => (d.dossierId || "") === g).map((d) => `<label data-docar-l="${esc((d.titre || d.nomFichier || "").toLowerCase())}"><input type="checkbox" name="doc" value="${d.id}"><span>${esc(d.titre || d.nomFichier)} <small class="tirline">${KIND_LAB[kind(d.contentType)] || ""}</small></span></label>`).join("")}</details>`).join("")
+      : `<p class="notice">Il voit déjà tous tes documents.</p>`}
+    <span class="tirline">Le document apparaîtra dans « Documents partagés par ton entraîneur », pour cet archer seulement.</span>`, {
+    onSave(fd) { const ids = fd.getAll("doc"); if (!ids.length) { toast("Coche au moins un document"); return false; } ids.forEach((id) => { const d = S.documents.find((x) => x.id === id); if (d) docArcherMaj(d, a.id, true); }); toast(ids.length > 1 ? `${ids.length} documents donnés` : "Document donné"); },
+  });
+  $("#docar-q")?.addEventListener("input", (e) => { const q = e.target.value.trim().toLowerCase(); document.querySelectorAll("[data-docar-l]").forEach((l) => { l.hidden = !!q && !l.dataset.docarL.includes(q); }); document.querySelectorAll("[data-docar-g]").forEach((g) => { g.hidden = ![...g.querySelectorAll("[data-docar-l]")].some((l) => !l.hidden); }); });
 }
 
 // ---------- Clubs ----------
@@ -7144,7 +7193,7 @@ function formSeance(s = null) {
 
 // ---------- Événements ----------
 document.addEventListener("click", (e) => {
-  const t = e.target.closest("[data-disc-ok],[data-disc-non],[data-tab],[data-ftab],[data-mattri],[data-rqdel],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-enc-edit],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab],[data-qsort],[data-coptab],[data-com-edit],[data-fmtfed],[data-fmt-del],[data-type-del],[data-fete-ap],[data-fete-new],[data-fete-edit],[data-fete-imgdel],[data-mot-edit],[data-centry-open],[data-cd-exp],[data-cd-arch],[data-exmode],[data-ftheme],[data-fiche],[data-anim],[data-animvue],[data-animtri],[data-anim-saisie],[data-anim-essai-new],[data-anim-retenir],[data-anim-essai-del]");
+  const t = e.target.closest("[data-docar-retirer],[data-docar-rendre],[data-docar-attr],[data-disc-ok],[data-disc-non],[data-tab],[data-ftab],[data-mattri],[data-rqdel],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-enc-edit],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab],[data-qsort],[data-coptab],[data-com-edit],[data-fmtfed],[data-fmt-del],[data-type-del],[data-fete-ap],[data-fete-new],[data-fete-edit],[data-fete-imgdel],[data-mot-edit],[data-centry-open],[data-cd-exp],[data-cd-arch],[data-exmode],[data-ftheme],[data-fiche],[data-anim],[data-animvue],[data-animtri],[data-anim-saisie],[data-anim-essai-new],[data-anim-retenir],[data-anim-essai-del]");
   if (!t || t.closest("#sheet")) return;
   if (t.dataset.dashSuivi) { const [sid, aid] = t.dataset.dashSuivi.split("|"); S.seance = sid; S.suivi = aid; S.tirOpen = null; render(); window.scrollTo(0, 0); return; }
   if (t.dataset.tab) { go(t.dataset.tab); try { history.replaceState(null, "", "#" + t.dataset.tab); } catch (_) {} return; }
@@ -7325,6 +7374,9 @@ document.addEventListener("click", (e) => {
   if (t.dataset.act === "close-tir") { S.tirOpen = null; render(); return; }
   if (t.dataset.act === "open-tir") { S.tirOpen = t.dataset.tir; render(); return; }
   if (t.dataset.act === "new-tir") { formTir(); return; }
+  if (t.dataset.docarRetirer || t.dataset.docarRendre) { const a = S.archers.find((x) => x.id === S.archer), d = S.documents.find((x) => x.id === (t.dataset.docarRetirer || t.dataset.docarRendre)); if (a && d && S.canWrite) { docArcherMaj(d, a.id, !!t.dataset.docarRendre); toast(t.dataset.docarRendre ? "Document rendu à l'archer" : "Document retiré de son espace"); } return; }
+  if (t.dataset.docarAttr) { const x = S.attributions.find((y) => y.id === t.dataset.docarAttr); if (x && S.canWrite) { x.visible = !x.visible; patch("attributions", x.id, { visible: x.visible }); toast(x.visible ? "Fiche visible dans l'espace de l'archer" : "Fiche masquée pour l'archer"); render(); } return; }
+  if (t.dataset.act === "docar-add") { const a = S.archers.find((x) => x.id === S.archer); if (a) formDocArcher(a); return; }
   if (t.dataset.discOk || t.dataset.discNon) { const k = t.dataset.discOk || t.dataset.discNon, ok = !!t.dataset.discOk; majDiscipline(t.dataset.aid, k, ok); toast(ok ? "Discipline ouverte à l'archer" : "Demande refusée"); return; }
   if (t.dataset.act === "run-groupe") {
     const s = S.seances.find((x) => x.id === S.seance); if (!s) return;
