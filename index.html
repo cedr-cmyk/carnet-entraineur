@@ -2595,11 +2595,30 @@ function viewSeances() {
   }
   return h;
 }
+// V.1.10 : club « de stages » (ex. Dumoulin Consulting) : on y invite, pour une ou plusieurs séances, des archers d'autres clubs (s.invites)
+const dansSeance = (a, s) => !!a && ((a.clubIds || []).includes(s.clubId) || (s.invites || []).includes(a.id));
+const clubStage = (id) => !!S.clubs.find((c) => c.id === id)?.stage;
+function formInviter(s) {
+  const deja = new Set(s.invites || []);
+  const groups = S.clubs.filter((k) => k.id !== s.clubId).map((k) => [k, S.archers.filter((a) => a.actif !== false && (a.clubIds || []).includes(k.id) && !(a.clubIds || []).includes(s.clubId)).sort(byName)]).filter(([, l]) => l.length);
+  if (!groups.length) { toast("Aucun archer d'un autre club à inviter"); return; }
+  const vus = new Set();
+  sheet("Inviter des archers à cette séance", `<span class="tirline">Ils restent dans leur club : ils sont seulement ajoutés à cette séance, et la verront dans leur espace.</span>
+    ${groups.map(([k, l]) => `<details class="pick" open><summary><span class="dot" style="background:${esc(k.couleur)};display:inline-block"></span> ${esc(k.nom)}</summary>
+      ${l.filter((a) => !vus.has(a.id) && vus.add(a.id)).map((a) => `<label><input type="checkbox" name="archer" value="${a.id}" ${deja.has(a.id) ? "checked" : ""}> ${esc(fullName(a))}</label>`).join("")}</details>`).join("")}`, {
+    onSave(fd) {
+      const ids = [...new Set(fd.getAll("archer"))], partis = [...deja].filter((id) => !ids.includes(id) && (s.presents || []).includes(id));
+      s.invites = ids; const up = { invites: ids };
+      if (partis.length) { s.presents = (s.presents || []).filter((id) => !partis.includes(id)); up.presents = s.presents; }
+      patch("seances", s.id, up); toast(ids.length ? `${ids.length} archer${ids.length > 1 ? "s" : ""} invité${ids.length > 1 ? "s" : ""}` : "Plus d'invités"); render();
+    },
+  });
+}
 function viewSeance() {
   const s = S.seances.find((x) => x.id === S.seance);
   if (!s) { S.seance = null; return viewSeances(); }
   const pres = new Set(s.presents || []);
-  const roster = S.archers.filter((a) => (a.clubIds || []).includes(s.clubId) && (a.actif !== false || pres.has(a.id))).sort(byName);
+  const roster = S.archers.filter((a) => dansSeance(a, s) && (a.actif !== false || pres.has(a.id))).sort(byName);
   return `<div class="bar"><button class="btn ghost" data-act="back">← Séances</button><span class="grow"></span>
       <button class="btn" data-act="chrono">⏱ Chrono</button>${S.canWrite && (s.presents || []).some((id) => RA.ouvert(S.archers.find((a) => a.id === id))) ? `<button class="btn" data-act="run-groupe">${RA.enCours(`grp:${s.id}`) ? "🏃 Reprendre le run en cours" : "🏃 Run-archery en groupe"}</button>` : ""}<button class="btn" data-act="print-sheet">Imprimer les fiches</button>
       ${S.canWrite ? `<button class="btn" data-act="quick-entry">Saisir la feuille papier</button><button class="btn" data-act="edit-seance">Modifier</button>` : ""}</div>
@@ -2609,9 +2628,9 @@ function viewSeance() {
       ${s.periodeId && folderName(s.periodeId) ? `<span><span class="tag fed">${esc(folderName(s.periodeId))}</span></span>` : ""}${s.public ? `<span><span class="tag">Proposée : ${esc(pubLab(s.public).toLowerCase())}</span></span>` : ""}</div>
     ${s.public ? reponsesBlock(s) : ""}
     ${(() => { const enc = roster.filter((a) => pres.has(a.id) && encadre(s, a.id)).length, arc = pres.size - enc; return `<div class="bar"><div class="score"><b>${arc}</b><span>archer${arc > 1 ? "s" : ""}${enc ? ` · ${enc} encadrant${enc > 1 ? "s" : ""}` : ""} sur ${roster.length} personnes</span></div><span class="grow"></span>`; })()}
-      ${S.canWrite && roster.length ? `<button class="btn" data-act="all-present">Tous présents</button><button class="btn" data-act="none-present">Tout décocher</button>` : ""}</div>
+      ${S.canWrite && roster.length ? `<button class="btn" data-act="all-present">Tous présents</button><button class="btn" data-act="none-present">Tout décocher</button>` : ""}${S.canWrite && clubStage(s.clubId) ? `<button class="btn" data-act="inviter">+ Inviter des archers${(s.invites || []).length ? ` (${s.invites.length})` : ""}</button>` : ""}</div>
     ${roster.length ? (() => {
-      const tile = (a) => `<div class="ptw"><button class="pt" data-toggle="${a.id}" aria-pressed="${pres.has(a.id)}" ${S.canWrite ? "" : "disabled"}><span class="box"></span>${avatarSvg(a, 34)}<span class="nm">${esc(fullName(a))}${pretsOf(a.id).length ? ` ${pretTag(a.id)}` : ""}<span class="sm">${esc(roleOf(a) === "encadrant" ? "Encadrant / animateur" : [(a.federations || []).map((f) => catOf(a, f)).filter(Boolean).join(" / "), (a.arcs || []).join(", ")].filter(Boolean).join(" · "))}</span></span></button>
+      const tile = (a) => `<div class="ptw"><button class="pt" data-toggle="${a.id}" aria-pressed="${pres.has(a.id)}" ${S.canWrite ? "" : "disabled"}><span class="box"></span>${avatarSvg(a, 34)}<span class="nm">${esc(fullName(a))}${(s.invites || []).includes(a.id) && !(a.clubIds || []).includes(s.clubId) ? ` <span class="tag fed">invité · ${esc(clubName((a.clubIds || [])[0]))}</span>` : ""}${pretsOf(a.id).length ? ` ${pretTag(a.id)}` : ""}<span class="sm">${esc(roleOf(a) === "encadrant" ? "Encadrant / animateur" : [(a.federations || []).map((f) => catOf(a, f)).filter(Boolean).join(" / "), (a.arcs || []).join(", ")].filter(Boolean).join(" · "))}</span></span></button>
         ${roleOf(a) === "les-deux" && pres.has(a.id) ? `<label class="encx"><input type="checkbox" data-encadre="${a.id}" ${(s.encadrants || []).includes(a.id) ? "checked" : ""} ${S.canWrite ? "" : "disabled"}> Encadre aujourd'hui</label>` : ""}</div>`;
       const arch = roster.filter((a) => roleOf(a) !== "encadrant"), staff = roster.filter((a) => roleOf(a) === "encadrant");
       return `<div class="attend">${arch.map(tile).join("")}</div>${staff.length ? `<h2 class="sec">Encadrement</h2><div class="attend">${staff.map(tile).join("")}</div>` : ""}`;
@@ -2645,7 +2664,7 @@ const docOf = (id) => S.documents.find((d) => d.id === id);
 const attrsFor = (aid, sid) => S.attributions.filter((x) => x.archerId === aid && (sid === undefined ? true : (x.seanceId || null) === sid))
   .sort((p, q) => (p.createdAt || 0) - (q.createdAt || 0));
 function nextSeanceFor(a, from = todayISO()) {
-  return S.seances.filter((s) => (a.clubIds || []).includes(s.clubId) && s.date >= from).sort((p, q) => (p.date + (p.heure || "")).localeCompare(q.date + (q.heure || "")))[0] || null;
+  return S.seances.filter((s) => dansSeance(a, s) && s.date >= from).sort((p, q) => (p.date + (p.heure || "")).localeCompare(q.date + (q.heure || "")))[0] || null;
 }
 function attrItem(x, { pending = false } = {}) {
   const d = docOf(x.documentId), ro = S.canWrite ? "" : "disabled";
@@ -3107,7 +3126,7 @@ const tireurs = (s, list) => list.filter((a) => tire(a) && !(s.encadrants || [])
 // Arcs du club prêtés à une personne, et l'étiquette qui le signale dans les listes
 const pretsOf = (aid) => S.materiel.filter((m) => m.archerId === aid).sort(byNum);
 const pretTag = (aid) => { const ms = pretsOf(aid); return ms.length ? `<span class="tag pret" title="${esc(ms.map((m) => [mtLab(mtype(m)) + " n°" + m.numero, tailleTxt(m), m.puissance ? m.puissance + " lbs" : "", m.modele].filter(Boolean).join(" · ")).join(", "))}">Prêt : ${ms.map((m) => esc(matShort(m))).join(", ")}</span>` : ""; };
-const sheetRoster = (s) => tireurs(s, S.archers.filter((a) => (a.clubIds || []).includes(s.clubId) && (a.actif !== false || (s.presents || []).includes(a.id)))).sort(byName);
+const sheetRoster = (s) => tireurs(s, S.archers.filter((a) => dansSeance(a, s) && (a.actif !== false || (s.presents || []).includes(a.id)))).sort(byName);
 function viewQuick() {
   const s = S.seances.find((x) => x.id === S.seance); if (!s) { S.quick = false; return viewSeances(); }
   const roster = sheetRoster(s), pres = new Set(s.presents || []);
@@ -3498,7 +3517,7 @@ function formEntree(e = null) {
   const y = moisYear(end, m), mm = String(m).padStart(2, "0");
   const today = todayISO(), def = today.startsWith(`${y}-${mm}`) ? today : `${y}-${mm}-01`;
   const used = new Set(S.centrees.map((x) => x.seanceId).filter(Boolean));
-  const sess = S.seances.filter((s) => s.date.slice(0, 7) === `${y}-${mm}` && (a.clubIds || []).includes(s.clubId) && ((s.presents || []).includes(a.id) || hasSuivi(s, a.id)) && (!used.has(s.id) || s.id === e?.seanceId)).sort((p, q) => p.date.localeCompare(q.date));
+  const sess = S.seances.filter((s) => s.date.slice(0, 7) === `${y}-${mm}` && dansSeance(a, s) && ((s.presents || []).includes(a.id) || hasSuivi(s, a.id)) && (!used.has(s.id) || s.id === e?.seanceId)).sort((p, q) => p.date.localeCompare(q.date));
   sheet(e ? "Modifier la séance du carnet" : "Nouvelle séance du carnet", `
     ${sess.length && !e ? `<label class="f" for="ce-from">Préremplir depuis une séance du club<select id="ce-from"><option value="">Non</option>${sess.map((s) => `<option value="${s.id}">${esc(dObj(s.date).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" }))} · ${esc(s.theme || "Entraînement")}</option>`).join("")}</select></label>` : ""}
     <input type="hidden" name="seanceId" id="ce-sid" value="${esc(e?.seanceId || "")}">
@@ -5119,7 +5138,7 @@ const pubLab = (p) => (PUBLICS.find(([k]) => k === (p || "")) || PUBLICS[0])[1];
 const guessPublic = (g) => (/jeune|enfant|ado|poussin|benjamin|minime|cadet|u1\d/i.test(g || "") ? "jeunes" : /adulte|senior|loisir/i.test(g || "") ? "adultes" : "tous");
 // jeune = 17 ans ou moins dans la saison de la séance (U18 et moins), même règle que dans l'espace archer
 const jeuneAt = (a, date) => (a?.naissance ? saisonOfDate(date) - Number(a.naissance.slice(0, 4)) <= 17 : null);
-const concerne = (s, a) => (a.clubIds || []).includes(s.clubId) && a.actif !== false && (s.public === "tous" || ["encadrant", "les-deux"].includes(roleOf(a)) || jeuneAt(a, s.date) == null || jeuneAt(a, s.date) === (s.public === "jeunes"));
+const concerne = (s, a) => dansSeance(a, s) && a.actif !== false && (s.public === "tous" || ["encadrant", "les-deux"].includes(roleOf(a)) || jeuneAt(a, s.date) == null || jeuneAt(a, s.date) === (s.public === "jeunes"));
 const repsOf = (sid) => S.reponses.filter((r) => r.seanceId === sid && S.archers.some((a) => a.id === r.archerId));
 const clubsLab = (ids) => (!ids || !ids.length || ids.includes("*") ? "Tous les clubs" : ids.map(clubName).join(", "));
 const addDaysISO = (iso, n) => { const d = dObj(iso); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
@@ -7083,6 +7102,7 @@ function formClub(c = null) {
     <label class="f" for="f-lieu">Lieu d'entraînement<input type="text" id="f-lieu" name="lieu" value="${esc(c?.lieu)}" placeholder="Ex. Gymnase municipal"></label>
     <label class="f" for="f-cper">Période en cours<select id="f-cper" name="periodeId">${periodOptions(c?.periodeId)}</select></label>
     <div class="f">Fédération(s)<div class="checks">${FEDS.map((f) => `<label><input type="checkbox" name="fed" value="${f}" ${(c?.federations || []).includes(f) ? "checked" : ""}>${f}</label>`).join("")}</div></div>
+    <label class="checks"><label><input type="checkbox" name="stage" ${c?.stage ? "checked" : ""}> Club de stages et d'interventions : inviter dans ses séances des archers d'autres clubs</label></label>
     <div class="f">Créneaux d'entraînement<div class="cren-list" id="cren-list"></div>
       <div><button type="button" class="btn" id="cren-add">+ Ajouter un créneau</button></div></div>
     <div class="f" style="display:grid;gap:6px;font-size:.85rem;font-weight:600;color:var(--muted)">Couleur du club <span class="tirline" id="sw-name" style="font-weight:500">${esc((PALETTE.find(([c]) => c === color) || [, "Couleur personnalisée"])[1])}</span><div class="swatches" id="sw">${PALETTE.map(([x, n]) => { const used = S.clubs.some((k) => k.couleur === x && k.id !== c?.id); return `<button type="button" aria-label="${n}${used ? " (déjà utilisée)" : ""}" title="${n}${used ? " · déjà utilisée par un club" : ""}" data-col="${x}" data-name="${n}" class="${used ? "used" : ""}" style="background:${x}" aria-pressed="${x === color}"></button>`; }).join("")}
@@ -7094,7 +7114,7 @@ function formClub(c = null) {
         const cr = [...document.querySelectorAll("#cren-list .cren")].map((r) => ({
           jour: r.querySelector(".j").value, debut: r.querySelector(".d").value, fin: r.querySelector(".fi").value, groupe: r.querySelector(".g").value.trim(),
         })).filter((k) => k.jour || k.debut || k.groupe);
-        const data = { nom, lieu: fd.get("lieu").trim(), federations: fd.getAll("fed"), creneaux: cr, periodeId: fd.get("periodeId") || null, couleur: color, createdAt: c?.createdAt || Date.now() };
+        const data = { nom, lieu: fd.get("lieu").trim(), federations: fd.getAll("fed"), creneaux: cr, periodeId: fd.get("periodeId") || null, couleur: color, stage: !!fd.get("stage"), createdAt: c?.createdAt || Date.now() };
         const id = c?.id || newId("clubs"); save("clubs", id, data); toast(c ? "Club enregistré" : "Club créé");
       },
       onDelete: c ? () => {
@@ -7315,6 +7335,7 @@ document.addEventListener("click", (e) => {
   if (t.dataset.cosaison) { S.coSaison = (S.coSaison || saisonYear()) + Number(t.dataset.cosaison); render(); return; }
   if (t.dataset.cocombo) { S.coCombo = t.dataset.cocombo; render(); return; }
   if (t.dataset.cofed != null) { LS.set("co-fed", t.dataset.cofed); render(); return; }
+  if (t.dataset.act === "inviter") { const s = S.seances.find((x) => x.id === S.seance); if (s) formInviter(s); return; }
   if (t.dataset.act === "new-concours") { formConcours(); return; }
   if (t.dataset.act === "edit-concours") { formConcours(S.concours.find((x) => x.id === S.concoursId)); return; }
   if (t.dataset.act === "co-inscrire") { formInscrire(); return; }
@@ -7521,7 +7542,7 @@ document.addEventListener("click", (e) => {
   }
   if (a === "all-present" || a === "none-present") {
     const s = S.seances.find((x) => x.id === S.seance); if (!s) return;
-    const presents = a === "all-present" ? [...new Set([...(s.presents || []).filter((id) => roleOf(S.archers.find((x) => x.id === id)) === "encadrant"), ...S.archers.filter((x) => (x.clubIds || []).includes(s.clubId) && x.actif !== false && tire(x)).map((x) => x.id)])] : [];
+    const presents = a === "all-present" ? [...new Set([...(s.presents || []).filter((id) => roleOf(S.archers.find((x) => x.id === id)) === "encadrant"), ...S.archers.filter((x) => dansSeance(x, s) && x.actif !== false && tire(x)).map((x) => x.id)])] : [];
     s.presents = presents; render(); patch("seances", s.id, { presents });
   }
 });
