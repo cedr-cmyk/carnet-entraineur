@@ -152,6 +152,7 @@
   }
   function write(col, id, op, data) {
     if (enc && !encPeut(col, id, op === "del" ? null : data)) { avertir("Ton accès ne permet pas de modifier ceci."); return Promise.resolve(); }
+    if (enc && col === "concours" && op !== "del" && data && !data.creePar && !cache.concours?.[id]) data = { ...data, creePar: session.user.id }; // concours créé par l'encadrant : il le garde visible
     cache[col] = cache[col] || {};
     if (op === "del") delete cache[col][id]; else cache[col][id] = data;
     pending[col + "|" + id] = { op, data }; persist(); notify(col);

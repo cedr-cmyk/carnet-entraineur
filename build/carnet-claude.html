@@ -2425,7 +2425,7 @@ const encDroits = () => ENC()?.droits || {};
 function tabOk(k) {
   if (!ENC()) return true;
   const d = encDroits(), voirS = ["voir", "noter"].includes(d.seances), voirA = ["voir", "modifier"].includes(d.archers);
-  return { accueil: true, seances: voirS, archers: voirA || voirS, exos: true, concours: voirA || ["voir", "gerer"].includes(d.concours), parametres: true }[k] || false;
+  return { accueil: true, seances: voirS, archers: voirA || voirS, exos: true, concours: ["voir", "gerer"].includes(d.concours), parametres: true }[k] || false;
 }
 // ce que l'encadrant peut modifier sur l'écran ouvert (null = pas encadrant)
 function encEcrit() {
@@ -6187,7 +6187,8 @@ function viewDeplacer(subs, docs) {
 }
 function viewFichiers() {
   if (S.folder && !S.dossiers.some((d) => d.id === S.folder)) S.folder = null;
-  const path = folderPath(S.folder), subs = subFolders(S.folder), docs = docsIn(S.folder);
+  // encadrant : seuls les dossiers qui contiennent des documents qu'il peut voir
+  const path = folderPath(S.folder), subs = subFolders(S.folder).filter((f) => !ENC() || [f.id, ...descendants(f.id)].some((id) => docsIn(id).length)), docs = docsIn(S.folder);
   const crumbs = `<nav class="crumbs" aria-label="Dossier">${S.folder ? `<button data-folder="">Documents</button>` : `<b>Documents</b>`}
     ${path.map((f, i) => `<span>›</span>${i === path.length - 1 ? `<b>${esc(f.nom)}</b>` : `<button data-folder="${f.id}">${esc(f.nom)}</button>`}`).join("")}</nav>`;
   if (S.canWrite && S.moveSel) return crumbs + viewDeplacer(subs, docs);
