@@ -1,4 +1,4 @@
-<title>Carnet de l'entraîneur</title>
+<title>Carnet d'entraînement</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap">
@@ -840,7 +840,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
   <div class="top-in">
     <div class="brand">
       <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><path d="M21 3l-8 8M17 3h4v4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-      <h1>Carnet <em>de l'entraîneur</em></h1>
+      <h1>Carnet <em>d'entraînement</em></h1>
       <span class="sub" id="sync">Connexion…</span>
       <button type="button" class="btn top-chrono" data-act="chrono" aria-label="Ouvrir le chrono d'entraînement">⏱<span class="tc-l"> Chrono</span></button>
     </div>
@@ -853,7 +853,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
 <div id="toast" class="toast" hidden></div>
 <input type="file" id="file-in" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.mp4,.webm,.txt,.md,.csv,application/pdf,image/*,video/mp4,video/webm,text/plain,text/markdown,text/csv">
 
-<script>window.CARNET_VERSION = { v: "1.9.79", date: "2026-11-16", site: "1.9.79", test: false };</script>
+<script>window.CARNET_VERSION = { v: "1.9.80", date: "2026-11-18", site: "1.9.80", test: false };</script>
 <script>
 // Espace archer : l'archer (ou son parent) voit uniquement ses propres informations,
 // telles que les renvoie la base (fonction espace_archer), et remplit son carnet.
@@ -5787,7 +5787,7 @@ function applyDisplay() {
 }
 // thème affiché : l'aperçu en cours sur cet appareil, sinon celui des dates de diffusion
 const feteActive = () => (S.feteApercu != null ? S.feteApercu : feteDuJour(prm().fetes));
-function applyParams() { const n = prm().nom; const h = document.querySelector(".brand h1"); if (h) h.innerHTML = n ? `Carnet <em>de ${esc(n)}</em>` : `Carnet <em>de l'entraîneur</em>`; }
+function applyParams() { const n = prm().nom; const h = document.querySelector(".brand h1"); if (h) h.innerHTML = n ? `Carnet <em>de ${esc(n)}</em>` : `Carnet <em>d'entraînement</em>`; }
 const radioRow = (name, cur, opts, attr = "data-disp") => `<div class="radio">${opts.map(([v, l]) => `<label><input type="radio" name="${name}" ${attr}="${name}" value="${v}" ${String(cur) === String(v) ? "checked" : ""}> ${l}</label>`).join("")}</div>`;
 const MOIS_C = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
 const mdLab = (md) => `${Number(md.slice(3))}${md.slice(3) === "01" ? "er" : ""} ${MOIS_C[Number(md.slice(0, 2)) - 1]}`;

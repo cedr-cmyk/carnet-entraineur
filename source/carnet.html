@@ -844,7 +844,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
   <div class="top-in">
     <div class="brand">
       <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><path d="M21 3l-8 8M17 3h4v4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-      <h1>Carnet <em>de l'entraîneur</em></h1>
+      <h1>Carnet <em>d'entraînement</em></h1>
       <span class="sub" id="sync">Connexion…</span>
       <button type="button" class="btn top-chrono" data-act="chrono" aria-label="Ouvrir le chrono d'entraînement">⏱<span class="tc-l"> Chrono</span></button>
     </div>
@@ -5009,7 +5009,7 @@ function applyDisplay() {
 }
 // thème affiché : l'aperçu en cours sur cet appareil, sinon celui des dates de diffusion
 const feteActive = () => (S.feteApercu != null ? S.feteApercu : feteDuJour(prm().fetes));
-function applyParams() { const n = prm().nom; const h = document.querySelector(".brand h1"); if (h) h.innerHTML = n ? `Carnet <em>de ${esc(n)}</em>` : `Carnet <em>de l'entraîneur</em>`; }
+function applyParams() { const n = prm().nom; const h = document.querySelector(".brand h1"); if (h) h.innerHTML = n ? `Carnet <em>de ${esc(n)}</em>` : `Carnet <em>d'entraînement</em>`; }
 const radioRow = (name, cur, opts, attr = "data-disp") => `<div class="radio">${opts.map(([v, l]) => `<label><input type="radio" name="${name}" ${attr}="${name}" value="${v}" ${String(cur) === String(v) ? "checked" : ""}> ${l}</label>`).join("")}</div>`;
 const MOIS_C = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
 const mdLab = (md) => `${Number(md.slice(3))}${md.slice(3) === "01" ? "er" : ""} ${MOIS_C[Number(md.slice(0, 2)) - 1]}`;
