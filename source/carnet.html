@@ -5184,7 +5184,10 @@ function applyDisplay() {
 }
 // thème affiché : l'aperçu en cours sur cet appareil, sinon celui des dates de diffusion
 const feteActive = () => (S.feteApercu != null ? S.feteApercu : feteDuJour(prm().fetes));
-function applyParams() { const n = prm().nom; const h = document.querySelector(".brand h1"); if (h) h.innerHTML = n ? `Carnet <em>de ${esc(n)}</em>` : `Carnet <em>d'entraînement</em>`; }
+function applyParams() { const n = prm().nom; const h = document.querySelector(".brand h1"); if (!h) return;
+  // encadrant : le titre montre ses clubs (pas le nom de l'entraîneur), pour qu'on voie tout de suite dans quel carnet on est
+  if (ENC()) { const cl = S.clubs.map((c) => c.nom).join(" · "); h.innerHTML = `Carnet <em>${esc(cl || "encadrant")}</em>`; return; }
+  h.innerHTML = n ? `Carnet <em>de ${esc(n)}</em>` : `Carnet <em>d'entraînement</em>`; }
 const radioRow = (name, cur, opts, attr = "data-disp") => `<div class="radio">${opts.map(([v, l]) => `<label><input type="radio" name="${name}" ${attr}="${name}" value="${v}" ${String(cur) === String(v) ? "checked" : ""}> ${l}</label>`).join("")}</div>`;
 const MOIS_C = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
 const mdLab = (md) => `${Number(md.slice(3))}${md.slice(3) === "01" ? "er" : ""} ${MOIS_C[Number(md.slice(0, 2)) - 1]}`;
@@ -6406,7 +6409,7 @@ function subscribe(col) {
   S.db.collection(col).onSnapshot((snap) => {
     S[col] = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     if (col === "clubs") S.clubs.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-    if (col === "parametres") applyParams();
+    if (col === "parametres" || col === "clubs") applyParams();
     S.loaded[col] = true;
     $("#sync").textContent = snap.metadata.fromCache ? "Hors ligne · copie locale" : "Synchronisé";
     if (isTyping() || $("#sheet").innerHTML) { S.stale = true; renderTabs(); return; }
