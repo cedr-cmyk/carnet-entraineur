@@ -370,7 +370,9 @@
           <h2 style="margin:.4em 0">Ton accès encadrant</h2><p>Ton accès ${enc.entraineur ? "au carnet de " + String(enc.entraineur).replace(/[<>&"]/g, "") : "encadrant"} est sur la nouvelle version du carnet.</p>
           <p><a href="${url}" style="display:inline-block;padding:14px 20px;border-radius:12px;background:#F59E0B;color:#0B0F19;font-weight:700;text-decoration:none">Ouvrir mon accès encadrant</a></p>
           <p style="font-size:.9rem;color:#94A3B8">Astuce : installe cette page (« Ajouter à l'écran d'accueil ») pour la retrouver facilement.</p>
-          <p><button id="enc-ici" style="background:none;border:1px solid #334155;color:#CBD5E1;border-radius:10px;padding:10px 14px;font:inherit">Rester ici (mon espace archer)</button></p></div>`;
+          <p><button id="enc-ici" style="background:none;border:1px solid #334155;color:#CBD5E1;border-radius:10px;padding:10px 14px;font:inherit">Rester ici (mon espace archer)</button></p>
+          <p><button id="enc-out" style="background:none;border:0;color:#94A3B8;text-decoration:underline;font:inherit">Se déconnecter</button></p></div>`;
+        document.getElementById("enc-out").onclick = () => window.carnetLogout();
         document.getElementById("enc-ici").onclick = () => { try { sessionStorage.setItem("enc-ici", "1"); } catch (e) { /* rien */ } location.reload(); };
         return new Promise(() => {});
       }
@@ -389,7 +391,8 @@
       catch (e) { console.warn("hors connexion : copie locale", e); online = false; horsLigne(true); pull().then(() => { startRealtime(); horsLigne(false); }).catch(() => {}); }
     } else horsLigne(true);
   })();
-  window.carnetLogout = async () => { try { await flush(); } catch (e) {} if (Object.keys(pending).length && !confirm("Des modifications ne sont pas encore envoyées (pas de réseau). Se déconnecter quand même ?")) return; await sb.auth.signOut(); ["cache", "uid", "coach", "pending", "mode", "ar-acces"].forEach((k) => localStorage.removeItem(LSK(k))); location.reload(); };
+  // déconnexion : ne bloque jamais (envoi en attente limité à 5 s, déconnexion locale même sans réseau)
+  window.carnetLogout = async () => { try { await withTimeout(flush(), 5000); } catch (e) {} if (Object.keys(pending).length && !confirm("Des modifications ne sont pas encore envoyées (pas de réseau). Se déconnecter quand même ?")) return; try { await withTimeout(sb.auth.signOut({ scope: "local" }), 4000); } catch (e) { /* on efface quand même la session */ } try { Object.keys(localStorage).filter((k) => /^sb-.*-auth-token$/.test(k) || k === "essai19-auth").forEach((k) => localStorage.removeItem(k)); } catch (e) {} ["cache", "uid", "coach", "pending", "mode", "ar-acces"].forEach((k) => localStorage.removeItem(LSK(k))); try { sessionStorage.clear(); } catch (e) {} location.reload(); };
   window.claude = {
     use: async (name) => {
       await ready;
