@@ -2445,13 +2445,14 @@ const encDroits = () => ENC()?.droits || {};
 function tabOk(k) {
   if (!ENC()) return true;
   const d = encDroits(), voirS = ["voir", "noter"].includes(d.seances), voirA = ["voir", "modifier"].includes(d.archers);
-  return { accueil: true, seances: voirS, archers: voirA || voirS, exos: true, concours: voirA, parametres: true }[k] || false;
+  return { accueil: true, seances: voirS, archers: voirA || voirS, exos: true, concours: voirA || ["voir", "gerer"].includes(d.concours), parametres: true }[k] || false;
 }
 // ce que l'encadrant peut modifier sur l'écran ouvert (null = pas encadrant)
 function encEcrit() {
   if (!ENC()) return null;
   const d = encDroits();
   if (S.seance || S.tab === "seances") return d.seances === "noter";
+  if (S.tab === "concours") return d.concours === "gerer";
   if (S.evaluation) return d.archers === "modifier" || d.seances === "noter";
   if (S.archer || S.carnet || S.tab === "archers") return d.archers === "modifier";
   return false;
@@ -6569,8 +6570,11 @@ function viewParamEnc() {
     <div class="card"><p style="margin:0">Tu es connecté au carnet de <b>${esc(ent)}</b>${e.nom ? ` en tant que <b>${esc(e.nom)}</b>` : ""}, avec un accès encadrant / animateur.</p>
       <div class="hub-mini"><div><span>Clubs</span><b>${esc(S.clubs.map((c) => c.nom).join(", ") || "aucun")}</b></div>
         <div><span>Séances et présences</span><b>${esc(lib[d.seances || "non"])}</b></div>
-        <div><span>Fiches des archers</span><b>${esc(lib[d.archers || "non"])}</b></div></div>
+        <div><span>Fiches des archers</span><b>${esc(lib[d.archers || "non"])}</b></div>
+        <div><span>Concours</span><b>${esc({ non: "pas d'accès", voir: "consulter", gerer: "créer et gérer" }[d.concours || "non"])}</b></div></div>
       <span class="tirline">C'est ${esc(ent)} qui choisit ces droits. Pour les changer, demande-lui.</span></div>
+    ${(() => { if (!window.carnetAcces?.moi) return ""; if (monAcces === null) { monAcces = []; chargerMonAcces(); }
+      return monAcces.length ? `<h2 class="sec">Mon espace archer</h2><div class="card"><span class="tirline">Ton compte est aussi relié à ${esc(monAcces.map((x) => [x.prenom, x.nom].filter(Boolean).join(" ")).join(", "))}. Tu passes d'un mode à l'autre sur cet appareil.</span><div class="bar"><button class="btn primary" data-act="mode-archer">🏹 Ouvrir mon espace archer</button></div></div>` : ""; })()}
     ${window.carnetLogout ? `<div class="card"><div class="bar"><span class="tirline">Connecté sur cet appareil.</span><span class="grow"></span><button class="btn" data-act="logout">Se déconnecter</button></div></div>` : ""}
     <h2 class="sec">Affichage sur cet appareil</h2>
     <div class="card">
@@ -6684,6 +6688,7 @@ async function chargerEnc(force = false) {
 }
 const ENC_SEANCES = [["non", "Pas d'accès"], ["voir", "Consulter"], ["noter", "Consulter, faire l'appel et noter"]];
 const ENC_ARCHERS = [["non", "Pas d'accès"], ["voir", "Consulter"], ["modifier", "Consulter et modifier"]];
+const ENC_CONCOURS = [["non", "Pas d'accès"], ["voir", "Consulter"], ["gerer", "Créer et gérer"]];
 const encLib = (l, v) => (l.find(([k]) => k === (v || "non")) || l[0])[1];
 function accesCard() {
   if (!encListe) { chargerEnc(); return `<p class="notice">Chargement des accès…</p>`; }
@@ -6693,7 +6698,7 @@ function accesCard() {
     const cl = (e.droits?.clubs || []).map(clubName).filter(Boolean).join(", ") || "aucun club";
     return `<button class="row" data-enc-edit="${esc(e.email)}"><span class="main"><span class="t">${esc(e.nom || e.email)} ${statut(e)}</span>
       <span class="m">${esc(e.email)}${e.vu_le ? " · dernière ouverture le " + esc(new Date(e.vu_le).toLocaleDateString("fr-FR")) : e.uid ? "" : " · compte pas encore ouvert"}</span>
-      <span class="m">${esc(cl)} · séances : ${esc(encLib(ENC_SEANCES, e.droits?.seances).toLowerCase())} · fiches archers : ${esc(encLib(ENC_ARCHERS, e.droits?.archers).toLowerCase())}</span></span><span class="count" aria-hidden="true">›</span></button>`;
+      <span class="m">${esc(cl)} · séances : ${esc(encLib(ENC_SEANCES, e.droits?.seances).toLowerCase())} · fiches archers : ${esc(encLib(ENC_ARCHERS, e.droits?.archers).toLowerCase())} · concours : ${esc(encLib(ENC_CONCOURS, e.droits?.concours).toLowerCase())}</span></span><span class="count" aria-hidden="true">›</span></button>`;
   };
   return `<h2 class="sec">Qui a accès à ton carnet</h2>
     <div class="list"><div class="row"><span class="main"><span class="t">${esc(prm().nom || "Toi")} <span class="tag ar-app">Entraîneur</span></span><span class="m">Accès complet : tous les clubs, tous les réglages</span></span></div>
@@ -6710,10 +6715,11 @@ function formEncadrant(e = null) {
     <div class="f">Clubs auxquels il a accès<div class="checks">${S.clubs.map((c) => `<label><input type="checkbox" name="club" value="${c.id}" ${(d.clubs || []).includes(c.id) ? "checked" : ""}>${esc(c.nom)}</label>`).join("")}</div></div>
     <div class="f">Séances et présences${radios("seances", ENC_SEANCES, d.seances)}</div>
     <div class="f">Fiches des archers (suivi, tirs, évaluations)${radios("archers", ENC_ARCHERS, d.archers)}</div>
+    <div class="f">Concours${radios("concours", ENC_CONCOURS, d.concours)}<span class="tirline">« Créer et gérer » : il ajoute des concours, y inscrit les archers de ses clubs et note leurs résultats.</span></div>
     <label class="checks"><label><input type="checkbox" name="actif" ${e?.actif === false ? "" : "checked"}>Accès actif (décoche pour le suspendre)</label></label>
     <span class="tirline">Pour faire l'appel et noter une séance, il voit la liste des archers des clubs choisis.</span>`, {
     onSave(fd) {
-      const droits = { clubs: fd.getAll("club"), seances: fd.get("seances") || "non", archers: fd.get("archers") || "non" };
+      const droits = { clubs: fd.getAll("club"), seances: fd.get("seances") || "non", archers: fd.get("archers") || "non", concours: fd.get("concours") || "non" };
       if (!droits.clubs.length) { toast("Choisis au moins un club"); return false; }
       const btn = $("#sheet-form [type=submit]"); if (btn) btn.disabled = true;
       window.carnetEncadrants.enregistrer({ email: fd.get("email"), nom: fd.get("nom"), droits, actif: fd.get("actif") === "on" }, e?.email)

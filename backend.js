@@ -147,6 +147,7 @@
     if (col === "archers") return a === "modifier" && (data.clubIds || []).some((c) => cl.includes(c));
     if (col === "carnetEntrees" || col === "evaluations") return (a === "modifier" || s === "noter") && archerOk(data.archerId);
     if (col === "carnets" || col === "attributions") return a === "modifier" && archerOk(data.archerId);
+    if (col === "concours") return d.concours === "gerer";
     return false;
   }
   function write(col, id, op, data) {
