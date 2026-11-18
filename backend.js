@@ -414,7 +414,8 @@
       catch (e) { console.warn("hors connexion : copie locale", e); online = false; horsLigne(true); pull().then(() => { startRealtime(); horsLigne(false); }).catch(() => {}); }
     } else horsLigne(true);
   })();
-  window.carnetLogout = async () => { try { await flush(); } catch (e) {} if (Object.keys(pending).length && !confirm("Des modifications ne sont pas encore envoyées (pas de réseau). Se déconnecter quand même ?")) return; await sb.auth.signOut(); ["cache", "uid", "coach", "pending", "mode", "ar-acces", "enc"].forEach((k) => localStorage.removeItem(LSK(k))); location.reload(); };
+  // déconnexion : ne bloque jamais (envoi en attente limité à 5 s, déconnexion locale même sans réseau)
+  window.carnetLogout = async () => { try { await withTimeout(flush(), 5000); } catch (e) {} if (Object.keys(pending).length && !confirm("Des modifications ne sont pas encore envoyées (pas de réseau). Se déconnecter quand même ?")) return; try { await withTimeout(sb.auth.signOut({ scope: "local" }), 4000); } catch (e) { /* on efface quand même la session */ } try { Object.keys(localStorage).filter((k) => /^sb-.*-auth-token$/.test(k) || k === "essai19-auth").forEach((k) => localStorage.removeItem(k)); } catch (e) {} ["cache", "uid", "coach", "pending", "mode", "ar-acces", "enc"].forEach((k) => localStorage.removeItem(LSK(k))); try { sessionStorage.clear(); } catch (e) {} location.reload(); };
   window.claude = {
     use: async (name) => {
       await ready;
