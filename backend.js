@@ -1,4 +1,4 @@
-// Carnet de l'entraîneur — version installée
+// Carnet d'entraînement — version installée
 // Remplace les services fournis par Claude (données, fichiers, téléchargements, compte) par Supabase,
 // avec une copie locale pour travailler hors connexion : les modifications partent dès que le réseau revient.
 (() => {
@@ -73,7 +73,7 @@
     return new Promise((resolve) => {
       const el = document.createElement("div"); el.id = "login";
       el.innerHTML = `<form class="sheet" style="position:fixed;inset:auto 0 0 0;margin:auto;top:0;height:fit-content;max-width:420px;border-radius:24px;z-index:50">
-        <h3>Carnet de l'entraîneur</h3>
+        <h3>Carnet d'entraînement</h3>
         <p class="notice">Connecte-toi pour retrouver ton carnet sur cet appareil.${msg ? "<br><b>" + msg + "</b>" : ""}</p>
         <label class="f">E-mail<input type="email" name="email" required autocomplete="username"></label>
         <label class="f">Mot de passe<input type="password" name="pw" required minlength="6" autocomplete="current-password"></label>
