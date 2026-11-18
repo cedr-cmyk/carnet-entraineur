@@ -359,21 +359,37 @@
       try { coach = await withTimeout(rpc("est_coach"), 4000); ls.set("coach", coach); } catch (e) { console.warn(e); if (netErr(e)) net = false; }
     }
     if (coach === null && !net) return besoinReseau("Pas de réseau. La première ouverture du carnet a besoin d'internet.");
-    // V.1.9.81 : un compte encadrant (accès donné dans la version de test 1.10) est envoyé vers la version de test
+    // V.1.9.83 : compte encadrant (accès donné dans la version de test 1.10).
+    // S'il est aussi relié à une fiche archer, il reste ici dans son espace archer, avec un petit bandeau vers son accès encadrant ;
+    // sinon, un écran l'envoie vers la version de test.
     if (coach === false && net) {
-      let enc = null; try { if (sessionStorage.getItem("enc-ici") !== "1") enc = await withTimeout(rpc("mon_encadrement"), 4000); } catch (e) { enc = null; }
-      if (enc) {
+      let enc = null, aussiArcher = false;
+      try { enc = await withTimeout(rpc("mon_encadrement"), 4000); } catch (e) { enc = null; }
+      if (enc) { try { aussiArcher = ((await withTimeout(rpc("mes_acces"), 4000)) || []).length > 0; } catch (e) { aussiArcher = false; } }
+      const url = "https://cedr-cmyk.github.io/carnet-essai/";
+      if (enc && aussiArcher) {
+        let ferme = false; try { ferme = sessionStorage.getItem("enc-bandeau") === "non"; } catch (e) { /* rien */ }
+        if (!ferme) (async () => {
+          await domReady();
+          const poser = () => {
+            if (document.getElementById("enc-bandeau")) return;
+            const b = document.createElement("div"); b.id = "enc-bandeau";
+            b.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:60;display:flex;gap:10px;align-items:center;background:#0F172A;color:#E5E7EB;border:1px solid #F59E0B;border-radius:12px;padding:8px 12px;font:14px system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.4);max-width:calc(100% - 24px)";
+            b.innerHTML = `<span>🎯 Accès encadrant : il s'ouvre sur la version 1.10</span><a href="${url}" style="color:#0B0F19;background:#F59E0B;border-radius:8px;padding:6px 10px;font-weight:700;text-decoration:none;white-space:nowrap">Ouvrir</a><button aria-label="Masquer" style="background:none;border:0;color:#94A3B8;font-size:18px;cursor:pointer">✕</button>`;
+            b.querySelector("button").onclick = () => { try { sessionStorage.setItem("enc-bandeau", "non"); } catch (e) { /* rien */ } b.remove(); clearInterval(h); };
+            document.body.appendChild(b);
+          };
+          poser(); const h = setInterval(() => { try { if (sessionStorage.getItem("enc-bandeau") === "non") return clearInterval(h); } catch (e) { /* rien */ } poser(); }, 1500);
+        })();
+      } else if (enc) {
         await domReady();
-        const url = "https://cedr-cmyk.github.io/carnet-essai/";
         document.body.style.background = "#0B0F19";
         document.body.innerHTML = `<div style="max-width:440px;margin:40px auto;padding:20px;font:1rem/1.5 system-ui,sans-serif;color:#E5E7EB;text-align:center"><p style="font-size:2rem;margin:0">🎯</p>
           <h2 style="margin:.4em 0">Ton accès encadrant</h2><p>Ton accès ${enc.entraineur ? "au carnet de " + String(enc.entraineur).replace(/[<>&"]/g, "") : "encadrant"} est sur la nouvelle version du carnet.</p>
           <p><a href="${url}" style="display:inline-block;padding:14px 20px;border-radius:12px;background:#F59E0B;color:#0B0F19;font-weight:700;text-decoration:none">Ouvrir mon accès encadrant</a></p>
           <p style="font-size:.9rem;color:#94A3B8">Astuce : installe cette page (« Ajouter à l'écran d'accueil ») pour la retrouver facilement.</p>
-          <p><button id="enc-ici" style="background:none;border:1px solid #334155;color:#CBD5E1;border-radius:10px;padding:10px 14px;font:inherit">Rester ici (mon espace archer)</button></p>
           <p><button id="enc-out" style="background:none;border:0;color:#94A3B8;text-decoration:underline;font:inherit">Se déconnecter</button></p></div>`;
         document.getElementById("enc-out").onclick = () => window.carnetLogout();
-        document.getElementById("enc-ici").onclick = () => { try { sessionStorage.setItem("enc-ici", "1"); } catch (e) { /* rien */ } location.reload(); };
         return new Promise(() => {});
       }
     }
