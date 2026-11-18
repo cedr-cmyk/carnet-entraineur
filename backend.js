@@ -44,6 +44,9 @@
 
   // ---------- Écran de connexion ----------
   let session = null;
+  // V.1.10 : encadrant ou animateur qui travaille dans le carnet d'un entraîneur (script 10) : { owner, nom, droits, entraineur }
+  let enc = ls.get("enc", null);
+  const ownerId = () => (enc ? enc.owner : session.user.id);
   const domReady = () => new Promise((r) => (document.body ? r() : document.addEventListener("DOMContentLoaded", r, { once: true })));
 
   // ---------- V.1.7.3 : Samsung Internet ----------
@@ -119,18 +122,37 @@
   let flushing = null;
   async function flush() {
     if (flushing || !session || session.offline) return flushing;
+    let refus = 0;
     flushing = (async () => {
       for (const key of Object.keys(pending)) {
         const [col, id] = key.split("|"), p = pending[key];
-        const r = p.op === "del" ? await sb.from("docs").delete().eq("col", col).eq("id", id) : await sb.from("docs").upsert({ owner: session.user.id, col, id, data: p.data, updated_at: new Date().toISOString() });
+        const r = p.op === "del" ? await sb.from("docs").delete().eq("owner", ownerId()).eq("col", col).eq("id", id) : await sb.from("docs").upsert({ owner: ownerId(), col, id, data: p.data, updated_at: new Date().toISOString() });
+        // encadrant : modification refusée par Supabase (droit retiré entre-temps) → on l'abandonne au lieu de bloquer les suivantes
+        if (r.error && enc && (r.error.code === "42501" || /row-level security/i.test(r.error.message || ""))) { delete pending[key]; refus++; continue; }
         if (r.error) { online = false; console.warn("synchro en attente", r.error.message); break; }
         if (pending[key] === p) delete pending[key];
       }
       persist(); online = navigator.onLine;
+      if (refus) { avertir("Une modification n'a pas été enregistrée : ton accès ne le permet plus."); pull().catch(() => {}); }
     })().finally(() => { flushing = null; });
     return flushing;
   }
+  // Encadrant : mêmes règles que Supabase (script 10), vérifiées avant d'enregistrer sur l'appareil
+  const avertir = (t) => { const el = document.querySelector("#toast"); if (!el) return; el.textContent = t; el.hidden = false; clearTimeout(avertir.h); avertir.h = setTimeout(() => (el.hidden = true), 3500); };
+  function encPeut(col, id, data) {
+    const d = enc?.droits || {}, cl = Array.isArray(d.clubs) ? d.clubs : [], s = d.seances || "non", a = d.archers || "non";
+    const archerOk = (aid) => { const ar = cache.archers?.[aid]; return !!ar && (ar.clubIds || []).some((c) => cl.includes(c)); };
+    if (!data) data = cache[col]?.[id] || {};
+    if (col === "seances") return s === "noter" && cl.includes(data.clubId) && (!cache.seances?.[id] || cl.includes(cache.seances[id].clubId));
+    if (col === "archers") return a === "modifier" && (data.clubIds || []).some((c) => cl.includes(c));
+    if (col === "carnetEntrees" || col === "evaluations") return (a === "modifier" || s === "noter") && archerOk(data.archerId);
+    if (col === "carnets" || col === "attributions") return a === "modifier" && archerOk(data.archerId);
+    if (col === "concours") return d.concours === "gerer";
+    return false;
+  }
   function write(col, id, op, data) {
+    if (enc && !encPeut(col, id, op === "del" ? null : data)) { avertir("Ton accès ne permet pas de modifier ceci."); return Promise.resolve(); }
+    if (enc && col === "concours" && op !== "del" && data && !data.creePar && !cache.concours?.[id]) data = { ...data, creePar: session.user.id }; // concours créé par l'encadrant : il le garde visible
     cache[col] = cache[col] || {};
     if (op === "del") delete cache[col][id]; else cache[col][id] = data;
     pending[col + "|" + id] = { op, data }; persist(); notify(col);
@@ -159,7 +181,7 @@
   let rtOn = false;
   const startRealtime = () => { if (!rtOn) { rtOn = true; realtime(); } };
   async function reconnect() {
-    if (ls.get("coach", true) === false) return; // espace archer : bouton « Réessayer »
+    if (ls.get("coach", true) === false && !enc) return; // espace archer : bouton « Réessayer »
     try {
       if (!session || session.offline) { const r = await withTimeout(sb.auth.getSession(), 5000); if (!r?.data?.session) return; session = r.data.session; sb.auth.onAuthStateChange((_e, s) => { if (s) { session = s; tellSW(); } }); tellSW(); }
       await withTimeout(flush(), 10000); await withTimeout(pull(), 10000); startRealtime(); horsLigne(false);
@@ -201,7 +223,7 @@
     },
     async list() {
       const out = []; let offset = 0;
-      for (;;) { const r = await bucket().list(session.user.id, { limit: 1000, offset }); if (r.error) throw r.error; out.push(...r.data); if (r.data.length < 1000) break; offset += 1000; }
+      for (;;) { const r = await bucket().list(ownerId(), { limit: 1000, offset }); if (r.error) throw r.error; out.push(...r.data); if (r.data.length < 1000) break; offset += 1000; }
       const items = out.filter((x) => x.id).map((x) => ({ id: x.name, url: "_blob/" + x.name, contentType: x.metadata?.mimetype || "", sizeBytes: x.metadata?.size || 0, createdAt: x.created_at }));
       return { assets: items, usage: { files: items.length, bytes: items.reduce((n, x) => n + x.sizeBytes, 0), maxFiles: 5000, maxBytes: MAX_BYTES } };
     },
@@ -228,6 +250,20 @@
     if (!r.ok || d.erreur) { const e = new Error(d.message || "Erreur " + r.status); e.code = d.erreur || "erreur"; throw e; }
     if (["ajouter", "sync"].includes(action)) await pull().catch(() => {}); // les documents mis à jour par le serveur
     return d;
+  };
+
+  // ---------- Accès des encadrants (V.1.10, script 10) : gérés par l'entraîneur ----------
+  window.carnetEncadrants = {
+    async lister() { const r = await sb.from("encadrants").select("email,nom,droits,actif,uid,vu_le,created_at").eq("owner", session.user.id).order("nom"); if (r.error) throw r.error; return r.data; },
+    async enregistrer(e, ancien) {
+      const email = String(e.email || "").trim().toLowerCase();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("Adresse e-mail invalide");
+      if (ancien && ancien !== email) { const d = await sb.from("encadrants").delete().eq("owner", session.user.id).eq("email", ancien); if (d.error) throw d.error; }
+      const row = { owner: session.user.id, email, nom: String(e.nom || "").trim(), droits: e.droits || {}, actif: e.actif !== false };
+      const r = ancien === email ? await sb.from("encadrants").update(row).eq("owner", session.user.id).eq("email", email) : await sb.from("encadrants").insert(row);
+      if (r.error) throw new Error(/duplicate|23505/.test(r.error.message + r.error.code) ? "Cette adresse a déjà un accès" : r.error.message);
+    },
+    async supprimer(email) { const r = await sb.from("encadrants").delete().eq("owner", session.user.id).eq("email", email); if (r.error) throw r.error; },
   };
 
   // ---------- Téléchargements ----------
@@ -300,6 +336,7 @@
       mot: (a, id, action, texte) => rpc("archer_mot", { p_owner: a.owner, p_archer: a.archer_id, p_id: id, p_action: action, p_texte: texte || "" }),
       animEssai: (a, anim, jeu, essai, cible, compte) => rpc("archer_anim_essai", { p_owner: a.owner, p_archer: a.archer_id, p_anim: anim, p_jeu: jeu, p_essai: essai, p_cible: cible, p_compte: compte }),
       avatar: (a, v) => rpc("archer_avatar", { p_owner: a.owner, p_archer: a.archer_id, p_avatar: v }),
+      demander: (a, quoi) => rpc("archer_demander", { p_owner: a.owner, p_archer: a.archer_id, p_quoi: quoi }),
       fichiers: (a) => { filesOwner = a.owner; tellSW(); },
       ajouterCode: async (code) => { await rpc("utiliser_invitation", { p_code: code }); return rpc("mes_acces"); },
       deconnexion: () => window.carnetLogout(),
@@ -359,41 +396,11 @@
       try { coach = await withTimeout(rpc("est_coach"), 4000); ls.set("coach", coach); } catch (e) { console.warn(e); if (netErr(e)) net = false; }
     }
     if (coach === null && !net) return besoinReseau("Pas de réseau. La première ouverture du carnet a besoin d'internet.");
-    // V.1.9.83 : compte encadrant (accès donné dans la version de test 1.10).
-    // S'il est aussi relié à une fiche archer, il reste ici dans son espace archer, avec un petit bandeau vers son accès encadrant ;
-    // sinon, un écran l'envoie vers la version de test.
-    if (coach === false && net) {
-      let enc = null, aussiArcher = false;
-      try { enc = await withTimeout(rpc("mon_encadrement"), 4000); } catch (e) { enc = null; }
-      if (enc) { try { aussiArcher = ((await withTimeout(rpc("mes_acces"), 4000)) || []).length > 0; } catch (e) { aussiArcher = false; } }
-      const url = "https://cedr-cmyk.github.io/carnet-essai/";
-      if (enc && aussiArcher) {
-        let ferme = false; try { ferme = sessionStorage.getItem("enc-bandeau") === "non"; } catch (e) { /* rien */ }
-        if (!ferme) (async () => {
-          await domReady();
-          const poser = () => {
-            if (document.getElementById("enc-bandeau")) return;
-            const b = document.createElement("div"); b.id = "enc-bandeau";
-            b.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:60;display:flex;gap:10px;align-items:center;background:#0F172A;color:#E5E7EB;border:1px solid #F59E0B;border-radius:12px;padding:8px 12px;font:14px system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.4);max-width:calc(100% - 24px)";
-            b.innerHTML = `<span>🎯 Accès encadrant : il s'ouvre sur la version 1.10</span><a href="${url}" style="color:#0B0F19;background:#F59E0B;border-radius:8px;padding:6px 10px;font-weight:700;text-decoration:none;white-space:nowrap">Ouvrir</a><button aria-label="Masquer" style="background:none;border:0;color:#94A3B8;font-size:18px;cursor:pointer">✕</button>`;
-            b.querySelector("button").onclick = () => { try { sessionStorage.setItem("enc-bandeau", "non"); } catch (e) { /* rien */ } b.remove(); clearInterval(h); };
-            document.body.appendChild(b);
-          };
-          poser(); const h = setInterval(() => { try { if (sessionStorage.getItem("enc-bandeau") === "non") return clearInterval(h); } catch (e) { /* rien */ } poser(); }, 1500);
-        })();
-      } else if (enc) {
-        await domReady();
-        document.body.style.background = "#0B0F19";
-        document.body.innerHTML = `<div style="max-width:440px;margin:40px auto;padding:20px;font:1rem/1.5 system-ui,sans-serif;color:#E5E7EB;text-align:center"><p style="font-size:2rem;margin:0">🎯</p>
-          <h2 style="margin:.4em 0">Ton accès encadrant</h2><p>Ton accès ${enc.entraineur ? "au carnet de " + String(enc.entraineur).replace(/[<>&"]/g, "") : "encadrant"} est sur la nouvelle version du carnet.</p>
-          <p><a href="${url}" style="display:inline-block;padding:14px 20px;border-radius:12px;background:#F59E0B;color:#0B0F19;font-weight:700;text-decoration:none">Ouvrir mon accès encadrant</a></p>
-          <p style="font-size:.9rem;color:#94A3B8">Astuce : installe cette page (« Ajouter à l'écran d'accueil ») pour la retrouver facilement.</p>
-          <p><button id="enc-out" style="background:none;border:0;color:#94A3B8;text-decoration:underline;font:inherit">Se déconnecter</button></p></div>`;
-        document.getElementById("enc-out").onclick = () => window.carnetLogout();
-        return new Promise(() => {});
-      }
-    }
-    if (coach === false) { if (!session.offline) sb.auth.onAuthStateChange((_e, s) => { if (s) { session = s; tellSW(); } }); let maint = false; if (net) { try { maint = !!(await withTimeout(rpc("etat_maintenance"), 4000))?.actif; } catch (e) { /* script pas encore installé ou pas de réseau */ } } return archerMode(net, false, maint); }
+    // encadrant ou animateur (V.1.10) : il ouvre le carnet de son entraîneur, avec les droits choisis par celui-ci
+    if (coach === false && net) { try { enc = await withTimeout(rpc("mon_encadrement"), 4000); ls.set("enc", enc); } catch (e) { if (!netErr(e)) { enc = null; ls.set("enc", null); } } }
+    if (coach !== false) enc = null;
+    if (enc) { window.CARNET_ENCADRANT = enc; filesOwner = enc.owner; }
+    if (coach === false && !enc) { if (!session.offline) sb.auth.onAuthStateChange((_e, s) => { if (s) { session = s; tellSW(); } }); let maint = false; if (net) { try { maint = !!(await withTimeout(rpc("etat_maintenance"), 4000))?.actif; } catch (e) { /* script pas encore installé ou pas de réseau */ } } return archerMode(net, false, maint); }
     // entraîneur qui a choisi son espace archer (Paramètres › Général › Mon espace archer) ; adresse ?mode=coach = retour forcé en entraîneur
     if (/[?&]mode=coach\b/.test(location.search)) { ls.set("mode", "coach"); history.replaceState(null, "", location.pathname + location.hash); }
     if (ls.get("mode", "coach") === "archer") { if (!session.offline) sb.auth.onAuthStateChange((_e, s) => { if (s) { session = s; tellSW(); } }); let apercu = false; try { apercu = sessionStorage.getItem("apercu-maint") === "1"; } catch (e) { /* rien */ } return archerMode(net, true, apercu); }
@@ -408,11 +415,11 @@
     } else horsLigne(true);
   })();
   // déconnexion : ne bloque jamais (envoi en attente limité à 5 s, déconnexion locale même sans réseau)
-  window.carnetLogout = async () => { try { await withTimeout(flush(), 5000); } catch (e) {} if (Object.keys(pending).length && !confirm("Des modifications ne sont pas encore envoyées (pas de réseau). Se déconnecter quand même ?")) return; try { await withTimeout(sb.auth.signOut({ scope: "local" }), 4000); } catch (e) { /* on efface quand même la session */ } try { Object.keys(localStorage).filter((k) => /^sb-.*-auth-token$/.test(k) || k === "essai19-auth").forEach((k) => localStorage.removeItem(k)); } catch (e) {} ["cache", "uid", "coach", "pending", "mode", "ar-acces"].forEach((k) => localStorage.removeItem(LSK(k))); try { sessionStorage.clear(); } catch (e) {} location.reload(); };
+  window.carnetLogout = async () => { try { await withTimeout(flush(), 5000); } catch (e) {} if (Object.keys(pending).length && !confirm("Des modifications ne sont pas encore envoyées (pas de réseau). Se déconnecter quand même ?")) return; try { await withTimeout(sb.auth.signOut({ scope: "local" }), 4000); } catch (e) { /* on efface quand même la session */ } try { Object.keys(localStorage).filter((k) => /^sb-.*-auth-token$/.test(k) || k === "essai19-auth").forEach((k) => localStorage.removeItem(k)); } catch (e) {} ["cache", "uid", "coach", "pending", "mode", "ar-acces", "enc"].forEach((k) => localStorage.removeItem(LSK(k))); try { sessionStorage.clear(); } catch (e) {} location.reload(); };
   window.claude = {
     use: async (name) => {
       await ready;
-      return { db, assets: session.offline ? null : assets, downloads, user, sample: null }[name] ?? null;
+      return { db, assets: session.offline || enc ? null : assets, downloads, user, sample: null }[name] ?? null;
     },
   };
 })();
