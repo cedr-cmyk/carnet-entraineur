@@ -2269,6 +2269,7 @@ const fmtCDate = (c) => {
   if (!f) return d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "long" });
   return `${d.getDate()}${d.getMonth() === f.getMonth() ? "" : " " + d.toLocaleDateString("fr-FR", { month: "short" })} au ${f.toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}`;
 };
+const coFed = () => { const f = LS.get("co-fed", ""); return FEDS.includes(f) ? f : ""; };
 const cTags = (c) => [...(c.types || []).map((t) => `<span class="tag ctype ct-${t}">${typeLab(t)}${t === "exterieur" && c.tae === "nat" && c.federation !== "UFOLEP" ? " · dist. nationales" : ""}</span>`), c.niveau ? `<span class="tag cniv cn-${c.niveau}">${nivLab(c.niveau)}</span>` : "", c.federation ? `<span class="tag fed">${esc(c.federation)}</span>` : ""].join(" ");
 const cTitle = (c) => c.nom || c.lieu || "Concours";
 // Nombre de flèches habituel : 2×30 en salle, 2×36 en extérieur
@@ -2395,10 +2396,15 @@ const defFleches = (c) => ((c.types || []).includes("salle") ? "60" : (c.types |
 function viewConcoursList() {
   if (!S.coSaison && (prm().co || {}).saisonDefaut === "derniere") { const lc = S.concours.filter((c) => resOf(c).some(([, r]) => num(r.score) != null)).sort((a, b) => b.date.localeCompare(a.date))[0]; if (lc) S.coSaison = saisonOfDate(lc.date); }
   const end = S.coSaison || saisonYear(), key = (d) => saisonOfDate(d) === end, plier = (prm().co || {}).passesReplies === "oui";
-  const list = S.concours.filter((c) => key(c.date)).sort((a, b) => a.date.localeCompare(b.date));
+  const tous = S.concours.filter((c) => key(c.date)), fed = coFed();
+  // V.1.10 : concours séparés par fédération (un concours sans fédération apparaît des deux côtés)
+  const fedOk = (c) => !fed || !c.federation || c.federation === fed;
+  const list = tous.filter(fedOk).sort((a, b) => a.date.localeCompare(b.date));
   const today = todayISO();
   let h = `<div class="bar"><button class="btn" data-cosaison="-1" aria-label="Saison précédente">‹</button><b style="font-family:var(--font-display);font-size:1.3rem;font-weight:800">Saison ${end - 1}-${end}</b><button class="btn" data-cosaison="1" aria-label="Saison suivante">›</button><span class="grow"></span></div>`;
-  if (!list.length) return h + `<div class="empty"><h3>Aucun concours cette saison</h3><p>Ajoute les concours de ton calendrier pour y inscrire tes archers et noter leurs scores.</p>${S.canWrite ? `<button class="btn primary" data-act="new-concours">Ajouter un concours</button>` : ""}</div>`;
+  const feds = FEDS.filter((f) => tous.some((c) => c.federation === f) || S.archers.some((a) => (a.federations || []).includes(f)));
+  if (feds.length > 1) h += `<div class="seg-mode" role="group" aria-label="Fédération">${[["", "Toutes"], ...feds.map((f) => [f, f])].map(([k, l]) => `<button type="button" data-cofed="${k}" aria-pressed="${fed === k}">${l} <span class="n">${tous.filter((c) => !k || !c.federation || c.federation === k).length}</span></button>`).join("")}</div>`;
+  if (!list.length) return h + `<div class="empty"><h3>Aucun concours ${fed ? fed + " " : ""}cette saison</h3><p>Ajoute les concours de ton calendrier pour y inscrire tes archers et noter leurs scores.</p>${S.canWrite ? `<button class="btn primary" data-act="new-concours">Ajouter un concours</button>` : ""}</div>`;
   const next = list.find((c) => (c.dateFin || c.date) >= today);
   if (next) {
     const n = resOf(next).length;
@@ -2416,7 +2422,7 @@ function viewConcoursList() {
     h += `<h2 class="sec">${MOIS_NOM[m]} ${ym.slice(0, 4)}</h2><div class="list">${list.filter((c) => c.date.slice(0, 7) === ym).map((c) => {
       const past = (c.dateFin || c.date) < today, rs = resOf(c), done = rs.filter(([, r]) => num(r.score) != null).length;
       return `<button class="row ${past ? "past" : ""}" data-concours="${c.id}"><span class="date"><span class="d">${dObj(c.date).getDate()}${c.dateFin && c.dateFin !== c.date ? `<small>-${dObj(c.dateFin).getDate()}</small>` : ""}</span><span class="mo">${dObj(c.date).toLocaleDateString("fr-FR", { weekday: "short" }).replace(".", "")}</span></span>
-        <span class="main"><span class="t">${esc(cTitle(c))}</span><span class="m">${cTags(c)}</span></span>
+        <span class="main"><span class="t">${esc(cTitle(c))}</span><span class="m">${cTags(c)}${!coFed() && c.federation && !cTags(c).includes(c.federation) ? ` <span class="tag fed">${esc(c.federation)}</span>` : ""}</span></span>
         <span class="count">${rs.length ? (past ? `${done}<small>/${rs.length} scores</small>` : `${rs.length}<small> inscrit${rs.length > 1 ? "s" : ""}</small>`) : "<small>—</small>"}</span></button>`;
     }).join("")}</div>`;
   });
@@ -2485,7 +2491,7 @@ function formModele(m = null) {
 function formConcours(c = null) {
   const lieux = [...new Set(S.concours.map((x) => (x.lieu || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "fr"));
   const datalist = `<datalist id="co-lieux">${lieux.map((l) => `<option value="${esc(l)}"></option>`).join("")}</datalist>`;
-  const cd = prm().co || {}, dv = c || { types: cd.types || [], niveau: cd.niveau || "", federation: cd.federation || "", notes: cd.notes || "" };
+  const cd = prm().co || {}, dv = c || { types: cd.types || [], niveau: cd.niveau || "", federation: coFed() || cd.federation || "", notes: cd.notes || "" };
   const top = c ? `
     <div class="grid2"><label class="f" for="co-date">Date<input type="date" id="co-date" name="date" required value="${esc(c?.date || todayISO())}"></label>
       <label class="f" for="co-fin">Jusqu'au (si sur plusieurs jours)<input type="date" id="co-fin" name="dateFin" value="${esc(c?.dateFin || "")}"></label></div>
@@ -2577,10 +2583,13 @@ function formConcours(c = null) {
 function formInscrire() {
   const c = S.concours.find((x) => x.id === S.concoursId); if (!c) return;
   const inscrits = new Set(resOf(c).map(([aid]) => aid));
-  const groups = S.clubs.map((k) => [k, S.archers.filter((a) => a.actif !== false && tire(a) && (a.clubIds || []).includes(k.id)).sort(byName)]).filter(([, l]) => l.length);
-  if (!groups.length) { toast("Ajoute d'abord des archers"); return; }
-  sheet(`Inscrire au concours · ${cTitle(c)}`, groups.map(([k, l]) => `<details class="pick" open><summary><span class="dot" style="background:${esc(k.couleur)};display:inline-block"></span> ${esc(k.nom)}</summary>
-    ${l.map((a) => `<label><input type="checkbox" name="archer" value="${a.id}" ${inscrits.has(a.id) ? "checked disabled" : ""}> ${esc(fullName(a))}${inscrits.has(a.id) ? ' <span class="tirline">déjà inscrit</span>' : ""}</label>`).join("")}</details>`).join(""), {
+  const deLaFed = (a) => !c.federation || !(a.federations || []).length || (a.federations || []).includes(c.federation);
+  const groups = S.clubs.map((k) => [k, S.archers.filter((a) => a.actif !== false && tire(a) && (a.clubIds || []).includes(k.id) && deLaFed(a)).sort(byName)]).filter(([, l]) => l.length);
+  const autres = S.archers.filter((a) => a.actif !== false && tire(a) && !deLaFed(a)).sort(byName);
+  if (!groups.length && !autres.length) { toast("Ajoute d'abord des archers"); return; }
+  sheet(`Inscrire au concours · ${cTitle(c)}`, (c.federation ? `<span class="tirline">Archers ${esc(c.federation)} de tes clubs.</span>` : "") + groups.map(([k, l]) => `<details class="pick" open><summary><span class="dot" style="background:${esc(k.couleur)};display:inline-block"></span> ${esc(k.nom)}</summary>
+    ${l.map((a) => `<label><input type="checkbox" name="archer" value="${a.id}" ${inscrits.has(a.id) ? "checked disabled" : ""}> ${esc(fullName(a))}${inscrits.has(a.id) ? ' <span class="tirline">déjà inscrit</span>' : ""}</label>`).join("")}</details>`).join("")
+    + (autres.length ? `<details class="pick"><summary>Autres archers (pas licenciés ${esc(c.federation)}) <span class="tirline">${autres.length}</span></summary>${autres.map((a) => `<label><input type="checkbox" name="archer" value="${a.id}" ${inscrits.has(a.id) ? "checked disabled" : ""}> ${esc(fullName(a))} <span class="tirline">${esc((a.federations || []).join(", "))}</span></label>`).join("")}</details>` : ""), {
     onSave(fd) {
       const ids = [...new Set(fd.getAll("archer"))].filter((id) => !inscrits.has(id)); if (!ids.length) { toast("Choisis au moins un archer"); return false; }
       const add = {};
@@ -5914,7 +5923,7 @@ function formSeance(s = null) {
 
 // ---------- Événements ----------
 document.addEventListener("click", (e) => {
-  const t = e.target.closest("[data-nouv-open],[data-docar-retirer],[data-docar-rendre],[data-docar-attr],[data-disc-ok],[data-disc-non],[data-tab],[data-ftab],[data-mattri],[data-rqdel],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-enc-edit],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab],[data-qsort],[data-coptab],[data-com-edit],[data-fmtfed],[data-fmt-del],[data-type-del],[data-fete-ap],[data-fete-new],[data-fete-edit],[data-fete-imgdel],[data-mot-edit],[data-centry-open],[data-cd-exp],[data-cd-arch],[data-exmode],[data-ftheme],[data-fiche],[data-anim],[data-animvue],[data-animtri],[data-anim-saisie],[data-anim-essai-new],[data-anim-retenir],[data-anim-essai-del]");
+  const t = e.target.closest("[data-cofed],[data-nouv-open],[data-docar-retirer],[data-docar-rendre],[data-docar-attr],[data-disc-ok],[data-disc-non],[data-tab],[data-ftab],[data-mattri],[data-rqdel],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-enc-edit],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab],[data-qsort],[data-coptab],[data-com-edit],[data-fmtfed],[data-fmt-del],[data-type-del],[data-fete-ap],[data-fete-new],[data-fete-edit],[data-fete-imgdel],[data-mot-edit],[data-centry-open],[data-cd-exp],[data-cd-arch],[data-exmode],[data-ftheme],[data-fiche],[data-anim],[data-animvue],[data-animtri],[data-anim-saisie],[data-anim-essai-new],[data-anim-retenir],[data-anim-essai-del]");
   if (!t || t.closest("#sheet")) return;
   if (t.dataset.dashSuivi) { const [sid, aid] = t.dataset.dashSuivi.split("|"); S.seance = sid; S.suivi = aid; S.tirOpen = null; render(); window.scrollTo(0, 0); return; }
   if (t.dataset.tab) { go(t.dataset.tab); try { history.replaceState(null, "", "#" + t.dataset.tab); } catch (_) {} return; }
@@ -5990,6 +5999,7 @@ document.addEventListener("click", (e) => {
   if (t.dataset.concours) { S.tab = "concours"; S.concoursId = t.dataset.concours; S.archer = null; S.seance = null; S.suivi = null; render(); window.scrollTo(0, 0); return; }
   if (t.dataset.cosaison) { S.coSaison = (S.coSaison || saisonYear()) + Number(t.dataset.cosaison); render(); return; }
   if (t.dataset.cocombo) { S.coCombo = t.dataset.cocombo; render(); return; }
+  if (t.dataset.cofed != null) { LS.set("co-fed", t.dataset.cofed); render(); return; }
   if (t.dataset.act === "new-concours") { formConcours(); return; }
   if (t.dataset.act === "edit-concours") { formConcours(S.concours.find((x) => x.id === S.concoursId)); return; }
   if (t.dataset.act === "co-inscrire") { formInscrire(); return; }
