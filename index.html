@@ -616,7 +616,8 @@ svg.chart .szl { stroke: var(--line-2, var(--line)); stroke-dasharray: 3 3; }
 .row-av { flex: none; display: flex; align-items: center; }
 .av-head { display: flex; align-items: center; gap: 14px; } .av-head h2 { margin: 0; }
 .badges { display: inline-flex; flex-wrap: wrap; gap: 6px; } .badge { display: inline-flex; align-items: center; font-size: .72rem; font-weight: 800; letter-spacing: .04em; border-radius: 999px; padding: 3px 10px; white-space: nowrap; }
-.badge.b-testeur { background: #4a6fa5; color: #fff; } .badge.b-partenaire { background: #13294b; color: #fff; }
+.ar-nom { display: grid; gap: 5px; min-width: 0; } .ar-nom h1 { margin: 0; } .ar-nom .badges { display: flex; gap: 5px; } .ar-nom .badge { font-size: .68rem; padding: 2px 9px; box-shadow: 0 0 0 1px rgba(255,255,255,.18); }
+.badge.b-testeur { background: #4a6fa5; color: #fff; } .badge.b-partenaire { background: linear-gradient(135deg, #f6d365, #d4a017); color: #3a2a00; }
 .av-btn { position: relative; border: 0; background: none; padding: 0; cursor: pointer; border-radius: 50%; }
 .av-btn .av-edit { position: absolute; right: -2px; bottom: -2px; width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: #0F172A; font-size: 13px; font-weight: 800; display: grid; place-items: center; border: 2px solid var(--bg); }
 .pt .av { width: 34px; height: 34px; }
@@ -875,7 +876,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
 <div id="toast" class="toast" hidden></div>
 <input type="file" id="file-in" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.mp4,.webm,.txt,.md,.csv,application/pdf,image/*,video/mp4,video/webm,text/plain,text/markdown,text/csv">
 
-<script>window.CARNET_VERSION = { v: "1.9.85", date: "2026-11-19", site: "1.9.85", test: false };</script>
+<script>window.CARNET_VERSION = { v: "1.9.86", date: "2026-11-19", site: "1.9.86", test: false };</script>
 <script>
 // Espace archer : l'archer (ou son parent) voit uniquement ses propres informations,
 // telles que les renvoie la base (fonction espace_archer), et remplit son carnet.
@@ -966,7 +967,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     if (!shownTabs.some(([k]) => k === St.tab) && !["carnet", "evaluations"].includes(St.tab)) St.tab = "accueil";
     top.innerHTML = `<div class="top-in"><div class="brand">${window.CarnetAvatar && St.data?.archer ? "" : `<span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/></svg></span>`}
       ${window.CarnetAvatar && St.data?.archer ? window.CarnetAvatar.svg(St.data.archer, 40) : ""}
-      <h1>Espace <em>${esc(St.data?.archer ? name(St.data.archer) : name(who()))}</em></h1><span class="sub">${PREVIEW || TESTW ? "" : API.versCoach ? `<button class="btn" id="ar-coach">↩ Mode entraîneur</button>` : `<button class="btn ghost" id="ar-out">Se déconnecter</button>`}</span></div>
+      <div class="ar-nom"><h1>Espace <em>${esc(St.data?.archer ? name(St.data.archer) : name(who()))}</em></h1>${window.CarnetBadges && St.data?.archer ? window.CarnetBadges.html(St.data.archer) : ""}</div><span class="sub">${PREVIEW || TESTW ? "" : API.versCoach ? `<button class="btn" id="ar-coach">↩ Mode entraîneur</button>` : `<button class="btn ghost" id="ar-out">Se déconnecter</button>`}</span></div>
       <nav class="tabs" role="tablist">${shownTabs.map(([k, l]) => `<button class="tab" role="tab" aria-selected="${St.tab === k}" data-atab="${k}">${l}</button>`).join("")}</nav></div>`;
   }
   function render() {
@@ -1050,9 +1051,6 @@ window.CarnetArcherUI = (API, opts = {}) => {
     const m = M(), q = [TC() ? `<button class="btn primary ar-big" data-act="tc-new">${tirEnCours() ? "🎯 Reprendre mon tir en cours" : "🎯 Nouveau tir compté"}</button>` : "", window.CarnetChrono && m.has("chrono") ? `<button class="btn ar-big" data-act="chrono">⏱ Chrono</button>` : ""].filter(Boolean);
     const RE = St.data.reglagesEspace || {}, fk = window.CarnetFete ? window.CarnetFete.jour(RE.fetes) : "";
     let h = fk ? `<div class="ar-fete">${window.CarnetFete.banniere(fk, RE.fetes, BLOB, RE.fetesMessage !== false)}</div>` : "";
-    // V.1.10 : badges donnés par l'entraîneur (testeur, archer partenaire)
-    const bdg = window.CarnetBadges ? window.CarnetBadges.de(St.data.archer) : [];
-    if (bdg.length) h += `<div class="card ar-badges"><div class="bar" style="align-items:center;gap:10px">${window.CarnetBadges.html(St.data.archer)}<span class="tirline" style="margin:0">${bdg.some(([k]) => k === "testeur") ? "Merci de tester les nouveautés et de faire tes retours !" : "Merci pour ton partenariat !"}</span></div></div>`;
     h += q.length ? `<div class="ar-quick${q.length === 1 ? " one" : ""}">${q.join("")}</div>` : "";
     if (nouv.length) h += `<div class="card ar-new"><div class="bar"><b>✨ Du nouveau depuis ta dernière visite</b><span class="grow"></span><button class="btn" data-act="vu">Vu ✓</button></div>
       <ul class="ar-new-l">${nouv.map((n) => `<li><button class="lnk" ${n.go}>${esc(n.txt)}</button></li>`).join("")}</ul></div>`;
@@ -1454,7 +1452,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     const nbs = [[1, "1"], [2, "2"], [3, "3 (par défaut)"], [4, "4"], [5, "5"], [6, "6"], [8, "8"], [0, "Tous (6 semaines)"]];
     return `<div class="ar-params">
       <section class="card"><h3 class="hub-h">Mon avatar</h3>
-        <div class="av-prev">${window.CarnetAvatar ? window.CarnetAvatar.svg(a, 72) : ""}<div style="display:grid;gap:6px"><b>${esc(name(a))}</b><button class="btn" data-act="avatar">Changer d'avatar</button></div></div>
+        <div class="av-prev">${window.CarnetAvatar ? window.CarnetAvatar.svg(a, 72) : ""}<div style="display:grid;gap:6px"><b>${esc(name(a))}</b>${window.CarnetBadges ? window.CarnetBadges.html(a) : ""}<button class="btn" data-act="avatar">Changer d'avatar</button></div></div>
         <span class="tirline">Un dessin à choisir, ou tes initiales. Ton entraîneur le voit sur ses listes.</span></section>
       <section class="card"><h3 class="hub-h">Accueil</h3>
         <label class="f">Entraînements proposés affichés<select data-pref="nbEnt">${nbs.map(([v, l]) => `<option value="${v}" ${Number(P.nbEnt ?? 3) === v ? "selected" : ""}>${l}</option>`).join("")}</select></label>
