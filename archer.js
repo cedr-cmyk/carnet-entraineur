@@ -613,6 +613,9 @@ window.CarnetArcherUI = (API, opts = {}) => {
     const m = M(), q = [TC() ? `<button class="btn primary ar-big" data-act="tc-new">${tirEnCours() ? "🎯 Reprendre mon tir en cours" : "🎯 Nouveau tir compté"}</button>` : "", CAMP() ? `<button class="btn ar-big" data-act="cp-new">${window.CarnetCampagne?.enCours(cpCle()) ? "⛰ Reprendre mon parcours campagne" : "⛰ Parcours campagne"}</button>` : "", RUN() ? `<button class="btn ar-big" data-act="run-new">${window.CarnetRun.enCours(runCle()) ? "🏃 Reprendre mon run-archery" : "🏃 Run-archery"}</button>` : "", window.CarnetChrono && m.has("chrono") ? `<button class="btn ar-big" data-act="chrono">⏱ Chrono</button>` : ""].filter(Boolean);
     const RE = St.data.reglagesEspace || {}, fk = window.CarnetFete ? window.CarnetFete.jour(RE.fetes) : "";
     let h = fk ? `<div class="ar-fete">${window.CarnetFete.banniere(fk, RE.fetes, BLOB, RE.fetesMessage !== false)}</div>` : "";
+    // V.1.10 : badges donnés par l'entraîneur (testeur, archer partenaire)
+    const bdg = window.CarnetBadges ? window.CarnetBadges.de(St.data.archer) : [];
+    if (bdg.length) h += `<div class="card ar-badges"><div class="bar" style="align-items:center;gap:10px">${window.CarnetBadges.html(St.data.archer)}<span class="tirline" style="margin:0">${bdg.some(([k]) => k === "testeur") ? "Merci de tester les nouveautés et de faire tes retours !" : "Merci pour ton partenariat !"}</span></div></div>`;
     h += q.length ? `<div class="ar-quick${q.length === 1 ? " one" : ""}">${q.join("")}</div>` : "";
     if (nouv.length) h += `<div class="card ar-new"><div class="bar"><b>✨ Du nouveau depuis ta dernière visite</b><span class="grow"></span><button class="btn" data-act="vu">Vu ✓</button></div>
       <ul class="ar-new-l">${nouv.map((n) => `<li><button class="lnk" ${n.go}>${esc(n.txt)}</button></li>`).join("")}</ul></div>`;
