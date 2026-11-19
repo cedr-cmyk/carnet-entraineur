@@ -595,6 +595,8 @@ svg.chart .szl { stroke: var(--line-2, var(--line)); stroke-dasharray: 3 3; }
 .av { display: block; flex: none; border-radius: 50%; }
 .row-av { flex: none; display: flex; align-items: center; }
 .av-head { display: flex; align-items: center; gap: 14px; } .av-head h2 { margin: 0; }
+.badges { display: inline-flex; flex-wrap: wrap; gap: 6px; } .badge { display: inline-flex; align-items: center; font-size: .72rem; font-weight: 800; letter-spacing: .04em; border-radius: 999px; padding: 3px 10px; white-space: nowrap; }
+.badge.b-testeur { background: #4a6fa5; color: #fff; } .badge.b-partenaire { background: #13294b; color: #fff; }
 .av-btn { position: relative; border: 0; background: none; padding: 0; cursor: pointer; border-radius: 50%; }
 .av-btn .av-edit { position: absolute; right: -2px; bottom: -2px; width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: #0F172A; font-size: 13px; font-weight: 800; display: grid; place-items: center; border: 2px solid var(--bg); }
 .pt .av { width: 34px; height: 34px; }
@@ -853,7 +855,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
 <div id="toast" class="toast" hidden></div>
 <input type="file" id="file-in" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.mp4,.webm,.txt,.md,.csv,application/pdf,image/*,video/mp4,video/webm,text/plain,text/markdown,text/csv">
 
-<script>window.CARNET_VERSION = { v: "1.9.84", date: "2026-11-18", site: "1.9.84", test: false };</script>
+<script>window.CARNET_VERSION = { v: "1.9.85", date: "2026-11-19", site: "1.9.85", test: false };</script>
 <script>
 // Espace archer : l'archer (ou son parent) voit uniquement ses propres informations,
 // telles que les renvoie la base (fonction espace_archer), et remplit son carnet.
@@ -1028,6 +1030,9 @@ window.CarnetArcherUI = (API, opts = {}) => {
     const m = M(), q = [TC() ? `<button class="btn primary ar-big" data-act="tc-new">${tirEnCours() ? "🎯 Reprendre mon tir en cours" : "🎯 Nouveau tir compté"}</button>` : "", window.CarnetChrono && m.has("chrono") ? `<button class="btn ar-big" data-act="chrono">⏱ Chrono</button>` : ""].filter(Boolean);
     const RE = St.data.reglagesEspace || {}, fk = window.CarnetFete ? window.CarnetFete.jour(RE.fetes) : "";
     let h = fk ? `<div class="ar-fete">${window.CarnetFete.banniere(fk, RE.fetes, BLOB, RE.fetesMessage !== false)}</div>` : "";
+    // V.1.10 : badges donnés par l'entraîneur (testeur, archer partenaire)
+    const bdg = window.CarnetBadges ? window.CarnetBadges.de(St.data.archer) : [];
+    if (bdg.length) h += `<div class="card ar-badges"><div class="bar" style="align-items:center;gap:10px">${window.CarnetBadges.html(St.data.archer)}<span class="tirline" style="margin:0">${bdg.some(([k]) => k === "testeur") ? "Merci de tester les nouveautés et de faire tes retours !" : "Merci pour ton partenariat !"}</span></div></div>`;
     h += q.length ? `<div class="ar-quick${q.length === 1 ? " one" : ""}">${q.join("")}</div>` : "";
     if (nouv.length) h += `<div class="card ar-new"><div class="bar"><b>✨ Du nouveau depuis ta dernière visite</b><span class="grow"></span><button class="btn" data-act="vu">Vu ✓</button></div>
       <ul class="ar-new-l">${nouv.map((n) => `<li><button class="lnk" ${n.go}>${esc(n.txt)}</button></li>`).join("")}</ul></div>`;
@@ -1645,6 +1650,11 @@ window.CarnetChrono = (store) => openChrono(store);
 window.CarnetChronoNoms = () => CHRONO_DEF.map((c) => c.nom);
 window.CarnetModules = (a, n, cfg, ne) => arModules(a, n, cfg || espaceCfg(), ne || 0);
 window.CarnetAvatar = { svg: (a, n) => avatarSvg(a, n), choisir: (a, f) => avatarPicker(a, f) };
+// V.1.10 : badges donnés par l'entraîneur (rangés dans espace.badges de la fiche, visibles par l'archer dans son espace)
+const BADGES = [["testeur", "✓ Testeur", "Teste les nouvelles versions de l'appli et fait des retours"], ["partenaire", "★ Archer partenaire", "Partenaire de Dumoulin Consulting"]];
+const badgesOf = (a) => BADGES.filter(([k]) => a?.espace?.badges?.[k] === true);
+const badgesHtml = (a) => { const b = badgesOf(a); return b.length ? `<span class="badges">${b.map(([k, l]) => `<span class="badge b-${k}">${l}</span>`).join("")}</span>` : ""; };
+window.CarnetBadges = { liste: BADGES, de: (a) => badgesOf(a), html: (a) => badgesHtml(a) };
 // ---------- Thèmes de fête (V.1.8) : Noël, Noël et fêtes de fin d'année, diffusés entre deux dates chaque année ----------
 const FETES = [["noel", "Noël", "🎄", "12-01", "12-26"], ["fetes", "Noël et fêtes de fin d'année", "✨", "12-01", "01-03"]];
 // Thèmes créés par l'entraîneur (V.1.9) : causes et événements (Octobre rose, Movember, Mars bleu…), rangés dans fetes.perso
@@ -3986,7 +3996,9 @@ function espaceCard(a) {
     <label class="f" for="esp-p">Profil<select id="esp-p" data-esp="profil" ${dis}>${profilOptions(p, true, a)}</select></label>
     <span class="tirline">L'accueil et ses paramètres restent toujours visibles. Ses évaluations apparaissent dès que vous en partagez une${S.evaluations.some((x) => x.archerId === a.id && x.partage === true) ? " (c'est le cas)" : ""}. Les profils et les règles automatiques se règlent dans Paramètres › Espace archers.</span>
     ${modsGrid(m, (k) => `data-espm="${k}"`, p === "perso" && S.canWrite)}
-    ${p === "perso" ? "" : `<span class="tirline">Choisissez « Personnalisé » pour cocher vous-même chaque partie.</span>`}</div>`;
+    ${p === "perso" ? "" : `<span class="tirline">Choisissez « Personnalisé » pour cocher vous-même chaque partie.</span>`}
+    <div class="f">Badges<div class="esp-mods">${BADGES.map(([k, l, t]) => `<label class="esp-m${a.espace?.badges?.[k] === true ? " on" : ""}"><input type="checkbox" data-espbadge="${k}" ${a.espace?.badges?.[k] === true ? "checked" : ""} ${dis}><span><b>${l}</b><small>${t}</small></span></label>`).join("")}</div></div>
+    <span class="tirline">Le badge s'affiche sur sa fiche et sur l'accueil de son espace archer.</span></div>`;
 }
 // Paramètres › Espace archers : trois rubriques
 let accTous = null;
@@ -4784,6 +4796,7 @@ function viewArcher() {
   const corps = part[ft]().trim() || `<p class="empty">Rien pour l'instant dans cette rubrique.</p>`;
   return `<div class="bar"><button class="btn ghost" data-act="back">← Archers</button><span class="grow"></span><button class="btn primary" data-act="open-carnet">Carnet d'entraînement</button>${S.canWrite ? `<button class="btn" data-act="new-eval">+ Évaluation technique</button><button class="btn" data-act="edit-archer">Modifier</button>` : ""}</div>
     <div class="head"><span class="m">${esc((a.clubIds || []).map(clubName).join(", "))}${a.actif === false ? " · inactif" : ""}</span><div class="av-head">${S.canWrite ? `<button type="button" class="av-btn" data-act="avatar" aria-label="Changer l'avatar de ${esc(fullName(a))}">${avatarSvg(a, 64)}<span class="av-edit" aria-hidden="true">✎</span></button>` : avatarSvg(a, 64)}<h2>${esc(fullName(a))}</h2></div>
+      ${badgesHtml(a)}
       <span class="m">${esc([a.naissance ? `${ageSaison(a)} ans en ${saisonLabel()}` : "", a.sexe === "F" ? "Femme" : a.sexe === "H" ? "Homme" : "", (a.arcs || []).join(", ") || "Type d'arc non renseigné"].filter(Boolean).join(" · "))}</span>
       <span class="clubline">${(a.federations || []).map((f) => {
         const cat = catOf(a, f), lic = (a.licences || {})[f];
@@ -6870,6 +6883,12 @@ document.addEventListener("change", (e) => {
     a.espace = v; patch("archers", a.id, { espace: v }); toast(`${fullName(a)} : ${profilNom(v.profil)}`); render(); return;
   }
   const esp = e.target.dataset?.esp, espm = e.target.dataset?.espm;
+  if (e.target.dataset?.espbadge && S.archer && S.canWrite) {
+    const a = S.archers.find((x) => x.id === S.archer); if (!a) return;
+    // (l'enregistrement fusionne les objets : on met false au lieu de supprimer la clé)
+    const v = { ...(a.espace || {}) }; v.badges = { ...(v.badges || {}), [e.target.dataset.espbadge]: e.target.checked };
+    a.espace = v; patch("archers", a.id, { espace: v }); toast(e.target.checked ? "Badge ajouté" : "Badge retiré"); render(); return;
+  }
   if ((esp || espm) && S.archer && S.canWrite) {
     const a = S.archers.find((x) => x.id === S.archer); if (!a) return;
     const nbc = S.concours.filter((c) => c.resultats && c.resultats[a.id] && typeof c.resultats[a.id] === "object").length;
