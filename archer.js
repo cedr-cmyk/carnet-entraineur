@@ -523,14 +523,14 @@ window.CarnetArcherUI = (API, opts = {}) => {
     render();
   }
   function header() {
-    const tabs = [["accueil", "Accueil"], ["entrainement", "Entraînement"], ["concours", "Mes concours"], ["documents", "Documents"], ["animations", "Animations"], ["parametres", "Paramètres"]];
-    const m = M(), vis = { entrainement: ["seances", "carnet", "tir", "impacts", "evals"].some((k) => m.has(k)), concours: m.has("concours"), documents: m.has("documents"), animations: anVisibles(m).length > 0 };
+    const tabs = [["accueil", "Accueil"], ["entrainement", "Entraînement"], ["concours", "Mes concours"], ["documents", "Documents"], ["animations", "Animations"], ["retours", "Mes retours"], ["parametres", "Paramètres"]];
+    const m = M(), vis = { retours: !!St.data && TEST() && !PREVIEW, entrainement: ["seances", "carnet", "tir", "impacts", "evals"].some((k) => m.has(k)), concours: m.has("concours"), documents: m.has("documents"), animations: anVisibles(m).length > 0 };
     const shownTabs = tabs.filter(([k]) => vis[k] !== false);
     if (!shownTabs.some(([k]) => k === St.tab) && !["carnet", "evaluations"].includes(St.tab)) St.tab = "accueil";
     top.innerHTML = `<div class="top-in"><div class="brand">${window.CarnetAvatar && St.data?.archer ? "" : `<span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/></svg></span>`}
       ${window.CarnetAvatar && St.data?.archer ? window.CarnetAvatar.svg(St.data.archer, 40) : ""}
       <div class="ar-nom"><h1>Espace <em>${esc(St.data?.archer ? name(St.data.archer) : name(who()))}</em></h1>${window.CarnetBadges && St.data?.archer ? window.CarnetBadges.html(St.data.archer) : ""}</div><span class="sub">${PREVIEW || TESTW ? "" : API.versCoach ? `<button class="btn" id="ar-coach">↩ Mode entraîneur</button>` : `<button class="btn ghost" id="ar-out">Se déconnecter</button>`}</span></div>
-      <nav class="tabs" role="tablist">${shownTabs.map(([k, l]) => `<button class="tab" role="tab" aria-selected="${St.tab === k}" data-atab="${k}">${l}</button>`).join("")}</nav></div>`;
+      <nav class="tabs" role="tablist">${shownTabs.map(([k, l]) => `<button class="tab" role="tab" aria-selected="${St.tab === k}" data-atab="${k}">${l}${k === "retours" && St.tab !== "retours" && rtNonVus().length ? `<span class="bulle" title="Réponses de ton entraîneur pas encore lues">${rtNonVus().length}</span>` : ""}</button>`).join("")}</nav></div>`;
   }
   // V.1.10 : avantages des badges (testeur, partenaire)
   const BDG = () => St.data?.archer?.espace?.badges || {};
@@ -541,12 +541,30 @@ window.CarnetArcherUI = (API, opts = {}) => {
     const v = PART() ? prefs().themeAr || "" : "", r = document.documentElement;
     if (v) r.setAttribute("data-ar-theme", v); else r.removeAttribute("data-ar-theme");
   }
+  // réponses de l'entraîneur pas encore lues (gardé sur cet appareil)
+  const rtVuKey = () => "carnet-rt-vu-" + (who()?.archer_id || "");
+  const rtCle = (r) => r.id + ":" + (r.reponse || "").length + ":" + (r.statut || "");
+  const rtNonVus = () => { const v = new Set(lsGet(rtVuKey(), [])); return (St.data?.retours || []).filter((r) => r.reponse && !v.has(rtCle(r))); };
+  const rtMarquerVus = () => lsSet(rtVuKey(), (St.data?.retours || []).map(rtCle));
+  function vRetours() {
+    const rts = St.data.retours || [];
+    const h = `<div class="card ar-avant"><h3 class="hub-h">${PART() ? "★ Mes retours de partenaire" : "✓ Mes retours de testeur"}</h3>
+      <span class="tirline" style="margin:0">Envoie à ton entraîneur un problème rencontré dans l'appli ou une idée. Tu suis ici où ça en est et ses réponses.</span>
+      ${API.retour ? `<div class="acts-w"><button class="btn" data-act="retour-bug">🐞 Signaler un problème</button><button class="btn" data-act="retour-idee">💡 Proposer une idée</button></div>` : ""}</div>
+      ${rts.length ? rts.map((r) => `<div class="card" style="gap:4px"><div class="bar" style="align-items:center"><b>${RT().type[r.type] || "Retour"}</b><span class="grow"></span><span class="rt-st s-${esc(r.statut)}">${esc(RT().lib(r.statut))}</span></div>
+        <span class="tirline" style="margin:0">${esc(dObj(r.date).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }))}</span>
+        <span style="white-space:pre-wrap">${esc(r.texte)}</span>${r.reponse ? `<div class="rt-rep"><b>Ton entraîneur :</b> <span style="white-space:pre-wrap">${esc(r.reponse)}</span></div>` : ""}</div>`).join("") : `<p class="notice">Tu n'as encore rien envoyé.</p>`}`;
+    rtMarquerVus();
+    return h;
+  }
   function vAvantages() {
-    const rts = St.data.retours || [], nbRep = rts.filter((r) => r.reponse).length;
-    return `<div class="card ar-avant"><h3 class="hub-h">${PART() ? "★ Ton espace partenaire" : "✓ Ton espace testeur"}</h3>
+    const rts = St.data.retours || [];
+    const nv = rtNonVus().length;
+    return `${nv ? `<div class="card rt-notif"><div class="bar" style="align-items:center"><span>🔔 <b>Ton entraîneur a répondu à ${nv > 1 ? nv + " de tes retours" : "un de tes retours"}</b></span><span class="grow"></span><button class="btn primary" data-atab="retours">Voir</button></div></div>` : ""}
+      <div class="card ar-avant"><h3 class="hub-h">${PART() ? "★ Ton espace partenaire" : "✓ Ton espace testeur"}</h3>
       <span class="tirline" style="margin:0">${PART() ? "Merci pour ton partenariat ! Tes idées de terrain font avancer l'appli." : "Merci de tester les nouveautés !"} Un problème, une idée ? Envoie-les directement à ton entraîneur.</span>
       <div class="acts-w">${API.retour && !PREVIEW ? `<button class="btn" data-act="retour-bug">🐞 Signaler un problème</button><button class="btn" data-act="retour-idee">💡 Proposer une idée</button>` : ""}
-        ${rts.length ? `<button class="btn ghost" data-act="retours">Mes retours (${rts.length}${nbRep ? ` · ${nbRep} réponse${nbRep > 1 ? "s" : ""}` : ""})</button>` : ""}
+        ${rts.length ? `<button class="btn ghost" data-atab="retours">Mes retours (${rts.length})</button>` : ""}
         ${RT().parcours ? `<a class="btn ghost" href="${RT().parcours}" target="_blank" rel="noopener">🌲 Appli Tir Parcours</a>` : ""}</div>
       ${PART() ? `<span class="tirline" style="margin:0">Thèmes et avatars réservés aux partenaires : dans tes Paramètres.</span>` : ""}</div>`;
   }
@@ -584,7 +602,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     else h += `<div class="bar"><span class="grow"></span><button class="btn ghost" data-act="add-code">J'ai un autre code (frère, sœur…)</button></div>`;
     if (St.err) h += `<p class="notice">${esc(St.err)}</p><button class="btn" data-act="reload">Réessayer</button>`;
     else if (!St.data) h += `<p class="notice">Chargement…</p>`;
-    else h += ({ accueil: vAccueil, entrainement: vEntrainement, carnet: vEntrainement, evaluations: vEntrainement, concours: vConcours, documents: vDocs, animations: vAnimations, parametres: vParams }[St.tab] || vAccueil)();
+    else h += ({ accueil: vAccueil, entrainement: vEntrainement, carnet: vEntrainement, evaluations: vEntrainement, concours: vConcours, documents: vDocs, animations: vAnimations, retours: vRetours, parametres: vParams }[St.tab] || vAccueil)();
     view.innerHTML = h;
   }
   // Réglages du chrono de l'archer : gardés sur son appareil
@@ -634,7 +652,6 @@ window.CarnetArcherUI = (API, opts = {}) => {
     (St.data.mots || []).filter((x) => !x.archive).forEach((x) => it.push({ k: "w:" + x.id + ":" + String(x.texte || "").length, txt: `Un message de ton entraîneur (${dObj(x.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })})`, go: `data-atab="accueil"` }));
     St.data.entrees.filter((x) => x.commentaireCoach && !x.motArchive).forEach((x) => it.push({ k: "m:" + x.id + ":" + x.commentaireCoach.length, txt: `Un mot de ton entraîneur (${dObj(x.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })})`, go: `data-entry="${esc(x.id)}"` }));
     if (m.has("documents")) (St.data.documents || []).forEach((x) => it.push({ k: "d:" + x.id, txt: `Document : ${x.titre || x.nomFichier || "nouveau document"}`, go: `data-atab="documents"` }));
-    (St.data.retours || []).filter((x) => x.reponse).forEach((x) => it.push({ k: "r:" + x.id + ":" + x.reponse.length, txt: `Ton entraîneur a répondu à ${x.type === "bug" ? "ton signalement" : "ton idée"}`, go: `data-act="retours"` }));
     (St.data.annonces || []).forEach((x) => it.push({ k: "a:" + x.id, txt: `Info du club : ${x.titre || ""}`, go: `data-act="vu-info"` }));
     return it;
   }
@@ -1320,7 +1337,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     if (t.dataset.motArch) { const [k, id, on] = t.dataset.motArch.split("|"); motAction(k, id, on === "1" ? "archiver" : "desarchiver"); return; }
     if (t.dataset.act === "all-ent") { St.allEnt = !St.allEnt; render(); return; }
     if (t.dataset.act === "retour-bug" || t.dataset.act === "retour-idee") { retourForm(t.dataset.act === "retour-bug" ? "bug" : "idee"); return; }
-    if (t.dataset.act === "retours") { retoursListe(); return; }
+    if (t.dataset.act === "retours") { St.tab = "retours"; render(); return; }
     if (t.dataset.act === "avatar" && window.CarnetAvatar) {
       window.CarnetAvatar.choisir(St.data.archer, async (v) => {
         if (PREVIEW) { toast("Aperçu : l'archer choisira son avatar ici"); return; }

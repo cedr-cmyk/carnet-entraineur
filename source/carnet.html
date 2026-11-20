@@ -621,6 +621,7 @@ svg.chart .szl { stroke: var(--line-2, var(--line)); stroke-dasharray: 3 3; }
 .rt-st.s-retenu, .rt-st.s-encours { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--accent); }
 .rt-st.s-fait { background: var(--ok-soft); color: var(--ok); }
 .rt-st.s-nonretenu { background: color-mix(in srgb, var(--danger) 15%, transparent); color: var(--danger); }
+.rt-notif { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
 .rt-rep { border-left: 3px solid var(--accent); padding: 4px 0 4px 10px; margin-top: 6px; }
 .ar-nom { display: grid; gap: 5px; min-width: 0; } .ar-nom h1 { margin: 0; } .ar-nom .badges { display: flex; gap: 5px; } .ar-nom .badge { font-size: .68rem; padding: 2px 9px; box-shadow: 0 0 0 1px rgba(255,255,255,.18); }
 .badge.b-testeur { background: #4a6fa5; color: #fff; } .badge.b-partenaire { background: linear-gradient(135deg, #f6d365, #d4a017); color: #3a2a00; }
@@ -1164,7 +1165,7 @@ const remove = (col, id) => write(`${col}/${id}`, () => S.db.collection(col).doc
 const newId = (col) => S.db.collection(col).doc().id;
 
 // ---------- Navigation ----------
-const TABS = [["accueil", "Accueil"], ["seances", "Séances"], ["archers", "Archers"], ["clubs", "Clubs"], ["exos", "Documents"], ["concours", "Concours"], ["materiel", "Matériel"], ["animations", "Animations"], ["parametres", "Paramètres"]];
+const TABS = [["accueil", "Accueil"], ["seances", "Séances"], ["archers", "Archers"], ["clubs", "Clubs"], ["exos", "Documents"], ["concours", "Concours"], ["materiel", "Matériel"], ["animations", "Animations"], ["retours", "Retours"], ["parametres", "Paramètres"]];
 // V.1.10 : encadrant / animateur connecté au carnet de l'entraîneur (droits choisis dans Paramètres › Accès)
 const ENC = () => window.CARNET_ENCADRANT || null;
 const encDroits = () => ENC()?.droits || {};
@@ -1230,7 +1231,7 @@ function renderTabs() {
   chargerNouv();
   const counts = { seances: S.seances.length, archers: S.archers.length, clubs: S.clubs.length, exos: S.documents.length, concours: S.concours.filter((c) => (c.dateFin || c.date) >= todayISO()).length };
   if (!tabOk(S.tab)) S.tab = "accueil";
-  $("#tabs").innerHTML = TABS.filter(([k]) => tabOk(k)).map(([k, l]) => `<button class="tab" role="tab" aria-selected="${S.tab === k && !S.seance && !S.archer}" data-tab="${k}">${l}${counts[k] ? `<span class="n">${counts[k]}</span>` : ""}${k === "archers" && nouvTotal() ? `<span class="bulle" title="Séances notées par tes archers, pas encore regardées">${nouvTotal()}</span>` : ""}</button>`).join("");
+  $("#tabs").innerHTML = TABS.filter(([k]) => tabOk(k) && (k !== "retours" || retoursVisibles())).map(([k, l]) => `<button class="tab" role="tab" aria-selected="${S.tab === k && !S.seance && !S.archer}" data-tab="${k}">${l}${counts[k] ? `<span class="n">${counts[k]}</span>` : ""}${k === "archers" && nouvTotal() ? `<span class="bulle" title="Séances notées par tes archers, pas encore regardées">${nouvTotal()}</span>` : ""}${k === "retours" && rtNouveaux().length ? `<span class="bulle" title="Nouveaux retours de tes testeurs et partenaires">${rtNouveaux().length}</span>` : ""}</button>`).join("");
 }
 
 function clubChips() {
@@ -1265,6 +1266,7 @@ function render() {
   if (S.tab === "archers") { v.innerHTML = viewArchers(); if (S.canWrite && S.clubs.length) { fab.hidden = false; fab.textContent = "+ Nouvel archer"; fab.onclick = () => formArcher(); } }
   if (S.tab === "clubs") { v.innerHTML = viewClubs(); fab.hidden = false; fab.textContent = "+ Nouveau club"; fab.onclick = () => formClub(); }
   if (S.tab === "accueil") v.innerHTML = viewAccueil();
+  if (S.tab === "retours") v.innerHTML = viewRetours();
   if (S.tab === "materiel") { v.innerHTML = viewMateriel(); if (S.canWrite && S.clubs.length) { fab.hidden = false; fab.textContent = "+ Nouveau matériel"; fab.onclick = () => formMat(); } }
   if (S.tab === "animations") { v.innerHTML = viewAnimations(); if (S.canWrite && !S.anim) { fab.hidden = false; fab.textContent = "+ Nouvelle animation"; fab.onclick = () => formAnimation(); } }
   if (S.tab === "concours") { v.innerHTML = S.concoursId ? viewConcours() : viewConcoursList(); if (S.canWrite && !S.concoursId) { fab.hidden = false; fab.textContent = "+ Nouveau concours"; fab.onclick = () => formConcours(); } }
@@ -3596,20 +3598,34 @@ function dashResRow(x) {
   const evo = d == null ? `<span class="evo">1er concours</span>` : d > 0 ? `<span class="evo up" title="Points de plus que sa moyenne précédente">▲ +${f(d)} pts <small>(+${pc(d)} %)</small></span>` : d < 0 ? `<span class="evo down" title="Points de moins que sa moyenne précédente">▼ ${f(d)} pts <small>(${pc(d)} %)</small></span>` : `<span class="evo">= stable</span>`;
   return `<div class="row"><span class="row-av">${avatarSvg(x.a, 36)}</span><span class="main"><span class="t">${esc(fullName(x.a))}</span><span class="m">${x.moy == null ? "pas de concours précédent" : `moyenne précédente ${f(x.moy)} pts sur ${x.n} concours`}${x.r.categorie ? " · " + esc(x.r.categorie) : ""}</span></span><span class="count">${esc(x.r.score)}<small> pts</small></span>${evo}</div>`;
 }
-// Accueil de l'entraîneur : problèmes et idées envoyés par les archers testeurs / partenaires
-function retoursCard() {
-  const all = (S.retours || []).filter((r) => S.archers.some((a) => a.id === r.archerId)); if (!all.length) return "";
-  const rec = (p, q) => (q.createdAt || 0) - (p.createdAt || 0);
-  const ouverts = all.filter((r) => !RT_CLOS.includes(r.statut)).sort(rec), clos = all.filter((r) => RT_CLOS.includes(r.statut)).sort(rec);
-  const row = (r) => { const a = S.archers.find((x) => x.id === r.archerId);
-    return `<div class="row" style="flex-wrap:wrap;align-items:flex-start"><span class="main"><span class="t">${RT_TYPE[r.type] || "Retour"} · ${esc(fullName(a))} ${(r.statut || "nouveau") === "nouveau" ? `<span class="tag today">Nouveau</span>` : `<span class="rt-st s-${esc(r.statut)}">${rtStLib(r.statut)}</span>`}</span>
-      <span class="m">${esc(fmtLong(r.date))}</span><span class="m" style="white-space:pre-wrap;color:var(--ink)">${esc(r.texte)}</span>${r.reponse ? `<span class="m rt-rep">Ta réponse : ${esc(r.reponse)}</span>` : ""}</span>
-      ${S.canWrite ? `<button class="btn" data-retour="${esc(r.id)}">${r.reponse ? "Modifier" : "Répondre"}</button>` : ""}</div>`; };
-  const nb = all.filter((r) => (r.statut || "nouveau") === "nouveau").length;
-  return `<div class="card" data-carte="retours"><div class="hub-bar"><h3 class="hub-h">💡 Retours des testeurs et partenaires${nb ? ` · ${nb} nouveau${nb > 1 ? "x" : ""}` : ""}</h3></div>
-    ${ouverts.length ? `<div class="list">${ouverts.map(row).join("")}</div>` : `<p class="tirline" style="margin:0">Tout est traité ✓</p>`}
-    ${clos.length ? `<details><summary class="tirline">Retours traités (${clos.length})</summary><div class="list">${clos.map(row).join("")}</div></details>` : ""}</div>`;
+// V.1.10 : retours (problèmes, idées) des archers testeurs / partenaires — onglet « Retours » et rappel sur l'accueil
+const rtTous = () => (S.retours || []).filter((r) => S.archers.some((a) => a.id === r.archerId));
+const rtNouveaux = () => ENC() ? [] : rtTous().filter((r) => (r.statut || "nouveau") === "nouveau");
+const retoursVisibles = () => !ENC() && (rtTous().length > 0 || S.archers.some((a) => a.espace?.badges?.testeur === true || a.espace?.badges?.partenaire === true));
+function retourRow(r) {
+  const a = S.archers.find((x) => x.id === r.archerId);
+  return `<div class="row" style="flex-wrap:wrap;align-items:flex-start"><span class="main"><span class="t">${RT_TYPE[r.type] || "Retour"} · <button class="lnk" data-archer="${esc(r.archerId)}">${esc(fullName(a))}</button> ${(r.statut || "nouveau") === "nouveau" ? `<span class="tag today">Nouveau</span>` : `<span class="rt-st s-${esc(r.statut)}">${rtStLib(r.statut)}</span>`}</span>
+    <span class="m">${esc(fmtLong(r.date))}</span><span class="m" style="white-space:pre-wrap;color:var(--ink)">${esc(r.texte)}</span>${r.reponse ? `<span class="m rt-rep">Ta réponse : ${esc(r.reponse)}</span>` : ""}</span>
+    ${S.canWrite ? `<button class="btn" data-retour="${esc(r.id)}">${r.reponse ? "Modifier" : "Répondre"}</button>` : ""}</div>`;
 }
+// Accueil : simple rappel quand il y a des retours pas encore lus
+function retoursCard() {
+  const n = rtNouveaux(); if (!n.length) return "";
+  const nb = (t) => n.filter((r) => r.type === t).length, parts = [nb("bug") ? `${nb("bug")} problème${nb("bug") > 1 ? "s" : ""}` : "", nb("idee") ? `${nb("idee")} idée${nb("idee") > 1 ? "s" : ""}` : ""].filter(Boolean);
+  return `<div class="card rt-notif" data-carte="retours"><div class="bar" style="align-items:center"><span>🔔 <b>${n.length} nouveau${n.length > 1 ? "x" : ""} retour${n.length > 1 ? "s" : ""}</b> de tes testeurs et partenaires${parts.length ? ` (${parts.join(", ")})` : ""}</span><span class="grow"></span><button class="btn primary" data-tab="retours">Voir les retours</button></div></div>`;
+}
+function viewRetours() {
+  const f = S.rtFiltre || "atraiter", t = S.rtType || "tous", rec = (p, q) => (q.createdAt || 0) - (p.createdAt || 0);
+  const all = rtTous().filter((r) => t === "tous" || r.type === t);
+  const l = all.filter((r) => f === "tous" ? true : f === "traites" ? RT_CLOS.includes(r.statut) : !RT_CLOS.includes(r.statut)).sort(rec);
+  const nAt = all.filter((r) => !RT_CLOS.includes(r.statut)).length, nTr = all.length - nAt;
+  const chip = (attr, k, lab, cur) => `<button class="chip" ${attr}="${k}" aria-pressed="${cur === k}">${lab}</button>`;
+  return `<div class="head"><span class="pill">Testeurs et partenaires</span><h2>Retours</h2><span class="m">Les problèmes et les idées que t'envoient les archers qui ont un badge. Ta réponse et le statut s'affichent dans leur espace.</span></div>
+    <div class="chips" role="group" aria-label="Filtrer">${chip("data-rtf", "atraiter", `À traiter (${nAt})`, f)}${chip("data-rtf", "traites", `Traités (${nTr})`, f)}${chip("data-rtf", "tous", "Tous", f)}</div>
+    <div class="chips" role="group" aria-label="Type">${chip("data-rtt", "tous", "Problèmes et idées", t)}${chip("data-rtt", "bug", "🐞 Problèmes", t)}${chip("data-rtt", "idee", "💡 Idées", t)}</div>
+    ${l.length ? `<div class="card"><div class="list">${l.map(retourRow).join("")}</div></div>` : `<p class="notice">${f === "atraiter" ? "Rien à traiter ✓" : "Aucun retour ici pour l'instant."} Les archers avec un badge Testeur ou Archer partenaire envoient leurs retours depuis leur accueil.</p>`}`;
+}
+document.addEventListener("click", (e) => { const b = e.target.closest("[data-rtf],[data-rtt]"); if (!b) return; if (b.dataset.rtf) S.rtFiltre = b.dataset.rtf; else S.rtType = b.dataset.rtt; render(); });
 function formRetour(id) {
   const r = (S.retours || []).find((x) => x.id === id); if (!r) return; const a = S.archers.find((x) => x.id === r.archerId);
   const cur = (r.statut || "nouveau") === "nouveau" ? "vu" : r.statut;
