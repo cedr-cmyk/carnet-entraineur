@@ -2630,7 +2630,7 @@ const remove = (col, id) => write(`${col}/${id}`, () => S.db.collection(col).doc
 const newId = (col) => S.db.collection(col).doc().id;
 
 // ---------- Navigation ----------
-const TABS = [["accueil", "Accueil"], ["seances", "Séances"], ["archers", "Archers"], ["clubs", "Clubs"], ["exos", "Documents"], ["concours", "Concours"], ["materiel", "Matériel"], ["animations", "Animations"], ["retours", "Retours"], ["parametres", "Paramètres"]];
+const TABS = [["accueil", "Accueil"], ["seances", "Séances"], ["archers", "Archers"], ["clubs", "Clubs"], ["exos", "Documents"], ["concours", "Concours"], ["materiel", "Matériel"], ["animations", "Animations"], ["retours", "★ Partenaires"], ["parametres", "Paramètres"]];
 // V.1.10 : encadrant / animateur connecté au carnet de l'entraîneur (droits choisis dans Paramètres › Accès)
 const ENC = () => window.CARNET_ENCADRANT || null;
 const encDroits = () => ENC()?.droits || {};
@@ -5197,7 +5197,7 @@ function viewFil() {
 }
 function viewRetours() {
   const vue = S.rtVue || "retours", nfl = filNonLus().length;
-  const vueChips = `<div class="chips" role="tablist" aria-label="Vue">${[["retours", `Retours${rtNouveaux().length ? ` (${rtNouveaux().length})` : ""}`], ["fil", `💬 Fil des partenaires${nfl ? ` (${nfl})` : ""}`]].map(([k, l]) => `<button class="chip" role="tab" data-rtvue="${k}" aria-pressed="${vue === k}">${l}</button>`).join("")}</div>`;
+  const vueChips = `<div class="chips" role="tablist" aria-label="Vue">${[["retours", `Retours et demandes${rtNouveaux().length ? ` (${rtNouveaux().length})` : ""}`], ["fil", `💬 Fil des partenaires${nfl ? ` (${nfl})` : ""}`]].map(([k, l]) => `<button class="chip" role="tab" data-rtvue="${k}" aria-pressed="${vue === k}">${l}</button>`).join("")}</div>`;
   if (vue === "fil") return `<div class="head"><span class="pill">Testeurs et partenaires</span><h2>Fil des partenaires</h2></div>${vueChips}${viewFil()}`;
   return retoursListeVue(vueChips);
 }

@@ -909,7 +909,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
 <div id="toast" class="toast" hidden></div>
 <input type="file" id="file-in" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.mp4,.webm,.txt,.md,.csv,application/pdf,image/*,video/mp4,video/webm,text/plain,text/markdown,text/csv">
 
-<script>window.CARNET_VERSION = { v: "1.10.36", date: "2026-11-20", site: "1.7.4", test: true };</script>
+<script>window.CARNET_VERSION = { v: "1.10.37", date: "2026-11-20", site: "1.7.4", test: true };</script>
 <script>
 // Espace archer : l'archer (ou son parent) voit uniquement ses propres informations,
 // telles que les renvoie la base (fonction espace_archer), et remplit son carnet.
@@ -2634,7 +2634,7 @@ const remove = (col, id) => write(`${col}/${id}`, () => S.db.collection(col).doc
 const newId = (col) => S.db.collection(col).doc().id;
 
 // ---------- Navigation ----------
-const TABS = [["accueil", "Accueil"], ["seances", "Séances"], ["archers", "Archers"], ["clubs", "Clubs"], ["exos", "Documents"], ["concours", "Concours"], ["materiel", "Matériel"], ["animations", "Animations"], ["retours", "Retours"], ["parametres", "Paramètres"]];
+const TABS = [["accueil", "Accueil"], ["seances", "Séances"], ["archers", "Archers"], ["clubs", "Clubs"], ["exos", "Documents"], ["concours", "Concours"], ["materiel", "Matériel"], ["animations", "Animations"], ["retours", "★ Partenaires"], ["parametres", "Paramètres"]];
 // V.1.10 : encadrant / animateur connecté au carnet de l'entraîneur (droits choisis dans Paramètres › Accès)
 const ENC = () => window.CARNET_ENCADRANT || null;
 const encDroits = () => ENC()?.droits || {};
@@ -5201,7 +5201,7 @@ function viewFil() {
 }
 function viewRetours() {
   const vue = S.rtVue || "retours", nfl = filNonLus().length;
-  const vueChips = `<div class="chips" role="tablist" aria-label="Vue">${[["retours", `Retours${rtNouveaux().length ? ` (${rtNouveaux().length})` : ""}`], ["fil", `💬 Fil des partenaires${nfl ? ` (${nfl})` : ""}`]].map(([k, l]) => `<button class="chip" role="tab" data-rtvue="${k}" aria-pressed="${vue === k}">${l}</button>`).join("")}</div>`;
+  const vueChips = `<div class="chips" role="tablist" aria-label="Vue">${[["retours", `Retours et demandes${rtNouveaux().length ? ` (${rtNouveaux().length})` : ""}`], ["fil", `💬 Fil des partenaires${nfl ? ` (${nfl})` : ""}`]].map(([k, l]) => `<button class="chip" role="tab" data-rtvue="${k}" aria-pressed="${vue === k}">${l}</button>`).join("")}</div>`;
   if (vue === "fil") return `<div class="head"><span class="pill">Testeurs et partenaires</span><h2>Fil des partenaires</h2></div>${vueChips}${viewFil()}`;
   return retoursListeVue(vueChips);
 }
