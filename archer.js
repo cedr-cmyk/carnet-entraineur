@@ -536,10 +536,12 @@ window.CarnetArcherUI = (API, opts = {}) => {
   // V.1.10 : avantages des badges (testeur, partenaire)
   const BDG = () => St.data?.archer?.espace?.badges || {};
   const PART = () => BDG().partenaire === true, TEST = () => BDG().testeur === true || PART();
+  // avantage ouvert par l'entraîneur pour cet archer (onglet ★ Partenaires › Membres)
+  const AVT = (k) => !!St.data?.archer && (window.CarnetBadges?.avantage ? window.CarnetBadges.avantage(St.data.archer, k) : TEST());
   const RT = () => window.CarnetRetours || { statuts: [], lib: (k) => k, type: {}, clos: [], parcours: "" };
   function applyArTheme() {
     if (PREVIEW || TESTW) return;
-    const v = PART() ? prefs().themeAr || "" : "", r = document.documentElement;
+    const v = PART() && AVT("perso") ? prefs().themeAr || "" : "", r = document.documentElement;
     if (v) r.setAttribute("data-ar-theme", v); else r.removeAttribute("data-ar-theme");
   }
   // réponses de l'entraîneur pas encore lues (gardé sur cet appareil)
@@ -549,7 +551,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
   const rtMarquerVus = () => lsSet(rtVuKey(), (St.data?.retours || []).map(rtCle));
   // ---------- V.1.10 : espace partenaire (fil, carte, bilan de saison, stage personnalisé) ----------
   const filVuKey = () => "carnet-fil-vu-" + (who()?.archer_id || "");
-  const filNonLus = () => { if (!PART()) return []; const v = Number(lsGet(filVuKey(), 0)) || 0, me = who()?.archer_id; return (St.data?.fil || []).filter((m) => m.auteur !== me && (m.createdAt || 0) > v); };
+  const filNonLus = () => { if (!PART() || !AVT("fil")) return []; const v = Number(lsGet(filVuKey(), 0)) || 0, me = who()?.archer_id; return (St.data?.fil || []).filter((m) => m.auteur !== me && (m.createdAt || 0) > v); };
   function vFilAr() {
     const msgs = St.data.fil, me = who()?.archer_id, vu = Number(lsGet(filVuKey(), 0)) || 0;
     if (msgs == null) return `<p class="notice">Le fil n'est pas disponible pour l'instant (ton entraîneur doit mettre l'appli à jour).</p>`;
@@ -609,8 +611,9 @@ window.CarnetArcherUI = (API, opts = {}) => {
     });
   }
   function vPartenaire() {
-    const pt = St.ptab || "fil", nf = filNonLus().length, nr = rtNonVus().length;
-    const tabs = [["fil", `💬 Fil${nf ? ` (${nf})` : ""}`], ["carte", "Ma carte"], ["bilan", "Mon bilan"], ["stage", "Stage perso"], ["retours", `Mes retours${nr ? ` (${nr})` : ""}`]];
+    let pt = St.ptab || "fil"; const nf = filNonLus().length, nr = rtNonVus().length;
+    const tabs = [["fil", `💬 Fil${nf ? ` (${nf})` : ""}`], ["carte", "Ma carte"], ["bilan", "Mon bilan"], ["stage", "Stage perso"], ["retours", `Mes retours${nr ? ` (${nr})` : ""}`]].filter(([k]) => k === "retours" || AVT(k));
+    if (!tabs.some(([k]) => k === pt)) pt = St.ptab = tabs[0][0];
     const body = { fil: vFilAr, carte: vCarte, bilan: vBilan, stage: vStagePerso, retours: () => vRetours(true) }[pt] || vFilAr;
     return `<div class="chips" role="tablist" aria-label="Espace partenaire">${tabs.map(([k, l]) => `<button class="chip" role="tab" data-ptab="${k}" aria-pressed="${pt === k}">${l}</button>`).join("")}</div>${body()}`;
   }
@@ -619,7 +622,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     const rts = St.data.retours || [];
     const h = `<div class="card ar-avant"><h3 class="hub-h">${PART() ? "★ Mes retours de partenaire" : "✓ Mes retours de testeur"}</h3>
       <span class="tirline" style="margin:0">Envoie à ton entraîneur un problème rencontré dans l'appli ou une idée. Tu suis ici où ça en est et ses réponses.</span>
-      ${API.retour ? `<div class="acts-w"><button class="btn" data-act="retour-bug">🐞 Signaler un problème</button><button class="btn" data-act="retour-idee">💡 Proposer une idée</button></div>` : ""}</div>
+      ${API.retour && AVT("retours") ? `<div class="acts-w"><button class="btn" data-act="retour-bug">🐞 Signaler un problème</button><button class="btn" data-act="retour-idee">💡 Proposer une idée</button></div>` : ""}</div>
       ${rts.length ? rts.map((r) => `<div class="card" style="gap:4px"><div class="bar" style="align-items:center"><b>${RT().type[r.type] || "Retour"}</b><span class="grow"></span><span class="rt-st s-${esc(r.statut)}">${esc(RT().lib(r.statut))}</span></div>
         <span class="tirline" style="margin:0">${esc(dObj(r.date).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }))}</span>
         <span style="white-space:pre-wrap">${esc(r.texte)}</span>${r.reponse ? `<div class="rt-rep"><b>Ton entraîneur :</b> <span style="white-space:pre-wrap">${esc(r.reponse)}</span></div>` : ""}</div>`).join("") : `<p class="notice">Tu n'as encore rien envoyé.</p>`}`;
@@ -633,10 +636,10 @@ window.CarnetArcherUI = (API, opts = {}) => {
       ${nf ? `<div class="card rt-notif"><div class="bar" style="align-items:center"><span>💬 <b>${nf} nouveau${nf > 1 ? "x" : ""} message${nf > 1 ? "s" : ""}</b> dans le fil des partenaires</span><span class="grow"></span><button class="btn primary" data-atab="retours" data-ptab-go="fil">Voir</button></div></div>` : ""}
       <div class="card ar-avant"><h3 class="hub-h">${PART() ? "★ Ton espace partenaire" : "✓ Ton espace testeur"}</h3>
       <span class="tirline" style="margin:0">${PART() ? "Merci pour ton partenariat ! Tes idées de terrain font avancer l'appli." : "Merci de tester les nouveautés !"} Un problème, une idée ? Envoie-les directement à ton entraîneur.</span>
-      <div class="acts-w">${API.retour && !PREVIEW ? `<button class="btn" data-act="retour-bug">🐞 Signaler un problème</button><button class="btn" data-act="retour-idee">💡 Proposer une idée</button>` : ""}
+      <div class="acts-w">${API.retour && !PREVIEW && AVT("retours") ? `<button class="btn" data-act="retour-bug">🐞 Signaler un problème</button><button class="btn" data-act="retour-idee">💡 Proposer une idée</button>` : ""}
         ${rts.length ? `<button class="btn ghost" data-atab="retours">Mes retours (${rts.length})</button>` : ""}
-        ${RT().parcours ? `<a class="btn ghost" href="${RT().parcours}" target="_blank" rel="noopener">🌲 Appli Tir Parcours</a>` : ""}</div>
-      ${PART() ? `<span class="tirline" style="margin:0">Thèmes et avatars réservés aux partenaires : dans tes Paramètres.</span>` : ""}</div>`;
+        ${RT().parcours && AVT("parcours") ? `<a class="btn ghost" href="${RT().parcours}" target="_blank" rel="noopener">🌲 Appli Tir Parcours</a>` : ""}</div>
+      ${PART() && AVT("perso") ? `<span class="tirline" style="margin:0">Thèmes et avatars réservés aux partenaires : dans tes Paramètres.</span>` : ""}</div>`;
   }
   function retourForm(type) {
     const el = $("#sheet"), bug = type === "bug";
@@ -1210,8 +1213,8 @@ window.CarnetArcherUI = (API, opts = {}) => {
     return `<div class="ar-params">
       <section class="card"><h3 class="hub-h">Mon avatar</h3>
         <div class="av-prev">${window.CarnetAvatar ? window.CarnetAvatar.svg(a, 72) : ""}<div style="display:grid;gap:6px"><b>${esc(name(a))}</b>${window.CarnetBadges ? window.CarnetBadges.html(a) : ""}<button class="btn" data-act="avatar">Changer d'avatar</button></div></div>
-        <span class="tirline">Un dessin à choisir, ou tes initiales. Ton entraîneur le voit sur ses listes.${PART() ? " ★ Partenaire : 4 dessins et 2 fonds rien que pour toi." : ""}</span></section>
-      ${PART() && !PREVIEW ? `<section class="card"><h3 class="hub-h">★ Thème partenaire</h3>
+        <span class="tirline">Un dessin à choisir, ou tes initiales. Ton entraîneur le voit sur ses listes.${PART() && AVT("perso") ? " ★ Partenaire : 4 dessins et 2 fonds rien que pour toi." : ""}</span></section>
+      ${PART() && AVT("perso") && !PREVIEW ? `<section class="card"><h3 class="hub-h">★ Thème partenaire</h3>
         <label class="f">Couleurs de l'appli<select data-pref="themeAr">${[["", "Normal"], ["or", "Or et marine"], ["argent", "Argent"]].map(([v, l]) => `<option value="${v}" ${(P.themeAr || "") === v ? "selected" : ""}>${l}</option>`).join("")}</select></label>
         <span class="tirline">Réservé aux archers partenaires. Pendant un thème de fête du club, c'est la fête qui s'affiche.</span></section>` : ""}
       ${TC() && API.demander ? (() => {
