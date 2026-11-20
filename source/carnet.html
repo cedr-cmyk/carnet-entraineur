@@ -2851,7 +2851,7 @@ const mtype = (m) => m?.type || "arc";
 const mtLab = (k, i = 1) => (MAT_TYPES.find(([x]) => x === k) || MAT_TYPES[0])[i];
 // Champs utiles selon le type : une poignée n'a pas de puissance, des branches n'ont pas de main
 const MAT_FIELDS = { arc: ["taille", "puissance", "main", "modele"], poignee: ["taille", "main", "modele"], branches: ["taille", "puissance", "modele"] };
-const has = (k, f) => MAT_FIELDS[k].includes(f);
+const has = (k, f) => (MAT_FIELDS[k] || MAT_FIELDS.arc).includes(f);
 const TAILLES = { arc: [48, 54, 58, 60, 62, 64, 66, 68, 70], poignee: [19, 21, 23, 25, 27], branches: ["Courtes", "Moyennes", "Longues", 66, 68, 70] };
 const tailleTxt = (m) => (m.taille ? (isNaN(Number(m.taille)) ? m.taille : m.taille + "″") : "");
 const matShort = (m) => `${mtLab(mtype(m), 3)} n°${m.numero}`;
@@ -2919,13 +2919,13 @@ function viewMateriel() {
   return h;
 }
 const typeRadios = (cur) => `<div class="f">Type de matériel<div class="radio" id="mt-type">${MAT_TYPES.map(([k, l]) => `<label><input type="radio" name="type" value="${k}" ${cur === k ? "checked" : ""}> ${l}</label>`).join("")}</div></div>`;
-const tailleList = (id, k) => `<datalist id="${id}">${TAILLES[k].map((t) => `<option value="${t}">`).join("")}</datalist>`;
+const tailleList = (id, k) => `<datalist id="${id}">${(TAILLES[k] || TAILLES.arc).map((t) => `<option value="${t}">`).join("")}</datalist>`;
 // Affiche ou masque les champs selon le type choisi dans un formulaire
 function bindMatType(prefix) {
   const upd = () => {
     const k = document.querySelector('#mt-type input:checked')?.value || "arc";
     ["puissance", "main", "modele"].forEach((f) => { const el = document.getElementById(`${prefix}-${f}-w`); if (el) el.hidden = !has(k, f); });
-    const dl = document.getElementById(`${prefix}-tl`); if (dl) dl.innerHTML = TAILLES[k].map((t) => `<option value="${t}">`).join("");
+    const dl = document.getElementById(`${prefix}-tl`); if (dl) dl.innerHTML = (TAILLES[k] || TAILLES.arc).map((t) => `<option value="${t}">`).join("");
     const lab = document.getElementById(`${prefix}-tlab`); if (lab) lab.textContent = k === "branches" ? "Taille (courtes, moyennes, longues ou pouces)" : k === "poignee" ? "Taille de la poignée (pouces)" : "Taille (pouces)";
     if (prefix === "mb") { const nx = Number(nextNum($("#mb-club").value, k)); $("#mb-from").value = nx; $("#mb-to").value = nx + 9; }
     else if (!S.matEdit && $("#mt-num")) $("#mt-num").value = nextNum($("#mt-club").value, k);
