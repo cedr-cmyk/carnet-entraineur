@@ -847,6 +847,8 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
 /* Téléphone : l'accueil ne déborde plus sur les bords (cartes qui ne s'élargissent pas avec leur contenu, lignes qui passent à la ligne) */
 .hub-grid { grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); }
 .hub-grid > *, .hub-stats > *, .wrap > * { min-width: 0; }
+/* V.1.10 : sur ordinateur, le carnet de l'entraîneur prend plus de largeur (l'espace archer garde sa largeur de lecture) */
+@media (min-width: 1100px) { .wrap, .top-in { max-width: min(1440px, calc(100vw - 64px)); } .ar-root .wrap, .ar-root .top-in { max-width: 920px; } }
 .hub-bar { flex-wrap: wrap; } .hub-bar .hub-h { min-width: 0; overflow-wrap: anywhere; }
 @media (max-width: 600px) {
   .hub-grid .row, .wrap > .card .list > .row { flex-wrap: wrap; row-gap: 6px; }
@@ -885,7 +887,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
 <div id="toast" class="toast" hidden></div>
 <input type="file" id="file-in" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.mp4,.webm,.txt,.md,.csv,application/pdf,image/*,video/mp4,video/webm,text/plain,text/markdown,text/csv">
 
-<script>window.CARNET_VERSION = { v: "1.10.31", date: "2026-11-20", site: "1.7.4", test: true };</script>
+<script>window.CARNET_VERSION = { v: "1.10.32", date: "2026-11-20", site: "1.7.4", test: true };</script>
 <script>
 // Espace archer : l'archer (ou son parent) voit uniquement ses propres informations,
 // telles que les renvoie la base (fonction espace_archer), et remplit son carnet.
