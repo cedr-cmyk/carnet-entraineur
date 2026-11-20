@@ -597,6 +597,31 @@ svg.chart .szl { stroke: var(--line-2, var(--line)); stroke-dasharray: 3 3; }
 .row-av { flex: none; display: flex; align-items: center; }
 .av-head { display: flex; align-items: center; gap: 14px; } .av-head h2 { margin: 0; }
 .badges { display: inline-flex; flex-wrap: wrap; gap: 6px; } .badge { display: inline-flex; align-items: center; font-size: .72rem; font-weight: 800; letter-spacing: .04em; border-radius: 999px; padding: 3px 10px; white-space: nowrap; }
+/* V.1.10 : thèmes réservés aux archers partenaires (choisis dans leurs paramètres ; un thème de fête du club passe devant) */
+:root[data-ar-theme="or"]:not([data-fete]) {
+  --bg: #0A1426; --surface: #10203A; --sunk: #0D1A31; --line: #1E3358; --line-2: #2C4675; --field: rgba(10,20,38,.88); --field-2: #7A5A0B; --muted: #A7B4CC;
+  --accent: #E8B931; --accent-2: #C99A14; --accent-ink: #13294B; --cyan: #7FB2FF; --gold: #F6D365;
+}
+:root[data-ar-theme="or"][data-theme="light"]:not([data-fete]) {
+  --bg: #F6F1E3; --surface: #FFFFFF; --sunk: #EEE5CC; --ink: #13294B; --muted: #4A5872; --line: #E6DBBB; --line-2: #D4C496; --field: rgba(255,255,255,.9); --field-ink: #13294B; --field-muted: #4A5872;
+  --accent: #A97C0A; --accent-2: #8A6408; --accent-ink: #fff; --cyan: #1F4E99; --gold: #A97C0A;
+}
+:root[data-ar-theme="argent"]:not([data-fete]) {
+  --bg: #0C0F14; --surface: #151A22; --sunk: #11151C; --line: #262D38; --line-2: #3A4350; --field: rgba(12,15,20,.88); --field-2: #3A4350; --muted: #A3ADBB;
+  --accent: #C9D3E0; --accent-2: #9AA7B8; --accent-ink: #0C0F14; --cyan: #8FD3FF; --gold: #E5E7EB;
+}
+:root[data-ar-theme="argent"][data-theme="light"]:not([data-fete]) {
+  --bg: #F1F3F6; --surface: #FFFFFF; --sunk: #E4E8EE; --ink: #111827; --muted: #4B5563; --line: #DDE2EA; --line-2: #C3CAD5; --field: rgba(255,255,255,.9); --field-ink: #111827; --field-muted: #4B5563;
+  --accent: #475569; --accent-2: #334155; --accent-ink: #fff; --cyan: #0369A1; --gold: #475569;
+}
+:root[data-ar-theme]:not([data-fete]) body { background-image: radial-gradient(1100px 480px at 85% -10%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 60%), radial-gradient(900px 480px at -10% 10%, color-mix(in srgb, var(--cyan) 8%, transparent), transparent 60%); }
+.ar-avant { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.ar-avant .acts-w { display: flex; flex-wrap: wrap; gap: 8px; }
+.rt-st { font-size: .72rem; font-weight: 700; border-radius: 999px; padding: 2px 9px; background: var(--sunk); color: var(--muted); white-space: nowrap; }
+.rt-st.s-retenu, .rt-st.s-encours { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--accent); }
+.rt-st.s-fait { background: var(--ok-soft); color: var(--ok); }
+.rt-st.s-nonretenu { background: color-mix(in srgb, var(--danger) 15%, transparent); color: var(--danger); }
+.rt-rep { border-left: 3px solid var(--accent); padding: 4px 0 4px 10px; margin-top: 6px; }
 .ar-nom { display: grid; gap: 5px; min-width: 0; } .ar-nom h1 { margin: 0; } .ar-nom .badges { display: flex; gap: 5px; } .ar-nom .badge { font-size: .68rem; padding: 2px 9px; box-shadow: 0 0 0 1px rgba(255,255,255,.18); }
 .badge.b-testeur { background: #4a6fa5; color: #fff; } .badge.b-partenaire { background: linear-gradient(135deg, #f6d365, #d4a017); color: #3a2a00; }
 .av-btn { position: relative; border: 0; background: none; padding: 0; cursor: pointer; border-radius: 50%; }
@@ -860,7 +885,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
 <div id="toast" class="toast" hidden></div>
 <input type="file" id="file-in" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.mp4,.webm,.txt,.md,.csv,application/pdf,image/*,video/mp4,video/webm,text/plain,text/markdown,text/csv">
 
-<script>window.CARNET_VERSION = { v: "1.10.30", date: "2026-11-19", site: "1.7.4", test: true };</script>
+<script>window.CARNET_VERSION = { v: "1.10.31", date: "2026-11-20", site: "1.7.4", test: true };</script>
 <script>
 // Espace archer : l'archer (ou son parent) voit uniquement ses propres informations,
 // telles que les renvoie la base (fonction espace_archer), et remplit son carnet.
@@ -1396,8 +1421,52 @@ window.CarnetArcherUI = (API, opts = {}) => {
       <div class="ar-nom"><h1>Espace <em>${esc(St.data?.archer ? name(St.data.archer) : name(who()))}</em></h1>${window.CarnetBadges && St.data?.archer ? window.CarnetBadges.html(St.data.archer) : ""}</div><span class="sub">${PREVIEW || TESTW ? "" : API.versCoach ? `<button class="btn" id="ar-coach">↩ Mode entraîneur</button>` : `<button class="btn ghost" id="ar-out">Se déconnecter</button>`}</span></div>
       <nav class="tabs" role="tablist">${shownTabs.map(([k, l]) => `<button class="tab" role="tab" aria-selected="${St.tab === k}" data-atab="${k}">${l}</button>`).join("")}</nav></div>`;
   }
+  // V.1.10 : avantages des badges (testeur, partenaire)
+  const BDG = () => St.data?.archer?.espace?.badges || {};
+  const PART = () => BDG().partenaire === true, TEST = () => BDG().testeur === true || PART();
+  const RT = () => window.CarnetRetours || { statuts: [], lib: (k) => k, type: {}, clos: [], parcours: "" };
+  function applyArTheme() {
+    if (PREVIEW || TESTW) return;
+    const v = PART() ? prefs().themeAr || "" : "", r = document.documentElement;
+    if (v) r.setAttribute("data-ar-theme", v); else r.removeAttribute("data-ar-theme");
+  }
+  function vAvantages() {
+    const rts = St.data.retours || [], nbRep = rts.filter((r) => r.reponse).length;
+    return `<div class="card ar-avant"><h3 class="hub-h">${PART() ? "★ Ton espace partenaire" : "✓ Ton espace testeur"}</h3>
+      <span class="tirline" style="margin:0">${PART() ? "Merci pour ton partenariat ! Tes idées de terrain font avancer l'appli." : "Merci de tester les nouveautés !"} Un problème, une idée ? Envoie-les directement à ton entraîneur.</span>
+      <div class="acts-w">${API.retour && !PREVIEW ? `<button class="btn" data-act="retour-bug">🐞 Signaler un problème</button><button class="btn" data-act="retour-idee">💡 Proposer une idée</button>` : ""}
+        ${rts.length ? `<button class="btn ghost" data-act="retours">Mes retours (${rts.length}${nbRep ? ` · ${nbRep} réponse${nbRep > 1 ? "s" : ""}` : ""})</button>` : ""}
+        ${RT().parcours ? `<a class="btn ghost" href="${RT().parcours}" target="_blank" rel="noopener">🌲 Appli Tir Parcours</a>` : ""}</div>
+      ${PART() ? `<span class="tirline" style="margin:0">Thèmes et avatars réservés aux partenaires : dans tes Paramètres.</span>` : ""}</div>`;
+  }
+  function retourForm(type) {
+    const el = $("#sheet"), bug = type === "bug";
+    el.innerHTML = `<div class="sheet-bg" data-close><form class="sheet" id="rt-form"><h3>${bug ? "🐞 Signaler un problème" : "💡 Proposer une idée"}</h3>
+      <label class="f">${bug ? "Qu'est-ce qui ne va pas ?" : "Ton idée"}<textarea name="t" required minlength="3" maxlength="1800" rows="6" placeholder="${bug ? "Ex. Sur l'onglet Concours, quand je touche « Ajouter », rien ne se passe." : "Ex. Pouvoir noter la météo sur un tir compté."}"></textarea></label>
+      <span class="tirline">${bug ? "Dis sur quel écran tu étais et ce que tu faisais. La version de l'appli et ton appareil sont ajoutés tout seuls." : "Ton entraîneur la verra tout de suite et te dira ce qu'il en pense."}</span>
+      <div class="acts"><button type="button" class="btn" data-close>Annuler</button><button class="btn primary">Envoyer</button></div></form></div>`;
+    el.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", (ev) => { if (ev.target === b) el.innerHTML = ""; }));
+    $("#rt-form").addEventListener("submit", async (ev) => {
+      ev.preventDefault(); let t = new FormData(ev.target).get("t").trim(); if (t.length < 3) return;
+      if (bug) { const ua = navigator.userAgent, app = /Android/i.test(ua) ? "Android" : /iPhone|iPad/i.test(ua) ? "iPhone/iPad" : /Windows/i.test(ua) ? "Windows" : /Mac/i.test(ua) ? "Mac" : "autre";
+        t += `\n\n— ${window.CARNET_VERSION ? "V." + window.CARNET_VERSION.v : "version ?"} · ${app}${window.matchMedia?.("(display-mode: standalone)").matches ? " · appli installée" : " · navigateur"} · écran ${innerWidth}×${innerHeight}`; }
+      const btn = ev.target.querySelector(".primary"); btn.disabled = true;
+      try { await API.retour(who(), type, t); el.innerHTML = ""; toast(bug ? "Merci ! Problème envoyé à ton entraîneur" : "Merci ! Idée envoyée à ton entraîneur");
+        try { St.data.retours = await API.mesRetours(who()); } catch (e) { /* liste rechargée plus tard */ } render(); }
+      catch (err) { btn.disabled = false; toast(/archer_retour|function/i.test(err.message) ? "Ton entraîneur doit d'abord mettre l'appli à jour (script 17)." : /trop de retours/.test(err.message) ? "Beaucoup d'envois aujourd'hui : réessaie demain." : "Non envoyé : " + err.message); }
+    });
+  }
+  function retoursListe() {
+    const el = $("#sheet"), rts = St.data.retours || [];
+    el.innerHTML = `<div class="sheet-bg" data-close><div class="sheet"><h3>Mes retours</h3>
+      ${rts.length ? rts.map((r) => `<div class="card" style="gap:4px"><div class="bar" style="align-items:center"><b>${RT().type[r.type] || "Retour"}</b><span class="grow"></span><span class="rt-st s-${esc(r.statut)}">${esc(RT().lib(r.statut))}</span></div>
+        <span class="tirline" style="margin:0">${esc(dObj(r.date).toLocaleDateString("fr-FR", { day: "numeric", month: "long" }))}</span>
+        <span style="white-space:pre-wrap">${esc(r.texte)}</span>${r.reponse ? `<div class="rt-rep"><b>Ton entraîneur :</b> <span style="white-space:pre-wrap">${esc(r.reponse)}</span></div>` : ""}</div>`).join("") : `<p class="tirline">Rien d'envoyé pour l'instant.</p>`}
+      <div class="acts"><button type="button" class="btn" data-close>Fermer</button></div></div></div>`;
+    el.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", (ev) => { if (ev.target === b) el.innerHTML = ""; }));
+  }
   function render() {
-    header();
+    header(); applyArTheme();
     let h = "";
     if (PREVIEW || TESTW) h += "";
     else if (St.list.length > 1) h += `<div class="chips" role="group" aria-label="Archer">${St.list.map((a, i) => `<button class="chip" data-who="${i}" aria-pressed="${i === St.cur}">${esc(name(a))}</button>`).join("")}<button class="chip" data-act="add-code">+ Code</button></div>`;
@@ -1454,6 +1523,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     (St.data.mots || []).filter((x) => !x.archive).forEach((x) => it.push({ k: "w:" + x.id + ":" + String(x.texte || "").length, txt: `Un message de ton entraîneur (${dObj(x.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })})`, go: `data-atab="accueil"` }));
     St.data.entrees.filter((x) => x.commentaireCoach && !x.motArchive).forEach((x) => it.push({ k: "m:" + x.id + ":" + x.commentaireCoach.length, txt: `Un mot de ton entraîneur (${dObj(x.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })})`, go: `data-entry="${esc(x.id)}"` }));
     if (m.has("documents")) (St.data.documents || []).forEach((x) => it.push({ k: "d:" + x.id, txt: `Document : ${x.titre || x.nomFichier || "nouveau document"}`, go: `data-atab="documents"` }));
+    (St.data.retours || []).filter((x) => x.reponse).forEach((x) => it.push({ k: "r:" + x.id + ":" + x.reponse.length, txt: `Ton entraîneur a répondu à ${x.type === "bug" ? "ton signalement" : "ton idée"}`, go: `data-act="retours"` }));
     (St.data.annonces || []).forEach((x) => it.push({ k: "a:" + x.id, txt: `Info du club : ${x.titre || ""}`, go: `data-act="vu-info"` }));
     return it;
   }
@@ -1480,6 +1550,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     h += q.length ? `<div class="ar-quick${q.length === 1 ? " one" : ""}">${q.join("")}</div>` : "";
     if (nouv.length) h += `<div class="card ar-new"><div class="bar"><b>✨ Du nouveau depuis ta dernière visite</b><span class="grow"></span><button class="btn" data-act="vu">Vu ✓</button></div>
       <ul class="ar-new-l">${nouv.map((n) => `<li><button class="lnk" ${n.go}>${esc(n.txt)}</button></li>`).join("")}</ul></div>`;
+    if (TEST()) h += vAvantages();
     if (mots.length || motsArch.length) h += `<div class="card ar-mots"><h3 class="hub-h">💬 Messages de ton entraîneur</h3>
       ${mots.length ? mots.map(motHtml).join("") : `<p class="tirline" style="margin:0">Tu as tout lu ✓</p>`}
       ${motsArch.length ? `<details class="ar-mots-arch" ${St.motsArchOpen ? "open" : ""}><summary class="tirline">Messages archivés (${motsArch.length})</summary>${motsArch.map(motHtml).join("")}</details>` : ""}</div>`;
@@ -1937,7 +2008,10 @@ window.CarnetArcherUI = (API, opts = {}) => {
     return `<div class="ar-params">
       <section class="card"><h3 class="hub-h">Mon avatar</h3>
         <div class="av-prev">${window.CarnetAvatar ? window.CarnetAvatar.svg(a, 72) : ""}<div style="display:grid;gap:6px"><b>${esc(name(a))}</b>${window.CarnetBadges ? window.CarnetBadges.html(a) : ""}<button class="btn" data-act="avatar">Changer d'avatar</button></div></div>
-        <span class="tirline">Un dessin à choisir, ou tes initiales. Ton entraîneur le voit sur ses listes.</span></section>
+        <span class="tirline">Un dessin à choisir, ou tes initiales. Ton entraîneur le voit sur ses listes.${PART() ? " ★ Partenaire : 4 dessins et 2 fonds rien que pour toi." : ""}</span></section>
+      ${PART() && !PREVIEW ? `<section class="card"><h3 class="hub-h">★ Thème partenaire</h3>
+        <label class="f">Couleurs de l'appli<select data-pref="themeAr">${[["", "Normal"], ["or", "Or et marine"], ["argent", "Argent"]].map(([v, l]) => `<option value="${v}" ${(P.themeAr || "") === v ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+        <span class="tirline">Réservé aux archers partenaires. Pendant un thème de fête du club, c'est la fête qui s'affiche.</span></section>` : ""}
       ${TC() && API.demander ? (() => {
         const esp = a.espace || {}, dm = esp.demandes || {};
         const ligne = ([k, l, d]) => `<div class="bar" style="align-items:flex-start"><div style="min-width:0;flex:1"><b>${l}</b><span class="tirline" style="display:block">${d}</span></div>
@@ -2084,7 +2158,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
   // ---------- Événements ----------
   root.addEventListener("change", (ev) => {
     const t = ev.target;
-    if (t.dataset.pref) { setPref(t.dataset.pref, t.value.trim()); toast("Préférence enregistrée"); return; }
+    if (t.dataset.pref) { setPref(t.dataset.pref, t.value.trim()); if (t.dataset.pref === "themeAr") applyArTheme(); toast("Préférence enregistrée"); return; }
     if (t.hasAttribute("data-pref-chrono")) { chronoStore.setLast(t.value); toast("Réglage du chrono enregistré"); }
   });
   root.addEventListener("click", async (ev) => {
@@ -2134,6 +2208,8 @@ window.CarnetArcherUI = (API, opts = {}) => {
     if (t.dataset.motRep) { const [k, id] = t.dataset.motRep.split("|"); motRepondre(k, id); return; }
     if (t.dataset.motArch) { const [k, id, on] = t.dataset.motArch.split("|"); motAction(k, id, on === "1" ? "archiver" : "desarchiver"); return; }
     if (t.dataset.act === "all-ent") { St.allEnt = !St.allEnt; render(); return; }
+    if (t.dataset.act === "retour-bug" || t.dataset.act === "retour-idee") { retourForm(t.dataset.act === "retour-bug" ? "bug" : "idee"); return; }
+    if (t.dataset.act === "retours") { retoursListe(); return; }
     if (t.dataset.act === "avatar" && window.CarnetAvatar) {
       window.CarnetAvatar.choisir(St.data.archer, async (v) => {
         if (PREVIEW) { toast("Aperçu : l'archer choisira son avatar ici"); return; }
@@ -2174,6 +2250,12 @@ const BADGES = [["testeur", "✓ Testeur", "Teste les nouvelles versions de l'ap
 const badgesOf = (a) => BADGES.filter(([k]) => a?.espace?.badges?.[k] === true);
 const badgesHtml = (a) => { const b = badgesOf(a); return b.length ? `<span class="badges">${b.map(([k, l]) => `<span class="badge b-${k}">${l}</span>`).join("")}</span>` : ""; };
 window.CarnetBadges = { liste: BADGES, de: (a) => badgesOf(a), html: (a) => badgesHtml(a) };
+// V.1.10 : avantages des badges — retours (problèmes, idées) envoyés par les testeurs et partenaires (script 17)
+const RT_ST = [["nouveau", "Nouveau"], ["vu", "Vu"], ["retenu", "Retenu"], ["encours", "En cours"], ["fait", "Fait"], ["nonretenu", "Pas retenu"]];
+const rtStLib = (k) => (RT_ST.find(([x]) => x === k) || RT_ST[0])[1];
+const RT_TYPE = { bug: "🐞 Problème", idee: "💡 Idée" };
+const RT_CLOS = ["fait", "nonretenu"];
+window.CarnetRetours = { statuts: RT_ST, lib: rtStLib, type: RT_TYPE, clos: RT_CLOS, parcours: "https://cedr-cmyk.github.io/tir-parcours/" };
 // ---------- Thèmes de fête (V.1.8) : Noël, Noël et fêtes de fin d'année, diffusés entre deux dates chaque année ----------
 const FETES = [["noel", "Noël", "🎄", "12-01", "12-26"], ["fetes", "Noël et fêtes de fin d'année", "✨", "12-01", "01-03"]];
 // Thèmes créés par l'entraîneur (V.1.9) : causes et événements (Octobre rose, Movember, Mars bleu…), rangés dans fetes.perso
@@ -2270,7 +2352,7 @@ const PALETTE = [
   ["#6aa84f", "Vert pomme"], ["#8a9a3b", "Olive"], ["#8b5a2b", "Marron"], ["#a8896c", "Sable"], ["#7d8a96", "Gris"], ["#3a4652", "Ardoise"],
 ];
 const COLORS = PALETTE.map(([c]) => c);
-const S = { clubs: [], archers: [], seances: [], mots: [], tab: "accueil", club: "all", q: "", seance: null, archer: null, loaded: {}, db: null, canWrite: true, past: false, suivi: null, tirOpen: null, overlay: {}, tt: {}, stale: false, evaluations: [], evaluation: null, evalFrom: null, evalOv: {}, evalT: {}, dossiers: [], documents: [], fiches: [], animations: [], anim: null, animVue: null, exMode: null, fTheme: "all", folder: null, assets: null, uploading: 0, parametres: [], attributions: [], concours: [], materiel: [], matEtat: "all", concoursId: null, coSaison: null, carnets: [], centrees: [], annonces: [], reponses: [], carnet: null, cSaison: null, cTab: null, cMonth: 9 };
+const S = { clubs: [], archers: [], seances: [], mots: [], tab: "accueil", club: "all", q: "", seance: null, archer: null, loaded: {}, db: null, canWrite: true, past: false, suivi: null, tirOpen: null, overlay: {}, tt: {}, stale: false, evaluations: [], evaluation: null, evalFrom: null, evalOv: {}, evalT: {}, dossiers: [], documents: [], fiches: [], animations: [], anim: null, animVue: null, exMode: null, fTheme: "all", folder: null, assets: null, uploading: 0, parametres: [], attributions: [], concours: [], materiel: [], matEtat: "all", concoursId: null, coSaison: null, carnets: [], centrees: [], annonces: [], reponses: [], retours: [], carnet: null, cSaison: null, cTab: null, cMonth: 9 };
 const $ = (s) => document.querySelector(s);
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const todayISO = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
@@ -4597,7 +4679,7 @@ function espaceCard(a) {
     ${p === "perso" ? "" : `<span class="tirline">Choisissez « Personnalisé » pour cocher vous-même chaque partie.</span>`}
     ${disciplinesHtml(a, dis)}
     <div class="f">Badges<div class="esp-mods">${BADGES.map(([k, l, t]) => `<label class="esp-m${a.espace?.badges?.[k] === true ? " on" : ""}"><input type="checkbox" data-espbadge="${k}" ${a.espace?.badges?.[k] === true ? "checked" : ""} ${dis}><span><b>${l}</b><small>${t}</small></span></label>`).join("")}</div></div>
-    <span class="tirline">Le badge s'affiche sur sa fiche et sur l'accueil de son espace archer.</span></div>`;
+    <span class="tirline">Le badge s'affiche sous son nom. Avec un badge, il peut t'envoyer des problèmes et des idées, et il a le lien de l'appli Tir Parcours. Partenaire : en plus, thèmes et avatars exclusifs, et les documents réservés aux partenaires.</span></div>`;
 }
 // Paramètres › Espace archers : trois rubriques
 let accTous = null;
@@ -4693,14 +4775,25 @@ const AV = {
   flamme: ["Flamme", `<path d="M32 8q14 14 12 28a12 12 0 0 1-24 0q0-8 6-14 0 8 6 8-4-10 0-22z" fill="#F97316"/><path d="M32 30q8 8 5 15a6 6 0 0 1-10 0q-1-6 5-15z" fill="#FDE047"/>`],
   montagne: ["Montagne", `<path d="M6 50l18-28 10 14 6-8 18 22z" fill="#475569"/><path d="M24 22l-5 8 4-2 3 3 3-3z M40 28l-3 5 3-1 2 2 2-2z" fill="#FFF"/><circle cx="48" cy="16" r="5" fill="#FBBF24"/>`],
 };
+// V.1.10 : dessins réservés aux archers partenaires (badge ★), et deux fonds dorés en plus
+const AV_EXCLU = {
+  couronne: ["Couronne", `<path d="M12 44l-2-24 12 10 10-16 10 16 12-10-2 24z" fill="#F6C945" stroke="#A16207" stroke-width="2" stroke-linejoin="round"/><rect x="12" y="44" width="40" height="7" rx="2" fill="#D4A017" stroke="#A16207" stroke-width="2"/><circle cx="32" cy="33" r="3.4" fill="#DC2626"/><circle cx="21" cy="37" r="2.4" fill="#2563EB"/><circle cx="43" cy="37" r="2.4" fill="#16A34A"/>`],
+  medaille: ["Médaille", `<path d="M22 8h8l6 16h-8zM42 8h-8l-6 16h8z" fill="#1E3A8A"/><path d="M28 8h8l-4 14z" fill="#DC2626"/><circle cx="32" cy="40" r="15" fill="#F6C945" stroke="#A16207" stroke-width="2.4"/><circle cx="32" cy="40" r="10" fill="none" stroke="#A16207" stroke-width="1.6"/><path d="M32 33l2.2 4.6 5 .6-3.7 3.4 1 5-4.5-2.5-4.5 2.5 1-5-3.7-3.4 5-.6z" fill="#A16207"/>`],
+  trophee: ["Trophée", `<path d="M20 12h24v12a12 12 0 0 1-24 0z" fill="#F6C945" stroke="#A16207" stroke-width="2"/><path d="M20 15h-6a6 6 0 0 0 6 10M44 15h6a6 6 0 0 1-6 10" stroke="#A16207" stroke-width="2.4" fill="none"/><rect x="29" y="35" width="6" height="8" fill="#D4A017"/><rect x="21" y="43" width="22" height="8" rx="2" fill="#78350F"/><path d="M32 17l1.6 3.2 3.5.5-2.5 2.4.6 3.5-3.2-1.7-3.2 1.7.6-3.5-2.5-2.4 3.5-.5z" fill="#FFF7D6"/>`],
+  blason: ["Blason d'or", `<path d="M14 12h36v18c0 12-8 19-18 24-10-5-18-12-18-24z" fill="#13294B" stroke="#D4A017" stroke-width="3" stroke-linejoin="round"/><circle cx="32" cy="29" r="10" fill="none" stroke="#F6C945" stroke-width="2.4"/><circle cx="32" cy="29" r="5" fill="none" stroke="#F6C945" stroke-width="2.4"/><circle cx="32" cy="29" r="1.8" fill="#F6C945"/><path d="M20 46l24-24" stroke="#FFF" stroke-width="2"/><path d="M44 22l-6 1 5 5z" fill="#FFF"/>`],
+};
+const AV_FONDS_EXCLU = ["#F6D365", "#13294B"];
+const avDef = (id) => AV[id] || AV_EXCLU[id];
+const estPartenaire = (a) => a?.espace?.badges?.partenaire === true;
 const avHash = (s) => [...String(s || "")].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
 const avInit = (a) => ((a?.prenom || "").trim()[0] || "") + ((a?.nom || "").trim()[0] || "") || "?";
 // Avatar d'un archer (ou de toute fiche {prenom, nom, avatar}) ; size en px
 function avatarSvg(a, size = 40) {
-  const av = a?.avatar, d = av && AV[av.id];
+  const av = a?.avatar, d = av && avDef(av.id);
   const fond = (av && av.fond) || AV_FONDS[avHash(a?.id || (a?.prenom || "") + (a?.nom || "")) % AV_FONDS.length];
   const inner = d ? d[1] : `<text x="32" y="41" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="24" font-weight="800" fill="${AV_K}">${esc(avInit(a).toUpperCase())}</text>`;
-  return `<svg class="av" width="${size}" height="${size}" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="32" fill="${fond}"/><g>${inner}</g></svg>`;
+  // archer partenaire : liseré doré autour de l'avatar
+  return `<svg class="av" width="${size}" height="${size}" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="32" fill="${fond}"/><g>${inner}</g>${estPartenaire(a) ? `<circle cx="32" cy="32" r="30.4" fill="none" stroke="#D4A017" stroke-width="3.2"/>` : ""}</svg>`;
 }
 // Fenêtre de choix : onPick({id, fond} | null pour revenir aux initiales)
 function avatarPicker(a, onPick) {
@@ -4709,9 +4802,10 @@ function avatarPicker(a, onPick) {
   const draw = () => {
     const prev = { ...a, avatar: cur.id ? cur : null };
     el.innerHTML = `<div class="sheet" role="dialog" aria-label="Choisir un avatar"><h3>Choisir un avatar</h3>
-      <div class="av-prev">${avatarSvg(cur.id ? { ...prev, avatar: { id: cur.id, fond: cur.fond || AV_FONDS[0] } } : prev, 88)}<b>${esc(cur.id ? AV[cur.id][0] : "Initiales")}</b></div>
+      <div class="av-prev">${avatarSvg(cur.id ? { ...prev, avatar: { id: cur.id, fond: cur.fond || AV_FONDS[0] } } : prev, 88)}<b>${esc(cur.id && avDef(cur.id) ? avDef(cur.id)[0] : "Initiales")}</b></div>
       <div class="av-grid" role="group" aria-label="Dessins">${[["", "Initiales"], ...Object.entries(AV).map(([k, v]) => [k, v[0]])].map(([k, n]) => `<button type="button" class="av-pick" data-av="${k}" aria-pressed="${cur.id === k}" aria-label="${esc(n)}">${avatarSvg(k ? { avatar: { id: k, fond: cur.fond || AV_FONDS[0] } } : a, 52)}</button>`).join("")}</div>
-      <div class="f">Couleur du fond<div class="av-cols">${AV_FONDS.map((c) => `<button type="button" class="av-col" data-fond="${c}" aria-pressed="${(cur.fond || "") === c}" aria-label="Fond ${c}" style="background:${c}"></button>`).join("")}</div></div>
+      ${estPartenaire(a) ? `<div class="f">★ Réservés aux archers partenaires<div class="av-grid" role="group" aria-label="Dessins des partenaires">${Object.entries(AV_EXCLU).map(([k, v]) => `<button type="button" class="av-pick" data-av="${k}" aria-pressed="${cur.id === k}" aria-label="${esc(v[0])}">${avatarSvg({ avatar: { id: k, fond: cur.fond || AV_FONDS_EXCLU[0] } }, 52)}</button>`).join("")}</div></div>` : ""}
+      <div class="f">Couleur du fond<div class="av-cols">${[...AV_FONDS, ...(estPartenaire(a) ? AV_FONDS_EXCLU : [])].map((c) => `<button type="button" class="av-col" data-fond="${c}" aria-pressed="${(cur.fond || "") === c}" aria-label="Fond ${c}" style="background:${c}"></button>`).join("")}</div></div>
       <div class="acts"><button type="button" class="btn" data-avx="no">Annuler</button><button type="button" class="btn primary" data-avx="ok">Choisir</button></div></div>`;
   };
   el.addEventListener("click", (ev) => {
@@ -4850,6 +4944,36 @@ function dashResRow(x) {
   const evo = d == null ? `<span class="evo">1er concours</span>` : d > 0 ? `<span class="evo up" title="Points de plus que sa moyenne précédente">▲ +${f(d)} pts <small>(+${pc(d)} %)</small></span>` : d < 0 ? `<span class="evo down" title="Points de moins que sa moyenne précédente">▼ ${f(d)} pts <small>(${pc(d)} %)</small></span>` : `<span class="evo">= stable</span>`;
   return `<div class="row"><span class="row-av">${avatarSvg(x.a, 36)}</span><span class="main"><span class="t">${esc(fullName(x.a))}</span><span class="m">${x.moy == null ? "pas de concours précédent" : `moyenne précédente ${f(x.moy)} pts sur ${x.n} concours`}${x.r.categorie ? " · " + esc(x.r.categorie) : ""}</span></span><span class="count">${esc(x.r.score)}<small> pts</small></span>${evo}</div>`;
 }
+// Accueil de l'entraîneur : problèmes et idées envoyés par les archers testeurs / partenaires
+function retoursCard() {
+  const all = (S.retours || []).filter((r) => S.archers.some((a) => a.id === r.archerId)); if (!all.length) return "";
+  const rec = (p, q) => (q.createdAt || 0) - (p.createdAt || 0);
+  const ouverts = all.filter((r) => !RT_CLOS.includes(r.statut)).sort(rec), clos = all.filter((r) => RT_CLOS.includes(r.statut)).sort(rec);
+  const row = (r) => { const a = S.archers.find((x) => x.id === r.archerId);
+    return `<div class="row" style="flex-wrap:wrap;align-items:flex-start"><span class="main"><span class="t">${RT_TYPE[r.type] || "Retour"} · ${esc(fullName(a))} ${(r.statut || "nouveau") === "nouveau" ? `<span class="tag today">Nouveau</span>` : `<span class="rt-st s-${esc(r.statut)}">${rtStLib(r.statut)}</span>`}</span>
+      <span class="m">${esc(fmtLong(r.date))}</span><span class="m" style="white-space:pre-wrap;color:var(--ink)">${esc(r.texte)}</span>${r.reponse ? `<span class="m rt-rep">Ta réponse : ${esc(r.reponse)}</span>` : ""}</span>
+      ${S.canWrite ? `<button class="btn" data-retour="${esc(r.id)}">${r.reponse ? "Modifier" : "Répondre"}</button>` : ""}</div>`; };
+  const nb = all.filter((r) => (r.statut || "nouveau") === "nouveau").length;
+  return `<div class="card" data-carte="retours"><div class="hub-bar"><h3 class="hub-h">💡 Retours des testeurs et partenaires${nb ? ` · ${nb} nouveau${nb > 1 ? "x" : ""}` : ""}</h3></div>
+    ${ouverts.length ? `<div class="list">${ouverts.map(row).join("")}</div>` : `<p class="tirline" style="margin:0">Tout est traité ✓</p>`}
+    ${clos.length ? `<details><summary class="tirline">Retours traités (${clos.length})</summary><div class="list">${clos.map(row).join("")}</div></details>` : ""}</div>`;
+}
+function formRetour(id) {
+  const r = (S.retours || []).find((x) => x.id === id); if (!r) return; const a = S.archers.find((x) => x.id === r.archerId);
+  const cur = (r.statut || "nouveau") === "nouveau" ? "vu" : r.statut;
+  sheet(`${RT_TYPE[r.type] || "Retour"} de ${fullName(a)}`, `
+    <span class="tirline">${esc(fmtLong(r.date))}</span><p style="white-space:pre-wrap;margin:0">${esc(r.texte)}</p>
+    <label class="f" for="rt-st">Où en est-il ?<select id="rt-st" name="statut">${RT_ST.map(([k, l]) => `<option value="${k}" ${cur === k ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+    <label class="f" for="rt-rep">Ta réponse (l'archer la voit dans son espace)<textarea id="rt-rep" name="reponse" maxlength="2000" placeholder="Ex. Merci, c'est corrigé dans la prochaine version.">${esc(r.reponse || "")}</textarea></label>`, {
+    onSave(fd) {
+      const v = { statut: fd.get("statut") || "vu", reponse: String(fd.get("reponse") || "").trim() };
+      if (v.reponse !== (r.reponse || "")) v.reponseLe = Date.now();
+      Object.assign(r, v); patch("retours", r.id, v); toast(v.reponse && v.reponseLe ? "Réponse envoyée à l'archer" : "Retour mis à jour"); render();
+    },
+    onDelete: () => { S.retours = S.retours.filter((x) => x.id !== r.id); remove("retours", r.id); toast("Retour supprimé"); render(); }, deleteLabel: "Supprimer",
+  });
+}
+document.addEventListener("click", (e) => { const b = e.target.closest("[data-retour]"); if (b) formRetour(b.dataset.retour); });
 function viewAccueil() {
   if (!S.clubs.length) return startHere();
   const coA = prm().co || {}, showNext = coA.accProchain !== "non", showRes = coA.accResultats !== "non";
@@ -4890,6 +5014,7 @@ function viewAccueil() {
     </div>
     ${ENC() ? "" : (() => { const l = S.archers.filter((x) => !x.archive).flatMap((x) => demandesDe(x).map((d) => [x, d])).sort((p, q) => byName(p[0], q[0]));
       return l.length ? `<div class="card" data-carte="demandes"><div class="hub-bar"><h3 class="hub-h">🙋 Demandes d'accès des archers</h3></div><div class="list">${l.map(([x, [k, lib]]) => `<div class="row" style="flex-wrap:wrap"><span class="main"><span class="t">${esc(fullName(x))}</span><span class="m">demande ${lib}</span></span>${S.canWrite ? `<button class="btn primary" data-disc-ok="${k}" data-aid="${x.id}">Accepter</button><button class="btn" data-disc-non="${k}" data-aid="${x.id}">Refuser</button>` : ""}</div>`).join("")}</div></div>` : ""; })()}
+    ${ENC() ? "" : retoursCard()}
     ${ENC() ? "" : espaceArchersCard(inC)}
     ${todoL.length ? `<details class="card hub-todo"><summary><i class="hub-ico c-cyan">${ICON.list}</i><b>${todoL.length} exercice${todoL.length > 1 ? "s" : ""} attribué${todoL.length > 1 ? "s" : ""} pas encore fait${todoL.length > 1 ? "s" : ""}</b><span class="grow"></span><span class="hub-chev" aria-hidden="true">›</span></summary>
       <div class="list">${todoL.map((x) => { const d = docOf(x.documentId), se = S.seances.find((y) => y.id === x.seanceId), a = S.archers.find((y) => y.id === x.archerId);
@@ -5070,7 +5195,7 @@ async function previewArcher(aid, testWrite = false) {
       seances: S.seances.filter((x) => (x.presents || []).includes(aid)).map((x) => ({ id: x.id, date: x.date, heure: x.heure, groupe: x.groupe, theme: x.theme, lieu: x.lieu, clubId: x.clubId, exercices: (x.exercices || []).map((d) => docOf(d)?.titre).filter(Boolean) })),
       annonces: S.annonces.filter((n) => annActive(n) && (!(n.clubIds || []).length || n.clubIds.some((id) => (a.clubIds || []).includes(id)))),
       animations: S.animations.filter((n) => (n.partage && (n.participants || []).includes(aid)) || animEquipes(n).some((e) => e.chefId === aid || (arModules(S.archers.find((x) => x.id === aid), nbConcoursOf(aid)).has("animations") && e.membres.includes(aid)))).sort((x, y) => (y.date || "").localeCompare(x.date || "")).map((n) => animPourArcher(n, aid)),
-      documents: S.documents.filter((d) => (d.partageArchers || []).includes(a.id) || ((d.partageClubs || []).some((id) => id === "*" || (a.clubIds || []).includes(id)) && !(d.partageExclus || []).includes(a.id))).map((d) => ({ id: d.id, titre: d.titre, description: d.description, assetId: d.assetId, contentType: d.contentType, nomFichier: d.nomFichier, video: d.video, partageLe: d.partageLe })),
+      documents: S.documents.filter((d) => (d.partageArchers || []).includes(a.id) || (((d.partageClubs || []).some((id) => id === "*" || (a.clubIds || []).includes(id)) || viaBadge(d, a)) && !(d.partageExclus || []).includes(a.id))).map((d) => ({ id: d.id, titre: d.titre, description: d.description, assetId: d.assetId, contentType: d.contentType, nomFichier: d.nomFichier, video: d.video, partageLe: d.partageLe })),
       entrainements: S.seances.filter((s) => s.public && s.date >= todayISO() && s.date <= addDaysISO(todayISO(), 42) && concerne(s, a)).sort((p, q) => (p.date + (p.heure || "")).localeCompare(q.date + (q.heure || ""))).map((s) => {
         const rs = repsOf(s.id), names = (v) => rs.filter((r) => r.reponse === v).map((r) => S.archers.find((x) => x.id === r.archerId)).sort(byName).map(fullName);
         return { id: s.id, date: s.date, heure: s.heure, groupe: s.groupe, theme: s.theme, lieu: s.lieu, clubId: s.clubId, public: s.public, reponse: rs.find((r) => r.archerId === aid)?.reponse || null,
@@ -5156,7 +5281,7 @@ function reponsesBlock(s) {
 function espaceArchersCard(inC) {
   const today = todayISO();
   const ann = S.annonces.filter((n) => S.club === "all" || !(n.clubIds || []).length || n.clubIds.includes(S.club)).sort((a, b) => (annActive(b) ? 2 : annProg(b) ? 1 : 0) - (annActive(a) ? 2 : annProg(a) ? 1 : 0) || (b.important ? 1 : 0) - (a.important ? 1 : 0) || (b.date || "").localeCompare(a.date || ""));
-  const docs = S.documents.filter((d) => (d.partageClubs || []).length && (S.club === "all" || d.partageClubs.includes("*") || d.partageClubs.includes(S.club))).sort((a, b) => (b.partageLe || 0) - (a.partageLe || 0));
+  const docs = S.documents.filter((d) => ((d.partageClubs || []).length && (S.club === "all" || d.partageClubs.includes("*") || d.partageClubs.includes(S.club))) || (S.club === "all" && (d.partageBadges || []).length)).sort((a, b) => (b.partageLe || 0) - (a.partageLe || 0));
   const prop = S.seances.filter((s) => s.public && s.date >= today && inC(s.clubId)).sort((a, b) => (a.date + (a.heure || "")).localeCompare(b.date + (b.heure || ""))).slice(0, 6);
   return `<h2 class="sec">Espace des archers</h2><div class="hub-grid">
     <div class="card"><div class="hub-bar"><h3 class="hub-h">Infos importantes</h3>${S.canWrite ? `<button class="btn" data-act="new-annonce">+ Nouvelle info</button>` : ""}</div>
@@ -5164,7 +5289,7 @@ function espaceArchersCard(inC) {
         ${n.texte ? `<span class="m">${esc(n.texte.slice(0, 120))}${n.texte.length > 120 ? "…" : ""}</span>` : ""}<span class="m">${esc(clubsLab(n.clubIds))}${n.jusquau ? ` · ${annActive(n) ? "jusqu'au" : "terminée le"} ${esc(dObj(n.jusquau).toLocaleDateString("fr-FR"))}` : ""}</span></span><span class="count" aria-hidden="true">›</span></button>`).join("")}</div>`
         : `<p class="notice">Les infos que tu écris ici s'affichent en haut de l'accueil des archers de chaque club concerné (date du concours du club, fermeture du gymnase, licences à renouveler…).</p>`}
       <div class="hub-bar" style="margin-top:6px"><h3 class="hub-h">Documents partagés</h3>${S.canWrite ? `<button class="btn" data-act="new-partage">+ Partager un document</button>` : ""}</div>
-      ${docs.length ? `<div class="list">${docs.map((d) => `<div class="row"><span class="thumb">${KIND_LAB[kind(d.contentType)] || "DOC"}</span><span class="main"><button class="lnk" data-doc="${d.id}">${esc(d.titre || d.nomFichier)}</button><span class="m">${esc(clubsLab(d.partageClubs))}</span></span>
+      ${docs.length ? `<div class="list">${docs.map((d) => `<div class="row"><span class="thumb">${KIND_LAB[kind(d.contentType)] || "DOC"}</span><span class="main"><button class="lnk" data-doc="${d.id}">${esc(d.titre || d.nomFichier)}</button><span class="m">${esc([(d.partageClubs || []).length ? clubsLab(d.partageClubs) : "", (d.partageBadges || []).length ? "★ Réservé aux " + d.partageBadges.map((b) => BADGE_GROUPES[b] || b).join(" et ") : ""].filter(Boolean).join(" · "))}</span></span>
         ${S.canWrite ? `<button class="btn ghost" data-partage="${d.id}">Modifier</button>` : ""}</div>`).join("")}</div>`
         : `<p class="notice">Calendrier des concours, règlement intérieur, fiche d'inscription… Les documents partagés sont visibles par tous les archers des clubs choisis, dans l'onglet « Documents » de leur espace.</p>`}</div>
     <div class="card"><div class="hub-bar"><h3 class="hub-h">Entraînements proposés</h3><button class="btn ghost" data-tab="seances">Séances</button></div>
@@ -5233,31 +5358,33 @@ function formAnnonce(n = null) {
 }
 
 function formPartage(d = null) {
-  const ids = d?.partageClubs || [], arIds = d?.partageArchers || [];
+  const ids = d?.partageClubs || [], arIds = d?.partageArchers || [], bIds = d?.partageBadges || [];
   const arChoix = S.archers.filter((a) => a.actif !== false).sort(byName);
   const choix = S.documents.slice().sort((a, b) => (a.titre || a.nomFichier || "").localeCompare(b.titre || b.nomFichier || "", "fr"));
   sheet(d ? "Partage du document" : "Partager un document avec les archers", `
     ${d ? `<b>${esc(d.titre || d.nomFichier)}</b>` : `<label class="f" for="pa-doc">Document de ta bibliothèque<select id="pa-doc" name="docId"><option value="">— choisir —</option>${choix.map((x) => `<option value="${x.id}">${esc(x.titre || x.nomFichier)}</option>`).join("")}</select></label>
       ${S.assets ? `<label class="f" for="pa-file">Ou un nouveau fichier (PDF, image)<input type="file" id="pa-file" name="file" accept="application/pdf,image/*"></label>` : ""}`}
     <div class="f">Visible par les archers de<div class="checks"><label><input type="checkbox" name="club" value="*" ${ids.includes("*") || (!d && !ids.length) ? "checked" : ""}>Tous les clubs</label>${S.clubs.map((c) => `<label><input type="checkbox" name="club" value="${c.id}" ${ids.includes(c.id) ? "checked" : ""}>${esc(c.nom)}</label>`).join("")}</div></div>
+    <div class="f">Réservé aux archers qui ont un badge<div class="checks">${BADGES.map(([k, l]) => `<label><input type="checkbox" name="badge" value="${k}" ${bIds.includes(k) ? "checked" : ""}>${esc(l)} (${S.archers.filter((a) => a.actif !== false && a.espace?.badges?.[k] === true).length})</label>`).join("")}</div>
+      <span class="tirline">Pour un contenu réservé, décoche les clubs : seuls les archers qui ont ce badge le verront, même ceux qui le recevront plus tard.</span></div>
     <details class="f" ${arIds.length ? "open" : ""}><summary>Ou seulement certains archers${arIds.length ? ` (${arIds.length})` : ""}</summary>
       <span class="tirline">Coche-les ici et décoche les clubs au-dessus : le document n'apparaîtra que dans leur onglet Documents.</span>
       <div class="checks" style="max-height:260px;overflow:auto">${arChoix.map((a) => `<label><input type="checkbox" name="archer" value="${a.id}" ${arIds.includes(a.id) ? "checked" : ""}>${esc(fullName(a))}</label>`).join("")}</div></details>`, {
     onSave(fd) {
-      const clubs = fd.getAll("club"), cl = clubs.includes("*") ? ["*"] : clubs, ars = fd.getAll("archer");
-      if (!cl.length && !ars.length) { toast("Coche au moins un club ou un archer, ou utilise « Ne plus partager »"); return false; }
+      const clubs = fd.getAll("club"), cl = clubs.includes("*") ? ["*"] : clubs, ars = fd.getAll("archer"), bg = fd.getAll("badge");
+      if (!cl.length && !ars.length && !bg.length) { toast("Coche au moins un club, un badge ou un archer, ou utilise « Ne plus partager »"); return false; }
       const f = fd.get("file");
       if (!d && f && f.size) {
         const type = guessType(f); if (!type) { toast("Format non accepté. Enregistre-le en PDF."); return false; }
         (async () => { try { const r = await S.assets.upload(f, { type }); const id = newId("documents");
-          await save("documents", id, { dossierId: null, titre: f.name.replace(/\.[^.]+$/, ""), description: "", assetId: r.id, nomFichier: f.name, contentType: r.contentType, taille: r.sizeBytes, createdAt: Date.now(), partageClubs: cl, partageArchers: ars, partageLe: Date.now() });
+          await save("documents", id, { dossierId: null, titre: f.name.replace(/\.[^.]+$/, ""), description: "", assetId: r.id, nomFichier: f.name, contentType: r.contentType, taille: r.sizeBytes, createdAt: Date.now(), partageClubs: cl, partageArchers: ars, partageBadges: bg, partageLe: Date.now() });
           toast("Document partagé avec les archers"); render(); } catch (e) { console.error(e); toast("Envoi impossible"); } })();
         return;
       }
       const doc = d || S.documents.find((x) => x.id === fd.get("docId")); if (!doc) { toast("Choisis un document ou un fichier"); return false; }
-      doc.partageClubs = cl; doc.partageArchers = ars; doc.partageLe = doc.partageLe || Date.now(); patch("documents", doc.id, { partageClubs: cl, partageArchers: ars, partageLe: doc.partageLe }); toast(cl.length ? "Document partagé avec les archers" : `Document partagé avec ${ars.length} archer${ars.length > 1 ? "s" : ""}`); render();
+      doc.partageClubs = cl; doc.partageArchers = ars; doc.partageBadges = bg; doc.partageLe = doc.partageLe || Date.now(); patch("documents", doc.id, { partageClubs: cl, partageArchers: ars, partageBadges: bg, partageLe: doc.partageLe }); toast(cl.length ? "Document partagé avec les archers" : bg.length && !ars.length ? "Document réservé aux " + bg.map((b) => BADGE_GROUPES[b]).join(" et ") : `Document partagé avec ${ars.length} archer${ars.length > 1 ? "s" : ""}`); render();
     },
-    onDelete: d && ((d.partageClubs || []).length || (d.partageArchers || []).length) ? () => { d.partageClubs = []; d.partageArchers = []; patch("documents", d.id, { partageClubs: [], partageArchers: [] }); toast("Le document n'est plus partagé"); render(); } : null, deleteLabel: "Ne plus partager",
+    onDelete: d && ((d.partageClubs || []).length || (d.partageArchers || []).length || (d.partageBadges || []).length) ? () => { d.partageClubs = []; d.partageArchers = []; d.partageBadges = []; patch("documents", d.id, { partageClubs: [], partageArchers: [], partageBadges: [] }); toast("Le document n'est plus partagé"); render(); } : null, deleteLabel: "Ne plus partager",
   });
 }
 let accCache = null;
@@ -5416,14 +5543,17 @@ function viewArcher() {
 
 // ---------- Fiche de l'archer › Documents (V.1.10, script 12) : ce qu'il voit dans son espace, et pourquoi ----------
 // Mêmes règles que Supabase (doc_partage_archer) : donné à lui seul, ou partagé à son club (sauf s'il en est retiré) ; plus les fiches attribuées visibles.
+// V.1.10 (script 17) : document réservé aux archers qui ont un badge (partageBadges) → libellé du groupe, sinon ""
+const BADGE_GROUPES = { partenaire: "archers partenaires", testeur: "testeurs" };
+const viaBadge = (d, a) => (d.partageBadges || []).filter((b) => a?.espace?.badges?.[b] === true).map((b) => BADGE_GROUPES[b] || b).join(" et ");
 function docsArcher(a) {
   const cl = a.clubIds || [], vus = [], retires = [];
   S.documents.forEach((d) => {
     const pc = d.partageClubs || [], club = pc.includes("*") || pc.some((c) => cl.includes(c)), seul = (d.partageArchers || []).includes(a.id), exclu = (d.partageExclus || []).includes(a.id);
-    const viaClub = club ? (pc.includes("*") ? "Partagé à tous les archers" : "Partagé au club " + pc.filter((c) => cl.includes(c)).map(clubName).join(", ")) : "";
+    const bdg = viaBadge(d, a), viaClub = club ? (pc.includes("*") ? "Partagé à tous les archers" : "Partagé au club " + pc.filter((c) => cl.includes(c)).map(clubName).join(", ")) : bdg ? "Réservé aux " + bdg : "";
     if (seul) vus.push({ d, pourquoi: "Donné à " + (a.prenom || "lui"), seul: true, club: viaClub });
-    else if (club && !exclu) vus.push({ d, pourquoi: viaClub, club: viaClub });
-    else if (club && exclu) retires.push({ d, pourquoi: viaClub });
+    else if ((club || bdg) && !exclu) vus.push({ d, pourquoi: viaClub, club: viaClub });
+    else if ((club || bdg) && exclu) retires.push({ d, pourquoi: viaClub });
   });
   const attr = S.attributions.filter((x) => x.archerId === a.id).map((x) => ({ x, d: S.documents.find((y) => y.id === x.documentId) })).filter((o) => o.d);
   const tri = (p, q) => (p.d.titre || p.d.nomFichier || "").localeCompare(q.d.titre || q.d.nomFichier || "", "fr");
@@ -6323,7 +6453,7 @@ function openDoc(d) {
     ${d.canva?.designId ? `<div class="bar"><span class="tirline">🎨 Fiche Canva${d.canva.majLe ? ", à jour le " + esc(fmtDT(d.canva.majLe)) : ""}</span><span class="grow"></span>${S.canWrite && CANVA() ? `<button type="button" class="btn" id="doc-cv">Mettre à jour depuis Canva</button>` : ""}</div>` : ""}
     <div class="acts">
       ${k === "yt" ? `<a class="btn" href="https://youtu.be/${esc(d.video)}" target="_blank" rel="noopener">Ouvrir dans YouTube</a>` : `<button type="button" class="btn" id="doc-dl">Télécharger</button>`}
-      ${S.canWrite ? `<button type="button" class="btn" id="doc-share">${(d.partageClubs || []).length || (d.partageArchers || []).length ? "Partagé avec les archers" : "Partager avec les archers"}</button><button type="button" class="btn" id="doc-attr">Attribuer à un archer</button><button type="button" class="btn" id="doc-edit">Modifier</button>` : ""}
+      ${S.canWrite ? `<button type="button" class="btn" id="doc-share">${(d.partageClubs || []).length || (d.partageArchers || []).length || (d.partageBadges || []).length ? "Partagé avec les archers" : "Partager avec les archers"}</button><button type="button" class="btn" id="doc-attr">Attribuer à un archer</button><button type="button" class="btn" id="doc-edit">Modifier</button>` : ""}
       <button type="button" class="btn primary" data-close>Fermer</button></div></div></div>`;
   const close = () => { el.innerHTML = ""; if (S.stale) { S.stale = false; render(); } };
   el.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", (e) => { if (e.target === b) close(); }));
@@ -6909,7 +7039,7 @@ async function showStorage() {
   } catch (e) { console.error(e); }
 }
 // ---------- Restauration d'une sauvegarde ----------
-const BK_COLS = [["clubs", "clubs"], ["archers", "archers"], ["seances", "séances"], ["evaluations", "évaluations"], ["carnets", "carnets de saison"], ["carnetEntrees", "lignes de carnet"], ["dossiers", "dossiers"], ["documents", "documents"], ["fiches", "fiches d'exercices"], ["animations", "animations"], ["parametres", "paramètres"], ["attributions", "exercices attribués"], ["concours", "concours"], ["materiel", "matériel"], ["annonces", "infos du club"], ["reponses", "réponses aux entraînements"], ["mots", "mots aux archers"]];
+const BK_COLS = [["clubs", "clubs"], ["archers", "archers"], ["seances", "séances"], ["evaluations", "évaluations"], ["carnets", "carnets de saison"], ["carnetEntrees", "lignes de carnet"], ["dossiers", "dossiers"], ["documents", "documents"], ["fiches", "fiches d'exercices"], ["animations", "animations"], ["parametres", "paramètres"], ["attributions", "exercices attribués"], ["concours", "concours"], ["materiel", "matériel"], ["annonces", "infos du club"], ["reponses", "réponses aux entraînements"], ["mots", "mots aux archers"], ["retours", "retours des testeurs"]];
 function startRestore() {
   const inp = document.createElement("input"); inp.type = "file"; inp.accept = "application/json,.json,application/zip,.zip";
   inp.addEventListener("change", async () => {
@@ -7742,7 +7872,7 @@ render();
   S.db = db;
   if (user) { const w = await user.can("data.write"); if (w === false) S.canWrite = false; }
   S.seesData = user ? (user.isOwner() || user.canEdit()) : null;
-  ["clubs", "archers", "seances", "evaluations", "dossiers", "documents", "fiches", "animations", "carnets", "parametres", "attributions", "concours", "materiel", "annonces", "reponses", "mots"].forEach(subscribe);
+  ["clubs", "archers", "seances", "evaluations", "dossiers", "documents", "fiches", "animations", "carnets", "parametres", "attributions", "concours", "materiel", "annonces", "reponses", "mots", "retours"].forEach(subscribe);
   claude.use("assets").then((as) => { S.assets = as; render(); });
   render();
 })();

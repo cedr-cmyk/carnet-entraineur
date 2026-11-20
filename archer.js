@@ -532,8 +532,52 @@ window.CarnetArcherUI = (API, opts = {}) => {
       <div class="ar-nom"><h1>Espace <em>${esc(St.data?.archer ? name(St.data.archer) : name(who()))}</em></h1>${window.CarnetBadges && St.data?.archer ? window.CarnetBadges.html(St.data.archer) : ""}</div><span class="sub">${PREVIEW || TESTW ? "" : API.versCoach ? `<button class="btn" id="ar-coach">↩ Mode entraîneur</button>` : `<button class="btn ghost" id="ar-out">Se déconnecter</button>`}</span></div>
       <nav class="tabs" role="tablist">${shownTabs.map(([k, l]) => `<button class="tab" role="tab" aria-selected="${St.tab === k}" data-atab="${k}">${l}</button>`).join("")}</nav></div>`;
   }
+  // V.1.10 : avantages des badges (testeur, partenaire)
+  const BDG = () => St.data?.archer?.espace?.badges || {};
+  const PART = () => BDG().partenaire === true, TEST = () => BDG().testeur === true || PART();
+  const RT = () => window.CarnetRetours || { statuts: [], lib: (k) => k, type: {}, clos: [], parcours: "" };
+  function applyArTheme() {
+    if (PREVIEW || TESTW) return;
+    const v = PART() ? prefs().themeAr || "" : "", r = document.documentElement;
+    if (v) r.setAttribute("data-ar-theme", v); else r.removeAttribute("data-ar-theme");
+  }
+  function vAvantages() {
+    const rts = St.data.retours || [], nbRep = rts.filter((r) => r.reponse).length;
+    return `<div class="card ar-avant"><h3 class="hub-h">${PART() ? "★ Ton espace partenaire" : "✓ Ton espace testeur"}</h3>
+      <span class="tirline" style="margin:0">${PART() ? "Merci pour ton partenariat ! Tes idées de terrain font avancer l'appli." : "Merci de tester les nouveautés !"} Un problème, une idée ? Envoie-les directement à ton entraîneur.</span>
+      <div class="acts-w">${API.retour && !PREVIEW ? `<button class="btn" data-act="retour-bug">🐞 Signaler un problème</button><button class="btn" data-act="retour-idee">💡 Proposer une idée</button>` : ""}
+        ${rts.length ? `<button class="btn ghost" data-act="retours">Mes retours (${rts.length}${nbRep ? ` · ${nbRep} réponse${nbRep > 1 ? "s" : ""}` : ""})</button>` : ""}
+        ${RT().parcours ? `<a class="btn ghost" href="${RT().parcours}" target="_blank" rel="noopener">🌲 Appli Tir Parcours</a>` : ""}</div>
+      ${PART() ? `<span class="tirline" style="margin:0">Thèmes et avatars réservés aux partenaires : dans tes Paramètres.</span>` : ""}</div>`;
+  }
+  function retourForm(type) {
+    const el = $("#sheet"), bug = type === "bug";
+    el.innerHTML = `<div class="sheet-bg" data-close><form class="sheet" id="rt-form"><h3>${bug ? "🐞 Signaler un problème" : "💡 Proposer une idée"}</h3>
+      <label class="f">${bug ? "Qu'est-ce qui ne va pas ?" : "Ton idée"}<textarea name="t" required minlength="3" maxlength="1800" rows="6" placeholder="${bug ? "Ex. Sur l'onglet Concours, quand je touche « Ajouter », rien ne se passe." : "Ex. Pouvoir noter la météo sur un tir compté."}"></textarea></label>
+      <span class="tirline">${bug ? "Dis sur quel écran tu étais et ce que tu faisais. La version de l'appli et ton appareil sont ajoutés tout seuls." : "Ton entraîneur la verra tout de suite et te dira ce qu'il en pense."}</span>
+      <div class="acts"><button type="button" class="btn" data-close>Annuler</button><button class="btn primary">Envoyer</button></div></form></div>`;
+    el.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", (ev) => { if (ev.target === b) el.innerHTML = ""; }));
+    $("#rt-form").addEventListener("submit", async (ev) => {
+      ev.preventDefault(); let t = new FormData(ev.target).get("t").trim(); if (t.length < 3) return;
+      if (bug) { const ua = navigator.userAgent, app = /Android/i.test(ua) ? "Android" : /iPhone|iPad/i.test(ua) ? "iPhone/iPad" : /Windows/i.test(ua) ? "Windows" : /Mac/i.test(ua) ? "Mac" : "autre";
+        t += `\n\n— ${window.CARNET_VERSION ? "V." + window.CARNET_VERSION.v : "version ?"} · ${app}${window.matchMedia?.("(display-mode: standalone)").matches ? " · appli installée" : " · navigateur"} · écran ${innerWidth}×${innerHeight}`; }
+      const btn = ev.target.querySelector(".primary"); btn.disabled = true;
+      try { await API.retour(who(), type, t); el.innerHTML = ""; toast(bug ? "Merci ! Problème envoyé à ton entraîneur" : "Merci ! Idée envoyée à ton entraîneur");
+        try { St.data.retours = await API.mesRetours(who()); } catch (e) { /* liste rechargée plus tard */ } render(); }
+      catch (err) { btn.disabled = false; toast(/archer_retour|function/i.test(err.message) ? "Ton entraîneur doit d'abord mettre l'appli à jour (script 17)." : /trop de retours/.test(err.message) ? "Beaucoup d'envois aujourd'hui : réessaie demain." : "Non envoyé : " + err.message); }
+    });
+  }
+  function retoursListe() {
+    const el = $("#sheet"), rts = St.data.retours || [];
+    el.innerHTML = `<div class="sheet-bg" data-close><div class="sheet"><h3>Mes retours</h3>
+      ${rts.length ? rts.map((r) => `<div class="card" style="gap:4px"><div class="bar" style="align-items:center"><b>${RT().type[r.type] || "Retour"}</b><span class="grow"></span><span class="rt-st s-${esc(r.statut)}">${esc(RT().lib(r.statut))}</span></div>
+        <span class="tirline" style="margin:0">${esc(dObj(r.date).toLocaleDateString("fr-FR", { day: "numeric", month: "long" }))}</span>
+        <span style="white-space:pre-wrap">${esc(r.texte)}</span>${r.reponse ? `<div class="rt-rep"><b>Ton entraîneur :</b> <span style="white-space:pre-wrap">${esc(r.reponse)}</span></div>` : ""}</div>`).join("") : `<p class="tirline">Rien d'envoyé pour l'instant.</p>`}
+      <div class="acts"><button type="button" class="btn" data-close>Fermer</button></div></div></div>`;
+    el.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", (ev) => { if (ev.target === b) el.innerHTML = ""; }));
+  }
   function render() {
-    header();
+    header(); applyArTheme();
     let h = "";
     if (PREVIEW || TESTW) h += "";
     else if (St.list.length > 1) h += `<div class="chips" role="group" aria-label="Archer">${St.list.map((a, i) => `<button class="chip" data-who="${i}" aria-pressed="${i === St.cur}">${esc(name(a))}</button>`).join("")}<button class="chip" data-act="add-code">+ Code</button></div>`;
@@ -590,6 +634,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     (St.data.mots || []).filter((x) => !x.archive).forEach((x) => it.push({ k: "w:" + x.id + ":" + String(x.texte || "").length, txt: `Un message de ton entraîneur (${dObj(x.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })})`, go: `data-atab="accueil"` }));
     St.data.entrees.filter((x) => x.commentaireCoach && !x.motArchive).forEach((x) => it.push({ k: "m:" + x.id + ":" + x.commentaireCoach.length, txt: `Un mot de ton entraîneur (${dObj(x.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })})`, go: `data-entry="${esc(x.id)}"` }));
     if (m.has("documents")) (St.data.documents || []).forEach((x) => it.push({ k: "d:" + x.id, txt: `Document : ${x.titre || x.nomFichier || "nouveau document"}`, go: `data-atab="documents"` }));
+    (St.data.retours || []).filter((x) => x.reponse).forEach((x) => it.push({ k: "r:" + x.id + ":" + x.reponse.length, txt: `Ton entraîneur a répondu à ${x.type === "bug" ? "ton signalement" : "ton idée"}`, go: `data-act="retours"` }));
     (St.data.annonces || []).forEach((x) => it.push({ k: "a:" + x.id, txt: `Info du club : ${x.titre || ""}`, go: `data-act="vu-info"` }));
     return it;
   }
@@ -616,6 +661,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     h += q.length ? `<div class="ar-quick${q.length === 1 ? " one" : ""}">${q.join("")}</div>` : "";
     if (nouv.length) h += `<div class="card ar-new"><div class="bar"><b>✨ Du nouveau depuis ta dernière visite</b><span class="grow"></span><button class="btn" data-act="vu">Vu ✓</button></div>
       <ul class="ar-new-l">${nouv.map((n) => `<li><button class="lnk" ${n.go}>${esc(n.txt)}</button></li>`).join("")}</ul></div>`;
+    if (TEST()) h += vAvantages();
     if (mots.length || motsArch.length) h += `<div class="card ar-mots"><h3 class="hub-h">💬 Messages de ton entraîneur</h3>
       ${mots.length ? mots.map(motHtml).join("") : `<p class="tirline" style="margin:0">Tu as tout lu ✓</p>`}
       ${motsArch.length ? `<details class="ar-mots-arch" ${St.motsArchOpen ? "open" : ""}><summary class="tirline">Messages archivés (${motsArch.length})</summary>${motsArch.map(motHtml).join("")}</details>` : ""}</div>`;
@@ -1073,7 +1119,10 @@ window.CarnetArcherUI = (API, opts = {}) => {
     return `<div class="ar-params">
       <section class="card"><h3 class="hub-h">Mon avatar</h3>
         <div class="av-prev">${window.CarnetAvatar ? window.CarnetAvatar.svg(a, 72) : ""}<div style="display:grid;gap:6px"><b>${esc(name(a))}</b>${window.CarnetBadges ? window.CarnetBadges.html(a) : ""}<button class="btn" data-act="avatar">Changer d'avatar</button></div></div>
-        <span class="tirline">Un dessin à choisir, ou tes initiales. Ton entraîneur le voit sur ses listes.</span></section>
+        <span class="tirline">Un dessin à choisir, ou tes initiales. Ton entraîneur le voit sur ses listes.${PART() ? " ★ Partenaire : 4 dessins et 2 fonds rien que pour toi." : ""}</span></section>
+      ${PART() && !PREVIEW ? `<section class="card"><h3 class="hub-h">★ Thème partenaire</h3>
+        <label class="f">Couleurs de l'appli<select data-pref="themeAr">${[["", "Normal"], ["or", "Or et marine"], ["argent", "Argent"]].map(([v, l]) => `<option value="${v}" ${(P.themeAr || "") === v ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+        <span class="tirline">Réservé aux archers partenaires. Pendant un thème de fête du club, c'est la fête qui s'affiche.</span></section>` : ""}
       ${TC() && API.demander ? (() => {
         const esp = a.espace || {}, dm = esp.demandes || {};
         const ligne = ([k, l, d]) => `<div class="bar" style="align-items:flex-start"><div style="min-width:0;flex:1"><b>${l}</b><span class="tirline" style="display:block">${d}</span></div>
@@ -1220,7 +1269,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
   // ---------- Événements ----------
   root.addEventListener("change", (ev) => {
     const t = ev.target;
-    if (t.dataset.pref) { setPref(t.dataset.pref, t.value.trim()); toast("Préférence enregistrée"); return; }
+    if (t.dataset.pref) { setPref(t.dataset.pref, t.value.trim()); if (t.dataset.pref === "themeAr") applyArTheme(); toast("Préférence enregistrée"); return; }
     if (t.hasAttribute("data-pref-chrono")) { chronoStore.setLast(t.value); toast("Réglage du chrono enregistré"); }
   });
   root.addEventListener("click", async (ev) => {
@@ -1270,6 +1319,8 @@ window.CarnetArcherUI = (API, opts = {}) => {
     if (t.dataset.motRep) { const [k, id] = t.dataset.motRep.split("|"); motRepondre(k, id); return; }
     if (t.dataset.motArch) { const [k, id, on] = t.dataset.motArch.split("|"); motAction(k, id, on === "1" ? "archiver" : "desarchiver"); return; }
     if (t.dataset.act === "all-ent") { St.allEnt = !St.allEnt; render(); return; }
+    if (t.dataset.act === "retour-bug" || t.dataset.act === "retour-idee") { retourForm(t.dataset.act === "retour-bug" ? "bug" : "idee"); return; }
+    if (t.dataset.act === "retours") { retoursListe(); return; }
     if (t.dataset.act === "avatar" && window.CarnetAvatar) {
       window.CarnetAvatar.choisir(St.data.archer, async (v) => {
         if (PREVIEW) { toast("Aperçu : l'archer choisira son avatar ici"); return; }
