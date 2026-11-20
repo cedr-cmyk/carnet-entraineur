@@ -908,6 +908,7 @@ const RT_ST = [["nouveau", "Nouveau"], ["vu", "Vu"], ["retenu", "Retenu"], ["enc
 const rtStLib = (k) => (RT_ST.find(([x]) => x === k) || RT_ST[0])[1];
 const RT_TYPE = { bug: "🐞 Problème", idee: "💡 Idée" };
 const RT_CLOS = ["fait", "nonretenu"];
+window.CarnetMat = { ligne: (m) => [mtLab(mtype(m)) + " n°" + m.numero, m.nature, tailleTxt(m), m.puissance ? m.puissance + " lbs" : "", m.spine ? "spine " + m.spine : "", m.quantite ? "×" + m.quantite : "", m.modele].filter(Boolean).join(" · ") };
 window.CarnetRetours = { statuts: RT_ST, lib: rtStLib, type: RT_TYPE, clos: RT_CLOS, parcours: "https://cedr-cmyk.github.io/tir-parcours/" };
 // ---------- Thèmes de fête (V.1.8) : Noël, Noël et fêtes de fin d'année, diffusés entre deux dates chaque année ----------
 const FETES = [["noel", "Noël", "🎄", "12-01", "12-26"], ["fetes", "Noël et fêtes de fin d'année", "✨", "12-01", "01-03"]];
@@ -2944,15 +2945,31 @@ function reviewImport(c, list, archers, stored = null) {
 
 // ---------- Matériel prêté : arcs d'initiation, poignées et branches de compétition ----------
 const ETATS = [["bon", "Bon état"], ["surveiller", "À surveiller"], ["reparer", "À réparer"], ["hs", "Hors service"]];
-const MAT_TYPES = [["arc", "Arc d'initiation", "Arcs d'initiation", "arc"], ["poignee", "Poignée de compétition", "Poignées", "poignée"], ["branches", "Branches de compétition", "Branches", "branches"], ["anim", "Arc d'animation", "Arcs d'animation", "arc d'animation"]];
+const MAT_TYPES = [["arc", "Arc d'initiation", "Arcs d'initiation", "arc"], ["poignee", "Poignée de compétition", "Poignées", "poignée"], ["branches", "Branches de compétition", "Branches", "branches"], ["anim", "Arc d'animation", "Arcs d'animation", "arc d'animation"], ["fleches", "Lot de flèches", "Flèches", "lot de flèches"], ["accessoire", "Accessoire", "Accessoires", "accessoire"]];
 const mtype = (m) => m?.type || "arc";
 const mtLab = (k, i = 1) => (MAT_TYPES.find(([x]) => x === k) || MAT_TYPES[0])[i];
 // Champs utiles selon le type : une poignée n'a pas de puissance, des branches n'ont pas de main
-const MAT_FIELDS = { arc: ["taille", "puissance", "main", "modele"], poignee: ["taille", "main", "modele"], branches: ["taille", "puissance", "modele"], anim: ["taille", "puissance", "main", "modele"] };
-const has = (k, f) => MAT_FIELDS[k].includes(f);
-const TAILLES = { arc: [48, 54, 58, 60, 62, 64, 66, 68, 70], poignee: [19, 21, 23, 25, 27], branches: ["Courtes", "Moyennes", "Longues", 66, 68, 70], anim: [48, 54, 58, 60, 62, 64, 66, 68, 70] };
+const MAT_FIELDS = { arc: ["taille", "puissance", "main", "modele"], poignee: ["taille", "main", "modele"], branches: ["taille", "puissance", "modele"], anim: ["taille", "puissance", "main", "modele"], fleches: ["taille", "spine", "quantite", "modele"], accessoire: ["nature", "taille", "main", "quantite", "modele"] };
+const ACC_NATURES = ["Carquois", "Protège-bras", "Palette", "Gant", "Plastron", "Dragonne", "Viseur", "Chevalet", "Cible", "Blasons", "Paille", "Repose-flèche"];
+const has = (k, f) => (MAT_FIELDS[k] || MAT_FIELDS.arc).includes(f);
+const TAILLES = { arc: [48, 54, 58, 60, 62, 64, 66, 68, 70], poignee: [19, 21, 23, 25, 27], branches: ["Courtes", "Moyennes", "Longues", 66, 68, 70], anim: [48, 54, 58, 60, 62, 64, 66, 68, 70], fleches: [24, 25, 26, 27, 28, 29, 30, 31, 32], accessoire: ["XS", "S", "M", "L", "XL", "40 cm", "60 cm", "80 cm", "122 cm"] };
 // V.1.10 : prêt à un archer de la liste (archerId) ou à une autre personne écrite à la main (pretA : parent, invité, animation…)
 const estPrete = (m) => !!(m.archerId || m.pretA);
+// Historique d'un matériel (prêts, retours, état, réparations), les plus anciens d'abord
+const matHisto = (m, t, txt) => [...(m.historique || []), { d: todayISO(), t, txt }].slice(-100);
+// Prêter (archer de la liste ou nom écrit à la main) ou rendre (les deux vides), avec l'état au retour si on le donne
+function majPret(m, archerId, pretA, extra = {}) {
+  const avant = pretNom(m), apres = archerId ? fullName(S.archers.find((a) => a.id === archerId) || {}) || "un archer" : pretA || "";
+  const up = { archerId: archerId || "", pretA: archerId ? "" : pretA || "", updatedAt: Date.now(), ...extra };
+  up.pretLe = apres ? (apres === avant ? m.pretLe || todayISO() : todayISO()) : "";
+  let h = m.historique || [];
+  const etatTxt = extra.etat && extra.etat !== (m.etat || "bon") ? ` · ${etatLab(extra.etat).toLowerCase()}` : "";
+  if (avant && avant !== apres) h = [...h, { d: todayISO(), t: "retour", txt: `Rendu par ${avant}${etatTxt}${extra.retourNote ? " · " + extra.retourNote : ""}` }];
+  else if (etatTxt) h = [...h, { d: todayISO(), t: "etat", txt: "État :" + etatTxt.slice(2) }];
+  if (apres && apres !== avant) h = [...h, { d: todayISO(), t: "pret", txt: `Prêté à ${apres}` }];
+  delete up.retourNote; up.historique = h.slice(-100);
+  Object.assign(m, up); patch("materiel", m.id, up);
+}
 const pretNom = (m) => m.pretA ? m.pretA : m.archerId ? (fullName(S.archers.find((a) => a.id === m.archerId) || {}) || "Prêté") : "";
 const tailleTxt = (m) => (m.taille ? (isNaN(Number(m.taille)) ? m.taille : m.taille + "″") : "");
 const matShort = (m) => `${mtLab(mtype(m), 3)} n°${m.numero}`;
@@ -3002,7 +3019,8 @@ function viewMateriel() {
     <div class="chips" role="group" aria-label="Trier le matériel"><span class="tirline" style="align-self:center">Trier par</span>${MAT_TRIS.map(([k, l]) => `<button class="chip" data-mattri="${k}" aria-pressed="${matTri() === k}">${l}</button>`).join("")}</div>
     <div class="chips" role="group" aria-label="Filtrer par état"><button class="chip" data-matetat="all" aria-pressed="${fe === "all"}">Tous états</button>
     ${ETATS.map(([k, l]) => `<button class="chip" data-matetat="${k}" aria-pressed="${fe === k}"><span class="dot et-${k}"></span>${l} <span style="opacity:.7">${cnt(k)}</span></button>`).join("")}</div>
-    <div class="bar"><span class="tirline">${cnt("bon") + cnt("surveiller")} utilisable${cnt("bon") + cnt("surveiller") > 1 ? "s" : ""} · ${all.filter(estPrete).length} prêté${all.filter(estPrete).length > 1 ? "s" : ""}</span><span class="grow"></span>${S.canWrite ? `<button class="btn" data-act="mat-bulk">Ajouter une série</button><button class="btn" data-act="mat-export">Exporter</button>` : ""}</div>`;
+    <div class="bar"><span class="tirline">${cnt("bon") + cnt("surveiller")} utilisable${cnt("bon") + cnt("surveiller") > 1 ? "s" : ""} · ${all.filter(estPrete).length} prêté${all.filter(estPrete).length > 1 ? "s" : ""}</span><span class="grow"></span>${S.canWrite ? `<button class="btn" data-act="mat-groupe">Prêt groupé</button><button class="btn" data-act="mat-pointage" ${all.some(estPrete) ? "" : "disabled"}>Retour et pointage</button><button class="btn" data-act="mat-bulk">Ajouter une série</button><button class="btn" data-act="mat-export">Exporter</button>` : ""}</div>
+    ${["fleches", "accessoire"].includes(ft) ? `<span class="tirline">Quantité totale : ${all.reduce((x, m) => x + (Number(m.quantite) || 0), 0)}${ft === "fleches" ? " flèches" : ""}</span>` : ""}`;
   const ro = S.canWrite ? "" : "disabled";
   const showType = ft === "all";
   h += `<div class="scroll"><table class="vol mat"><thead><tr>${cid ? "" : "<th>Club</th>"}${showType ? "<th>Type</th>" : ""}${S.canWrite ? "<th></th>" : ""}<th>N°</th><th>Taille</th><th>Puissance</th><th>Main</th><th>Modèle</th><th>État</th><th>Prêté à</th><th>Remarque</th></tr></thead><tbody>
@@ -3011,8 +3029,8 @@ function viewMateriel() {
       return `<tr class="et-row-${m.etat || "bon"}">${cid ? "" : `<td class="txt"><span class="dot" style="background:${esc(clubColor(m.clubId))};display:inline-block"></span> ${esc(clubName(m.clubId))}</td>`}
         ${showType ? `<td class="txt">${esc(mtLab(k).replace(" de compétition", ""))}</td>` : ""}
         ${S.canWrite ? `<td><button class="btn ghost mat-mod" data-mat="${m.id}" aria-label="Modifier le n°${esc(m.numero)}" title="Modifier">✎ Modifier</button></td>` : ""}
-        <th>${esc(m.numero)}</th><td>${esc(tailleTxt(m)) || "—"}</td><td>${has(k, "puissance") && m.puissance ? esc(m.puissance) + " lbs" : "—"}</td><td>${has(k, "main") ? (m.main === "G" ? "Gaucher" : m.main === "D" ? "Droitier" : m.main === "A" ? "Ambidextre" : "—") : "—"}</td>
-        <td class="txt">${esc(m.modele || "") || "—"}</td>
+        <th>${esc(m.numero)}${m.quantite ? ` <small class="tirline" title="Quantité">×${esc(m.quantite)}</small>` : ""}</th><td>${esc(tailleTxt(m)) || "—"}</td><td>${has(k, "puissance") && m.puissance ? esc(m.puissance) + " lbs" : has(k, "spine") && m.spine ? "spine " + esc(m.spine) : "—"}</td><td>${has(k, "main") ? (m.main === "G" ? "Gaucher" : m.main === "D" ? "Droitier" : m.main === "A" ? "Ambidextre" : "—") : "—"}</td>
+        <td class="txt">${esc([m.nature, m.modele].filter(Boolean).join(" · ")) || "—"}</td>
         <td><select class="etat-sel et-${m.etat || "bon"}" data-matf="${m.id}|etat" ${ro} aria-label="État du n°${esc(m.numero)}">${ETATS.map(([e, l]) => `<option value="${e}" ${(m.etat || "bon") === e ? "selected" : ""}>${l}</option>`).join("")}</select></td>
         <td><select data-matf="${m.id}|archerId" ${ro} aria-label="Prêté à"><option value="">—</option>${m.pretA ? `<option value="__pretA" selected>✏️ ${esc(m.pretA)}</option>` : ""}${ar.map((a) => `<option value="${a.id}" ${!m.pretA && m.archerId === a.id ? "selected" : ""}>${esc(fullName(a))}</option>`).join("")}${!m.pretA && m.archerId && !ar.some((a) => a.id === m.archerId) ? `<option value="${esc(m.archerId)}" selected>${esc(fullName(S.archers.find((a) => a.id === m.archerId) || {}))}</option>` : ""}<option value="__libre">✏️ Autre personne…</option></select></td>
         <td class="txt">${esc(m.remarque || "")}</td></tr>`;
@@ -3025,13 +3043,59 @@ const tailleList = (id, k) => `<datalist id="${id}">${TAILLES[k].map((t) => `<op
 function bindMatType(prefix) {
   const upd = () => {
     const k = document.querySelector('#mt-type input:checked')?.value || "arc";
-    ["puissance", "main", "modele"].forEach((f) => { const el = document.getElementById(`${prefix}-${f}-w`); if (el) el.hidden = !has(k, f); });
+    ["puissance", "main", "modele", "spine", "quantite", "nature"].forEach((f) => { const el = document.getElementById(`${prefix}-${f}-w`); if (el) el.hidden = !has(k, f); });
     const dl = document.getElementById(`${prefix}-tl`); if (dl) dl.innerHTML = TAILLES[k].map((t) => `<option value="${t}">`).join("");
-    const lab = document.getElementById(`${prefix}-tlab`); if (lab) lab.textContent = k === "branches" ? "Taille (courtes, moyennes, longues ou pouces)" : k === "poignee" ? "Taille de la poignée (pouces)" : "Taille (pouces)";
+    const lab = document.getElementById(`${prefix}-tlab`); if (lab) lab.textContent = k === "branches" ? "Taille (courtes, moyennes, longues ou pouces)" : k === "poignee" ? "Taille de la poignée (pouces)" : k === "fleches" ? "Longueur (pouces)" : k === "accessoire" ? "Taille" : "Taille (pouces)";
     if (prefix === "mb") { const nx = Number(nextNum($("#mb-club").value, k)); $("#mb-from").value = nx; $("#mb-to").value = nx + 9; }
     else if (!S.matEdit && $("#mt-num")) $("#mt-num").value = nextNum($("#mt-club").value, k);
   };
   $("#mt-type").addEventListener("change", upd); upd();
+}
+// V.1.10 : prêt groupé — plusieurs matériels prêtés d'un coup (ex. tous les arcs d'animation pour une fête)
+function formPretGroupe() {
+  const cid = S.club !== "all" && club(S.club) ? S.club : S.clubs.length === 1 ? S.clubs[0].id : null;
+  const libres = S.materiel.filter((m) => (!cid || m.clubId === cid) && !estPrete(m) && !["reparer", "hs"].includes(m.etat || "bon")).sort((a, b) => clubName(a.clubId).localeCompare(clubName(b.clubId)) || byMat(a, b));
+  if (!libres.length) { toast("Aucun matériel disponible à prêter"); return; }
+  const ar = S.archers.filter((a) => a.actif !== false && (!cid || (a.clubIds || []).includes(cid))).sort(byName);
+  const deja = [...new Set(S.materiel.map((x) => x.pretA).filter(Boolean))].sort((a, b) => a.localeCompare(b, "fr"));
+  const types = MAT_TYPES.filter(([k]) => libres.some((m) => mtype(m) === k));
+  sheet("Prêt groupé", `
+    <div class="grid2"><label class="f" for="pg-ar">À un archer<select id="pg-ar" name="archer"><option value="">—</option>${ar.map((a) => `<option value="${a.id}">${esc(fullName(a))}</option>`).join("")}</select></label>
+      <label class="f" for="pg-nom">Ou à une autre personne / un événement<input type="text" id="pg-nom" name="nom" list="pg-dl" maxlength="80" placeholder="Ex. Fête du village"><datalist id="pg-dl">${deja.map((n) => `<option value="${esc(n)}">`).join("")}</datalist></label></div>
+    ${types.map(([k, , pl]) => { const l = libres.filter((m) => mtype(m) === k);
+      return `<div class="f"><div class="bar" style="align-items:center"><b>${pl}</b><span class="tirline" style="margin:0">${l.length} disponible${l.length > 1 ? "s" : ""}</span><span class="grow"></span><button type="button" class="btn ghost" data-pg-tous="${k}">Tout cocher</button></div>
+        <div class="checks">${l.map((m) => `<label><input type="checkbox" name="mat" value="${m.id}" data-pg-type="${k}">n°${esc(m.numero)}${[tailleTxt(m), m.puissance ? m.puissance + " lbs" : "", m.quantite ? "×" + m.quantite : "", cid ? "" : clubName(m.clubId)].filter(Boolean).map((x) => " · " + esc(x)).join("")}</label>`).join("")}</div></div>`; }).join("")}
+    <span class="tirline">Le matériel « à réparer » ou « hors service » n'apparaît pas. Au retour, utilise « Retour et pointage ».</span>`, {
+    onSave(fd) {
+      const ids = fd.getAll("mat"), aid = fd.get("archer") || "", nom = String(fd.get("nom") || "").trim();
+      if (!ids.length) { toast("Coche le matériel à prêter"); return false; }
+      if (!aid && !nom) { toast("Choisis un archer ou écris un nom"); return false; }
+      ids.forEach((id) => { const m = S.materiel.find((x) => x.id === id); if (m) majPret(m, aid, aid ? "" : nom); });
+      toast(`${ids.length} prêté${ids.length > 1 ? "s" : ""} à ${aid ? fullName(S.archers.find((a) => a.id === aid)) : nom}`); render();
+    },
+  });
+  $("#sheet-form").addEventListener("click", (e) => { const b = e.target.closest("[data-pg-tous]"); if (!b) return; const cs = [...document.querySelectorAll(`[data-pg-type="${b.dataset.pgTous}"]`)], on = !cs.every((c) => c.checked); cs.forEach((c) => { c.checked = on; }); b.textContent = on ? "Tout décocher" : "Tout cocher"; });
+}
+// V.1.10 : retour et pointage — ce qui revient d'un prêt (archer, personne ou événement), avec l'état de chaque élément
+function formPointage(qui0 = "") {
+  const cid = S.club !== "all" && club(S.club) ? S.club : S.clubs.length === 1 ? S.clubs[0].id : null;
+  const prets = S.materiel.filter((m) => (!cid || m.clubId === cid) && estPrete(m));
+  if (!prets.length) { toast("Aucun matériel prêté"); return; }
+  const noms = [...new Set(prets.map(pretNom))].sort((a, b) => a.localeCompare(b, "fr")), qui = noms.includes(qui0) ? qui0 : noms[0];
+  const l = prets.filter((m) => pretNom(m) === qui).sort(byMat);
+  sheet("Retour et pointage", `
+    <label class="f" for="po-qui">Prêté à<select id="po-qui">${noms.map((n) => `<option ${n === qui ? "selected" : ""}>${esc(n)}</option>`).join("")}</select></label>
+    <div class="list">${l.map((m) => `<div class="row" style="flex-wrap:wrap"><label style="display:flex;gap:8px;align-items:center;flex:1;min-width:180px"><input type="checkbox" name="rendu" value="${m.id}" checked><span><b>${esc(matShort(m))}</b>${[tailleTxt(m), m.puissance ? m.puissance + " lbs" : "", m.quantite ? "×" + m.quantite : ""].filter(Boolean).map((x) => " · " + esc(x)).join("")}${m.pretLe ? `<span class="tirline" style="display:block;margin:0">depuis le ${esc(fmtDateL(m.pretLe))}</span>` : ""}</span></label>
+      <select name="etat_${m.id}" aria-label="État au retour de ${esc(matShort(m))}">${ETATS.map(([e, lb]) => `<option value="${e}" ${(m.etat || "bon") === e ? "selected" : ""}>${lb}</option>`).join("")}</select></div>`).join("")}</div>
+    <label class="f" for="po-note">Remarque sur ce retour (facultatif)<input type="text" id="po-note" name="note" maxlength="120" placeholder="Ex. 2 flèches cassées, carquois manquant"></label>
+    <span class="tirline">Coche ce qui est revenu et indique son état : le matériel non coché reste prêté. Tout s'inscrit dans l'historique de chaque matériel.</span>`, {
+    onSave(fd) {
+      const ids = fd.getAll("rendu"), note = String(fd.get("note") || "").trim(); if (!ids.length) { toast("Coche ce qui est revenu"); return false; }
+      ids.forEach((id) => { const m = S.materiel.find((x) => x.id === id); if (m) majPret(m, "", "", { etat: fd.get("etat_" + id) || m.etat || "bon", retourNote: note }); });
+      const rest = l.length - ids.length; toast(`${ids.length} rendu${ids.length > 1 ? "s" : ""}${rest ? ` · ${rest} encore prêté${rest > 1 ? "s" : ""}` : ""}`); render();
+    },
+  });
+  $("#po-qui").addEventListener("change", (e) => formPointage(e.target.value));
 }
 // Prêt à quelqu'un qui n'est pas dans la liste des archers (parent, invité, autre club, animation…)
 function formPretLibre(m) {
@@ -3042,9 +3106,26 @@ function formPretLibre(m) {
     <span class="tirline">Pour une personne qui n'est pas dans ta liste d'archers. Pour un archer, choisis-le directement dans la liste.</span>`, {
     onSave(fd) {
       const n = String(fd.get("nom") || "").trim(); if (!n) { toast("Écris le nom de la personne"); return false; }
-      const up = { archerId: "", pretA: n, pretLe: m.pretA === n ? m.pretLe || todayISO() : todayISO(), updatedAt: Date.now() }; Object.assign(m, up); patch("materiel", m.id, up); toast(`${matShort(m)} prêté à ${n}`); render();
+      majPret(m, "", n); toast(`${matShort(m)} prêté à ${n}`); render();
     },
   });
+}
+// Champs des flèches et accessoires (V.1.10) : nature, spine, quantité
+const matExtras = (pre, m = null) => `<div class="grid3"><label class="f" for="${pre}-nat" id="${pre}-nature-w">Nature<input type="text" id="${pre}-nat" name="nature" list="${pre}-natl" value="${esc(m?.nature ?? "")}" placeholder="Ex. Carquois"><datalist id="${pre}-natl">${ACC_NATURES.map((n) => `<option value="${n}">`).join("")}</datalist></label>
+  <label class="f" for="${pre}-sp" id="${pre}-spine-w">Spine<input type="text" inputmode="numeric" id="${pre}-sp" name="spine" value="${esc(m?.spine ?? "")}" placeholder="Ex. 600"></label>
+  <label class="f" for="${pre}-q" id="${pre}-quantite-w">Quantité<input type="number" inputmode="numeric" min="0" max="9999" id="${pre}-q" name="quantite" value="${esc(m?.quantite ?? "")}" placeholder="Ex. 12"></label></div>`;
+const matExtrasData = (fd, type) => ({ nature: has(type, "nature") ? String(fd.get("nature") || "").trim() : "", spine: has(type, "spine") ? String(fd.get("spine") || "").trim() : "", quantite: has(type, "quantite") ? String(fd.get("quantite") || "").trim() : "" });
+// Fiche d'un matériel : réparations et historique
+function matSuivi(m) {
+  const rp = m.reparations || [], tot = rp.reduce((x, r) => x + (Number(String(r.cout || "").replace(",", ".")) || 0), 0), hi = (m.historique || []).slice().reverse();
+  return `<details class="f" ${rp.length ? "" : "open"}><summary><b>🔧 Réparations</b>${rp.length ? ` (${rp.length}${tot ? ` · ${tot.toLocaleString("fr-FR")} €` : ""})` : ""}</summary>
+      ${rp.slice().reverse().map((r) => `<div class="tirline">${esc(fmtDateL(r.date))} · ${esc(r.txt)}${r.cout ? ` · ${esc(r.cout)} €` : ""}</div>`).join("")}
+      <div class="grid3" style="margin-top:6px"><label class="f" for="rp-d">Date<input type="date" id="rp-d" name="rpDate" value="${todayISO()}"></label>
+        <label class="f" for="rp-t" style="grid-column:span 2">Réparation faite<input type="text" id="rp-t" name="rpTxt" maxlength="200" placeholder="Ex. corde changée, repose-flèche remplacé"></label></div>
+      <div class="grid2"><label class="f" for="rp-c">Coût (€, facultatif)<input type="text" inputmode="decimal" id="rp-c" name="rpCout" placeholder="Ex. 12,50"></label>
+        <label class="f" style="align-self:end"><span><input type="checkbox" name="rpBon" checked> Remettre en « Bon état »</span></label></div>
+      <span class="tirline">Écris la réparation puis « Enregistrer » : elle s'ajoute à la liste.</span></details>
+    <details class="f"><summary><b>🕘 Historique</b> (${hi.length})</summary>${hi.length ? hi.map((x) => `<div class="tirline">${esc(fmtDateL(x.d))} · ${esc(x.txt)}</div>`).join("") : `<span class="tirline">Rien pour l'instant : les prêts, les retours, les changements d'état et les réparations s'inscriront ici.</span>`}</details>`;
 }
 function formMat(m = null) {
   const cid = m?.clubId || (S.club !== "all" && club(S.club) ? S.club : S.clubs[0]?.id), k0 = m ? mtype(m) : S.matType && S.matType !== "all" ? S.matType : "arc";
@@ -3057,15 +3138,22 @@ function formMat(m = null) {
       <label class="f" for="mt-p" id="mt-puissance-w">Puissance (lbs)<input type="number" inputmode="decimal" min="0" max="80" step="0.5" id="mt-p" name="puissance" value="${esc(m?.puissance ?? "")}"></label>
       <label class="f" for="mt-m" id="mt-main-w">Main<select id="mt-m" name="main"><option value="">—</option><option value="D" ${m?.main === "D" ? "selected" : ""}>Droitier</option><option value="G" ${m?.main === "G" ? "selected" : ""}>Gaucher</option><option value="A" ${m?.main === "A" ? "selected" : ""}>Ambidextre</option></select></label></div>
     <label class="f" for="mt-mod" id="mt-modele-w">Marque et modèle<input type="text" id="mt-mod" name="modele" value="${esc(m?.modele ?? "")}" placeholder="Ex. WNS, Hoyt…"></label>
+    ${matExtras("mt", m)}
     <div class="f">État<div class="radio">${ETATS.map(([e, l]) => `<label><input type="radio" name="etat" value="${e}" ${(m?.etat || "bon") === e ? "checked" : ""}> ${l}</label>`).join("")}</div></div>
-    <label class="f" for="mt-r">Remarque<textarea id="mt-r" name="remarque" style="min-height:60px" placeholder="Corde, repose-flèche, viseur fourni, défaut constaté…">${esc(m?.remarque)}</textarea></label>${remarqueChips("mt-r")}`, {
+    <label class="f" for="mt-r">Remarque<textarea id="mt-r" name="remarque" style="min-height:60px" placeholder="Corde, repose-flèche, viseur fourni, défaut constaté…">${esc(m?.remarque)}</textarea></label>${remarqueChips("mt-r")}
+    ${m ? matSuivi(m) : ""}`, {
     onSave(fd) {
       const numero = fd.get("numero").trim(); if (!numero) { toast("Indique le numéro"); return false; }
       const clubId = fd.get("clubId"), type = fd.get("type") || "arc";
       if (S.materiel.some((x) => x.clubId === clubId && mtype(x) === type && String(x.numero) === numero && x.id !== m?.id)) { toast(`Le n°${numero} existe déjà pour ce type de matériel dans ce club`); return false; }
       const data = { clubId, type, numero, taille: fd.get("taille").trim(), puissance: has(type, "puissance") ? fd.get("puissance") : "", main: has(type, "main") ? fd.get("main") : "", modele: has(type, "modele") ? fd.get("modele").trim() : "",
-        etat: fd.get("etat") || "bon", remarque: fd.get("remarque").trim(), archerId: m?.clubId === clubId ? m?.archerId || "" : "", pretA: m?.clubId === clubId ? m?.pretA || "" : "", updatedAt: Date.now() };
-      if (m) { Object.assign(m, data); patch("materiel", m.id, data); toast("Matériel enregistré"); }
+        etat: fd.get("etat") || "bon", remarque: fd.get("remarque").trim(), archerId: m?.clubId === clubId ? m?.archerId || "" : "", pretA: m?.clubId === clubId ? m?.pretA || "" : "", updatedAt: Date.now(), ...matExtrasData(fd, type) };
+      if (m && (m.etat || "bon") !== data.etat) data.historique = matHisto(m, "etat", "État : " + etatLab(data.etat).toLowerCase());
+      const rpTxt = m ? String(fd.get("rpTxt") || "").trim() : "";
+      if (rpTxt) { const r = { date: fd.get("rpDate") || todayISO(), txt: rpTxt, cout: String(fd.get("rpCout") || "").trim() };
+        data.reparations = [...(m.reparations || []), r]; if (fd.get("rpBon")) data.etat = "bon";
+        data.historique = [...(data.historique || m.historique || []), { d: r.date, t: "repar", txt: "Réparation : " + rpTxt + (r.cout ? ` (${r.cout} €)` : "") + (fd.get("rpBon") ? " · remis en bon état" : "") }].slice(-100); }
+      if (m) { Object.assign(m, data); patch("materiel", m.id, data); toast(rpTxt ? "Réparation enregistrée" : "Matériel enregistré"); }
       else { const id = newId("materiel"); S.materiel.push({ id, ...data, createdAt: Date.now() }); save("materiel", id, { ...data, createdAt: Date.now() }); toast(`${mtLab(type)} n°${numero} ajouté${type === "branches" ? "es" : type === "poignee" ? "e" : ""}`); }
       render();
     },
@@ -3103,7 +3191,7 @@ async function exportMateriel(cid, ft, fe, format, prets, remarques, filtres) {
   const qui = (m) => pretNom(m);
   const jour = new Date().toLocaleDateString("fr-FR"), name = `materiel-${slugOf(cid ? clubName(cid) : "clubs")}-${todayISO()}`;
   const etCol = (et) => (et === "reparer" || et === "hs" ? [170, 40, 30] : et === "surveiller" ? [160, 110, 0] : [30, 110, 60]);
-  const cols = [...(cid ? [] : [["Club", (m) => clubName(m.clubId), 30]]), ["Type", (m) => mtLab(mtype(m)), 38], ["N°", (m) => m.numero, 12], ["Taille", (m) => tailleTxt(m).replace("″", " po"), 18], ["Puissance", (m) => (has(mtype(m), "puissance") && m.puissance ? m.puissance + " lbs" : ""), 20],
+  const cols = [...(cid ? [] : [["Club", (m) => clubName(m.clubId), 30]]), ["Type", (m) => mtLab(mtype(m)), 38], ["N°", (m) => m.numero, 12], ["Taille", (m) => tailleTxt(m).replace("″", " po"), 18], ["Puissance", (m) => (has(mtype(m), "puissance") && m.puissance ? m.puissance + " lbs" : has(mtype(m), "spine") && m.spine ? "spine " + m.spine : ""), 20], ...(L.some((m) => m.quantite) ? [["Qté", (m) => m.quantite || "", 10]] : []),
     ["Main", mainTxt, 22], ["Modèle", (m) => m.modele || "", 32], ["État", (m) => etatLab(m.etat || "bon"), 24], ...(prets ? [["Prêté à", qui, 38]] : []), ...(remarques ? [["Remarque", (m) => m.remarque || "", 0]] : [])];
   let data, filename;
   if (format === "csv") {
@@ -3150,6 +3238,7 @@ function formMatBulk() {
       <label class="f" for="mb-p" id="mb-puissance-w">Puissance (lbs)<input type="number" inputmode="decimal" min="0" max="80" step="0.5" id="mb-p" name="puissance"></label>
       <label class="f" for="mb-m" id="mb-main-w">Main<select id="mb-m" name="main"><option value="">—</option><option value="D">Droitier</option><option value="G">Gaucher</option><option value="A">Ambidextre</option></select></label></div>
     <label class="f" for="mb-mod" id="mb-modele-w">Marque et modèle<input type="text" id="mb-mod" name="modele"></label>
+    ${matExtras("mb")}
     <label class="f" for="mb-r">Remarque pour toute la série<textarea id="mb-r" name="remarque" style="min-height:50px" placeholder="Facultatif"></textarea></label>${remarqueChips("mb-r")}
     <span class="tirline">Tout le matériel créé aura ces caractéristiques et sera en « Bon état ». Tu pourras ensuite modifier chaque élément.</span>`, {
     onSave(fd) {
@@ -3159,7 +3248,7 @@ function formMatBulk() {
       let n = 0, skip = 0;
       for (let k = from; k <= to; k++) {
         if (S.materiel.some((x) => x.clubId === clubId && mtype(x) === type && String(x.numero) === String(k))) { skip++; continue; }
-        const id = newId("materiel"), data = { clubId, type, numero: String(k), taille: fd.get("taille").trim(), puissance: has(type, "puissance") ? fd.get("puissance") : "", main: has(type, "main") ? fd.get("main") : "", modele: has(type, "modele") ? fd.get("modele").trim() : "", etat: "bon", remarque: (fd.get("remarque") || "").trim(), archerId: "", createdAt: Date.now() + k, updatedAt: Date.now() };
+        const id = newId("materiel"), data = { clubId, type, numero: String(k), taille: fd.get("taille").trim(), puissance: has(type, "puissance") ? fd.get("puissance") : "", main: has(type, "main") ? fd.get("main") : "", modele: has(type, "modele") ? fd.get("modele").trim() : "", etat: "bon", remarque: (fd.get("remarque") || "").trim(), archerId: "", createdAt: Date.now() + k, updatedAt: Date.now(), ...matExtrasData(fd, type) };
         S.materiel.push({ id, ...data }); save("materiel", id, data); n++;
       }
       toast(`${n} ajout${n > 1 ? "s" : ""}${skip ? ` (${skip} numéro${skip > 1 ? "s" : ""} déjà existant${skip > 1 ? "s" : ""})` : ""}`); render();
@@ -6169,6 +6258,8 @@ document.addEventListener("click", (e) => {
   if (t.dataset.act === "mat-new") { formMat(); return; }
   if (t.dataset.act === "edit-equip") { formEquip(S.archers.find((x) => x.id === S.archer)); return; }
   if (t.dataset.act === "mat-bulk") { formMatBulk(); return; }
+  if (t.dataset.act === "mat-groupe") { formPretGroupe(); return; }
+  if (t.dataset.act === "mat-pointage") { formPointage(); return; }
   if (t.dataset.act === "mat-export") { formMatExport(); return; }
   if (t.dataset.cls) { const c = S.concours.find((x) => x.id === S.concoursId), k = (c?.classements || []).find((x) => x.id === t.dataset.cls); if (k) openClassement(c, k); return; }
   if (t.dataset.clsDel) {
@@ -6393,9 +6484,10 @@ document.addEventListener("change", (e) => {
     if (field === "archerId") { // prêt : archer de la liste, autre personne écrite à la main, ou rendu
       const v = e.target.value; if (v === "__pretA") return;
       if (v === "__libre") { e.target.value = m.pretA ? "__pretA" : m.archerId || ""; formPretLibre(m); return; }
-      const up = { archerId: v, pretA: "", pretLe: v ? todayISO() : "", updatedAt: Date.now() }; Object.assign(m, up); patch("materiel", id, up);
+      majPret(m, v, "");
       $("#sync").textContent = v ? "Prêt enregistré" : `${matShort(m)} rendu`; render(); return;
     }
+    if (field === "etat") { const v = e.target.value, up = { etat: v, updatedAt: Date.now(), historique: matHisto(m, "etat", "État : " + etatLab(v).toLowerCase()) }; Object.assign(m, up); patch("materiel", id, up); $("#sync").textContent = `${matShort(m)} : ${etatLab(v).toLowerCase()}`; render(); return; }
     m[field] = e.target.value; m.updatedAt = Date.now(); patch("materiel", id, { [field]: e.target.value, updatedAt: m.updatedAt });
     $("#sync").textContent = field === "etat" ? `${matShort(m)} : ${etatLab(m.etat).toLowerCase()}` : "Prêt enregistré"; render(); return;
   }

@@ -328,6 +328,8 @@
         try { if (d) d.animations = await rpc("archer_animations", { p_owner: a.owner, p_archer: a.archer_id }); } catch (e) { if (d) d.animations = []; }
         // Thèmes de fête (V.1.9, script 9) : si l'espace ne les donne pas encore (avant le script 6), on les demande à part
         try { if (d && !(d.reglagesEspace && "fetes" in d.reglagesEspace)) { const f = await rpc("archer_fetes", { p_owner: a.owner, p_archer: a.archer_id }); if (f) d.reglagesEspace = { ...(d.reglagesEspace || {}), ...f }; } } catch (e) {}
+        // V.1.10 (script 18) : matériel prêté par le club à l'archer
+        try { if (d) d.materiel = await rpc("archer_materiel", { p_owner: a.owner, p_archer: a.archer_id }); } catch (e) { if (d) d.materiel = null; }
         // V.1.10 (script 17) : retours (problèmes, idées) de l'archer testeur ou partenaire, avec les réponses de l'entraîneur
         try { const b = d?.archer?.espace?.badges || {}; if (d && (b.testeur === true || b.partenaire === true)) d.retours = await rpc("archer_mes_retours", { p_owner: a.owner, p_archer: a.archer_id }); } catch (e) { if (d) d.retours = null; }
         return d;

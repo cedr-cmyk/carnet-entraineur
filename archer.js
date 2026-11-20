@@ -678,6 +678,10 @@ window.CarnetArcherUI = (API, opts = {}) => {
     h += q.length ? `<div class="ar-quick${q.length === 1 ? " one" : ""}">${q.join("")}</div>` : "";
     if (nouv.length) h += `<div class="card ar-new"><div class="bar"><b>✨ Du nouveau depuis ta dernière visite</b><span class="grow"></span><button class="btn" data-act="vu">Vu ✓</button></div>
       <ul class="ar-new-l">${nouv.map((n) => `<li><button class="lnk" ${n.go}>${esc(n.txt)}</button></li>`).join("")}</ul></div>`;
+    // V.1.10 : matériel prêté par le club
+    const mats = St.data.materiel || [];
+    if (mats.length && window.CarnetMat) h += `<div class="card ar-mat"><h3 class="hub-h">🏹 Matériel prêté par le club</h3>${mats.map((x) => `<div class="eq-l"><span>${esc(window.CarnetMat.ligne(x))}</span>${x.pretLe ? `<b class="tirline" style="margin:0;white-space:nowrap">depuis le ${esc(dObj(x.pretLe).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }))}</b>` : ""}</div>`).join("")}
+      <span class="tirline" style="margin:0">Prends-en soin : signale à ton entraîneur tout souci (corde, branche, repose-flèche…).</span></div>`;
     if (TEST()) h += vAvantages();
     if (mots.length || motsArch.length) h += `<div class="card ar-mots"><h3 class="hub-h">💬 Messages de ton entraîneur</h3>
       ${mots.length ? mots.map(motHtml).join("") : `<p class="tirline" style="margin:0">Tu as tout lu ✓</p>`}
