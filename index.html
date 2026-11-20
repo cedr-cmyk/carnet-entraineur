@@ -4327,13 +4327,16 @@ function reviewImport(c, list, archers, stored = null) {
 
 // ---------- Matériel prêté : arcs d'initiation, poignées et branches de compétition ----------
 const ETATS = [["bon", "Bon état"], ["surveiller", "À surveiller"], ["reparer", "À réparer"], ["hs", "Hors service"]];
-const MAT_TYPES = [["arc", "Arc d'initiation", "Arcs d'initiation", "arc"], ["poignee", "Poignée de compétition", "Poignées", "poignée"], ["branches", "Branches de compétition", "Branches", "branches"]];
+const MAT_TYPES = [["arc", "Arc d'initiation", "Arcs d'initiation", "arc"], ["poignee", "Poignée de compétition", "Poignées", "poignée"], ["branches", "Branches de compétition", "Branches", "branches"], ["anim", "Arc d'animation", "Arcs d'animation", "arc d'animation"]];
 const mtype = (m) => m?.type || "arc";
 const mtLab = (k, i = 1) => (MAT_TYPES.find(([x]) => x === k) || MAT_TYPES[0])[i];
 // Champs utiles selon le type : une poignée n'a pas de puissance, des branches n'ont pas de main
-const MAT_FIELDS = { arc: ["taille", "puissance", "main", "modele"], poignee: ["taille", "main", "modele"], branches: ["taille", "puissance", "modele"] };
+const MAT_FIELDS = { arc: ["taille", "puissance", "main", "modele"], poignee: ["taille", "main", "modele"], branches: ["taille", "puissance", "modele"], anim: ["taille", "puissance", "main", "modele"] };
 const has = (k, f) => MAT_FIELDS[k].includes(f);
-const TAILLES = { arc: [48, 54, 58, 60, 62, 64, 66, 68, 70], poignee: [19, 21, 23, 25, 27], branches: ["Courtes", "Moyennes", "Longues", 66, 68, 70] };
+const TAILLES = { arc: [48, 54, 58, 60, 62, 64, 66, 68, 70], poignee: [19, 21, 23, 25, 27], branches: ["Courtes", "Moyennes", "Longues", 66, 68, 70], anim: [48, 54, 58, 60, 62, 64, 66, 68, 70] };
+// V.1.10 : prêt à un archer de la liste (archerId) ou à une autre personne écrite à la main (pretA : parent, invité, animation…)
+const estPrete = (m) => !!(m.archerId || m.pretA);
+const pretNom = (m) => m.pretA ? m.pretA : m.archerId ? (fullName(S.archers.find((a) => a.id === m.archerId) || {}) || "Prêté") : "";
 const tailleTxt = (m) => (m.taille ? (isNaN(Number(m.taille)) ? m.taille : m.taille + "″") : "");
 const matShort = (m) => `${mtLab(mtype(m), 3)} n°${m.numero}`;
 const etatLab = (k) => (ETATS.find(([x]) => x === k) || ETATS[0])[1];
@@ -4382,19 +4385,19 @@ function viewMateriel() {
     <div class="chips" role="group" aria-label="Trier le matériel"><span class="tirline" style="align-self:center">Trier par</span>${MAT_TRIS.map(([k, l]) => `<button class="chip" data-mattri="${k}" aria-pressed="${matTri() === k}">${l}</button>`).join("")}</div>
     <div class="chips" role="group" aria-label="Filtrer par état"><button class="chip" data-matetat="all" aria-pressed="${fe === "all"}">Tous états</button>
     ${ETATS.map(([k, l]) => `<button class="chip" data-matetat="${k}" aria-pressed="${fe === k}"><span class="dot et-${k}"></span>${l} <span style="opacity:.7">${cnt(k)}</span></button>`).join("")}</div>
-    <div class="bar"><span class="tirline">${cnt("bon") + cnt("surveiller")} utilisable${cnt("bon") + cnt("surveiller") > 1 ? "s" : ""} · ${all.filter((m) => m.archerId).length} prêté${all.filter((m) => m.archerId).length > 1 ? "s" : ""}</span><span class="grow"></span>${S.canWrite ? `<button class="btn" data-act="mat-bulk">Ajouter une série</button><button class="btn" data-act="mat-export">Exporter</button>` : ""}</div>`;
+    <div class="bar"><span class="tirline">${cnt("bon") + cnt("surveiller")} utilisable${cnt("bon") + cnt("surveiller") > 1 ? "s" : ""} · ${all.filter(estPrete).length} prêté${all.filter(estPrete).length > 1 ? "s" : ""}</span><span class="grow"></span>${S.canWrite ? `<button class="btn" data-act="mat-bulk">Ajouter une série</button><button class="btn" data-act="mat-export">Exporter</button>` : ""}</div>`;
   const ro = S.canWrite ? "" : "disabled";
   const showType = ft === "all";
   h += `<div class="scroll"><table class="vol mat"><thead><tr>${cid ? "" : "<th>Club</th>"}${showType ? "<th>Type</th>" : ""}${S.canWrite ? "<th></th>" : ""}<th>N°</th><th>Taille</th><th>Puissance</th><th>Main</th><th>Modèle</th><th>État</th><th>Prêté à</th><th>Remarque</th></tr></thead><tbody>
     ${list.map((m) => {
       const k = mtype(m), ar = S.archers.filter((a) => (a.clubIds || []).includes(m.clubId) && a.actif !== false).sort(byName);
       return `<tr class="et-row-${m.etat || "bon"}">${cid ? "" : `<td class="txt"><span class="dot" style="background:${esc(clubColor(m.clubId))};display:inline-block"></span> ${esc(clubName(m.clubId))}</td>`}
-        ${showType ? `<td class="txt">${esc(mtLab(k, 2).replace(/s$/, ""))}</td>` : ""}
+        ${showType ? `<td class="txt">${esc(mtLab(k).replace(" de compétition", ""))}</td>` : ""}
         ${S.canWrite ? `<td><button class="btn ghost mat-mod" data-mat="${m.id}" aria-label="Modifier le n°${esc(m.numero)}" title="Modifier">✎ Modifier</button></td>` : ""}
         <th>${esc(m.numero)}</th><td>${esc(tailleTxt(m)) || "—"}</td><td>${has(k, "puissance") && m.puissance ? esc(m.puissance) + " lbs" : "—"}</td><td>${has(k, "main") ? (m.main === "G" ? "Gaucher" : m.main === "D" ? "Droitier" : m.main === "A" ? "Ambidextre" : "—") : "—"}</td>
         <td class="txt">${esc(m.modele || "") || "—"}</td>
         <td><select class="etat-sel et-${m.etat || "bon"}" data-matf="${m.id}|etat" ${ro} aria-label="État du n°${esc(m.numero)}">${ETATS.map(([e, l]) => `<option value="${e}" ${(m.etat || "bon") === e ? "selected" : ""}>${l}</option>`).join("")}</select></td>
-        <td><select data-matf="${m.id}|archerId" ${ro} aria-label="Prêté à"><option value="">—</option>${ar.map((a) => `<option value="${a.id}" ${m.archerId === a.id ? "selected" : ""}>${esc(fullName(a))}</option>`).join("")}${m.archerId && !ar.some((a) => a.id === m.archerId) ? `<option value="${esc(m.archerId)}" selected>${esc(fullName(S.archers.find((a) => a.id === m.archerId) || {}))}</option>` : ""}</select></td>
+        <td><select data-matf="${m.id}|archerId" ${ro} aria-label="Prêté à"><option value="">—</option>${m.pretA ? `<option value="__pretA" selected>✏️ ${esc(m.pretA)}</option>` : ""}${ar.map((a) => `<option value="${a.id}" ${!m.pretA && m.archerId === a.id ? "selected" : ""}>${esc(fullName(a))}</option>`).join("")}${!m.pretA && m.archerId && !ar.some((a) => a.id === m.archerId) ? `<option value="${esc(m.archerId)}" selected>${esc(fullName(S.archers.find((a) => a.id === m.archerId) || {}))}</option>` : ""}<option value="__libre">✏️ Autre personne…</option></select></td>
         <td class="txt">${esc(m.remarque || "")}</td></tr>`;
     }).join("") || `<tr><td colspan="11" class="txt">Aucun matériel avec ces filtres.</td></tr>`}</tbody></table></div>`;
   return h;
@@ -4412,6 +4415,19 @@ function bindMatType(prefix) {
     else if (!S.matEdit && $("#mt-num")) $("#mt-num").value = nextNum($("#mt-club").value, k);
   };
   $("#mt-type").addEventListener("change", upd); upd();
+}
+// Prêt à quelqu'un qui n'est pas dans la liste des archers (parent, invité, autre club, animation…)
+function formPretLibre(m) {
+  const deja = [...new Set(S.materiel.map((x) => x.pretA).filter(Boolean))].sort((a, b) => a.localeCompare(b, "fr"));
+  sheet(`Prêter ${matShort(m)}`, `
+    <label class="f" for="pl-nom">Prêté à<input type="text" id="pl-nom" name="nom" list="pl-dl" maxlength="80" required value="${esc(m.pretA || "")}" placeholder="Ex. Mairie de Smarves, Paul (papa de Léa), fête du village…"></label>
+    <datalist id="pl-dl">${deja.map((n) => `<option value="${esc(n)}">`).join("")}</datalist>
+    <span class="tirline">Pour une personne qui n'est pas dans ta liste d'archers. Pour un archer, choisis-le directement dans la liste.</span>`, {
+    onSave(fd) {
+      const n = String(fd.get("nom") || "").trim(); if (!n) { toast("Écris le nom de la personne"); return false; }
+      const up = { archerId: "", pretA: n, pretLe: m.pretA === n ? m.pretLe || todayISO() : todayISO(), updatedAt: Date.now() }; Object.assign(m, up); patch("materiel", m.id, up); toast(`${matShort(m)} prêté à ${n}`); render();
+    },
+  });
 }
 function formMat(m = null) {
   const cid = m?.clubId || (S.club !== "all" && club(S.club) ? S.club : S.clubs[0]?.id), k0 = m ? mtype(m) : S.matType && S.matType !== "all" ? S.matType : "arc";
@@ -4431,7 +4447,7 @@ function formMat(m = null) {
       const clubId = fd.get("clubId"), type = fd.get("type") || "arc";
       if (S.materiel.some((x) => x.clubId === clubId && mtype(x) === type && String(x.numero) === numero && x.id !== m?.id)) { toast(`Le n°${numero} existe déjà pour ce type de matériel dans ce club`); return false; }
       const data = { clubId, type, numero, taille: fd.get("taille").trim(), puissance: has(type, "puissance") ? fd.get("puissance") : "", main: has(type, "main") ? fd.get("main") : "", modele: has(type, "modele") ? fd.get("modele").trim() : "",
-        etat: fd.get("etat") || "bon", remarque: fd.get("remarque").trim(), archerId: m?.clubId === clubId ? m?.archerId || "" : "", updatedAt: Date.now() };
+        etat: fd.get("etat") || "bon", remarque: fd.get("remarque").trim(), archerId: m?.clubId === clubId ? m?.archerId || "" : "", pretA: m?.clubId === clubId ? m?.pretA || "" : "", updatedAt: Date.now() };
       if (m) { Object.assign(m, data); patch("materiel", m.id, data); toast("Matériel enregistré"); }
       else { const id = newId("materiel"); S.materiel.push({ id, ...data, createdAt: Date.now() }); save("materiel", id, { ...data, createdAt: Date.now() }); toast(`${mtLab(type)} n°${numero} ajouté${type === "branches" ? "es" : type === "poignee" ? "e" : ""}`); }
       render();
@@ -4467,7 +4483,7 @@ function formMatExport() {
 async function exportMateriel(cid, ft, fe, format, prets, remarques, filtres) {
   const L = matListe(cid, ft, fe); if (!L.length) { toast("Aucun matériel avec ces filtres"); return; }
   const dl = await claude.use("downloads"); if (!dl) { toast("Téléchargement indisponible sur cet appareil"); return; }
-  const qui = (m) => { if (!m.archerId) return ""; const a = S.archers.find((x) => x.id === m.archerId); return a ? fullName(a) : "Prêté"; };
+  const qui = (m) => pretNom(m);
   const jour = new Date().toLocaleDateString("fr-FR"), name = `materiel-${slugOf(cid ? clubName(cid) : "clubs")}-${todayISO()}`;
   const etCol = (et) => (et === "reparer" || et === "hs" ? [170, 40, 30] : et === "surveiller" ? [160, 110, 0] : [30, 110, 60]);
   const cols = [...(cid ? [] : [["Club", (m) => clubName(m.clubId), 30]]), ["Type", (m) => mtLab(mtype(m)), 38], ["N°", (m) => m.numero, 12], ["Taille", (m) => tailleTxt(m).replace("″", " po"), 18], ["Puissance", (m) => (has(mtype(m), "puissance") && m.puissance ? m.puissance + " lbs" : ""), 20],
@@ -4486,7 +4502,7 @@ async function exportMateriel(cid, ft, fe, format, prets, remarques, filtres) {
     const page = (premiere) => { doc.addPage(); y = M; doc.setFillColor(...PDF_GREEN); doc.rect(0, 0, W, 4, "F");
       if (premiere) { doc.setTextColor(...PDF_GREY); doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.text(`MATÉRIEL DU CLUB · ${jour}`, M, y + 4); doc.setTextColor(...PDF_INK); doc.setFontSize(18); doc.text(cid ? clubName(cid) : "Matériel des clubs", M, y + 12);
         doc.setFont("helvetica", "normal"); doc.setFontSize(9.5); doc.setTextColor(...PDF_GREY);
-        const ut = L.filter((m) => ["bon", "surveiller"].includes(m.etat || "bon")).length, pr = L.filter((m) => m.archerId).length;
+        const ut = L.filter((m) => ["bon", "surveiller"].includes(m.etat || "bon")).length, pr = L.filter(estPrete).length;
         doc.text(`${L.length} élément${L.length > 1 ? "s" : ""} · ${ut} utilisable${ut > 1 ? "s" : ""} · ${pr} prêté${pr > 1 ? "s" : ""} · ${filtres}`, M, y + 18); y += 26; }
       else y += 6;
       entete(); };
@@ -5052,7 +5068,7 @@ function viewAccueil() {
   let h = clubChips() + `<button class="btn primary dash-chrono" data-act="chrono">⏱ Lancer le chrono d'entraînement</button><div class="head"><span class="pill">Tableau de bord</span><h2>${(ENC() ? ENC().nom : prm().nom) ? "Bonjour " + esc(ENC() ? ENC().nom : prm().nom) : "Bonjour"}</h2><span class="m">${esc(fmtLong(today))}</span></div>${(() => { const k = feteActive(); return k ? banniereFete(k, prm().fetes, BLOB_BASE, prm().fetesMessage !== false) : ""; })()}
     <div class="hub-stats">
       ${card("cal", "c-cyan", "Séances du mois", sessM.length, `${upcoming.length ? "prochaine : " + dObj(upcoming[0].date).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" }) : "aucune prévue"}`)}
-      ${ENC() ? "" : card("wrench", aRep ? "c-red" : "c-green", "Matériel à réparer", aRep, `${mat.filter((m) => m.archerId).length} prêté${mat.filter((m) => m.archerId).length > 1 ? "s" : ""} sur ${mat.length}`)}
+      ${ENC() ? "" : card("wrench", aRep ? "c-red" : "c-green", "Matériel à réparer", aRep, `${mat.filter(estPrete).length} prêté${mat.filter(estPrete).length > 1 ? "s" : ""} sur ${mat.length}`)}
     </div>
     <div class="hub-grid">
       <div class="card" data-carte="seances"><div class="hub-bar"><h3 class="hub-h">Séances à venir</h3><button class="btn ghost" data-tab="seances">Tout voir</button></div>
@@ -7757,6 +7773,12 @@ document.addEventListener("change", (e) => {
   const mf = e.target.dataset?.matf;
   if (mf && S.canWrite) {
     const [id, field] = mf.split("|"), m = S.materiel.find((x) => x.id === id); if (!m) return;
+    if (field === "archerId") { // prêt : archer de la liste, autre personne écrite à la main, ou rendu
+      const v = e.target.value; if (v === "__pretA") return;
+      if (v === "__libre") { e.target.value = m.pretA ? "__pretA" : m.archerId || ""; formPretLibre(m); return; }
+      const up = { archerId: v, pretA: "", pretLe: v ? todayISO() : "", updatedAt: Date.now() }; Object.assign(m, up); patch("materiel", id, up);
+      $("#sync").textContent = v ? "Prêt enregistré" : `${matShort(m)} rendu`; render(); return;
+    }
     m[field] = e.target.value; m.updatedAt = Date.now(); patch("materiel", id, { [field]: e.target.value, updatedAt: m.updatedAt });
     $("#sync").textContent = field === "etat" ? `${matShort(m)} : ${etatLab(m.etat).toLowerCase()}` : "Prêt enregistré"; render(); return;
   }
