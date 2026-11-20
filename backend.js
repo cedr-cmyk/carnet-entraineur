@@ -332,8 +332,12 @@
         try { if (d) d.materiel = await rpc("archer_materiel", { p_owner: a.owner, p_archer: a.archer_id }); } catch (e) { if (d) d.materiel = null; }
         // V.1.10 (script 17) : retours (problèmes, idées) de l'archer testeur ou partenaire, avec les réponses de l'entraîneur
         try { const b = d?.archer?.espace?.badges || {}; if (d && (b.testeur === true || b.partenaire === true)) d.retours = await rpc("archer_mes_retours", { p_owner: a.owner, p_archer: a.archer_id }); } catch (e) { if (d) d.retours = null; }
+        // V.1.10 (script 19) : fil des partenaires
+        try { if (d?.archer?.espace?.badges?.partenaire === true) d.fil = await rpc("archer_fil", { p_owner: a.owner, p_archer: a.archer_id }); } catch (e) { if (d) d.fil = null; }
         return d;
       },
+      fil: (a) => rpc("archer_fil", { p_owner: a.owner, p_archer: a.archer_id }),
+      filEcrire: (a, texte) => rpc("archer_fil_ecrire", { p_owner: a.owner, p_archer: a.archer_id, p_texte: texte }),
       retour: (a, type, texte) => rpc("archer_retour", { p_owner: a.owner, p_archer: a.archer_id, p_type: type, p_texte: texte }),
       mesRetours: (a) => rpc("archer_mes_retours", { p_owner: a.owner, p_archer: a.archer_id }),
       ecrire: (a, id, data) => rpc("archer_ecrire_entree", { p_owner: a.owner, p_archer: a.archer_id, p_id: id, p_data: data }),

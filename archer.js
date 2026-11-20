@@ -530,7 +530,8 @@ window.CarnetArcherUI = (API, opts = {}) => {
     top.innerHTML = `<div class="top-in"><div class="brand">${window.CarnetAvatar && St.data?.archer ? "" : `<span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/></svg></span>`}
       ${window.CarnetAvatar && St.data?.archer ? window.CarnetAvatar.svg(St.data.archer, 40) : ""}
       <div class="ar-nom"><h1>Espace <em>${esc(St.data?.archer ? name(St.data.archer) : name(who()))}</em></h1>${window.CarnetBadges && St.data?.archer ? window.CarnetBadges.html(St.data.archer) : ""}</div><span class="sub">${PREVIEW || TESTW ? "" : API.versCoach ? `<button class="btn" id="ar-coach">↩ Mode entraîneur</button>` : `<button class="btn ghost" id="ar-out">Se déconnecter</button>`}</span></div>
-      <nav class="tabs" role="tablist">${shownTabs.map(([k, l]) => `<button class="tab" role="tab" aria-selected="${St.tab === k}" data-atab="${k}">${l}${k === "retours" && St.tab !== "retours" && rtNonVus().length ? `<span class="bulle" title="Réponses de ton entraîneur pas encore lues">${rtNonVus().length}</span>` : ""}</button>`).join("")}</nav></div>`;
+      <nav class="tabs" role="tablist">${shownTabs.map(([k, l]) => { const nb = k === "retours" && St.tab !== "retours" ? rtNonVus().length + filNonLus().length : 0;
+      return `<button class="tab" role="tab" aria-selected="${St.tab === k}" data-atab="${k}">${k === "retours" && PART() ? "★ Partenaire" : l}${nb ? `<span class="bulle" title="Réponses et messages pas encore lus">${nb}</span>` : ""}</button>`; }).join("")}</nav></div>`;
   }
   // V.1.10 : avantages des badges (testeur, partenaire)
   const BDG = () => St.data?.archer?.espace?.badges || {};
@@ -546,7 +547,75 @@ window.CarnetArcherUI = (API, opts = {}) => {
   const rtCle = (r) => r.id + ":" + (r.reponse || "").length + ":" + (r.statut || "");
   const rtNonVus = () => { const v = new Set(lsGet(rtVuKey(), [])); return (St.data?.retours || []).filter((r) => r.reponse && !v.has(rtCle(r))); };
   const rtMarquerVus = () => lsSet(rtVuKey(), (St.data?.retours || []).map(rtCle));
-  function vRetours() {
+  // ---------- V.1.10 : espace partenaire (fil, carte, bilan de saison, stage personnalisé) ----------
+  const filVuKey = () => "carnet-fil-vu-" + (who()?.archer_id || "");
+  const filNonLus = () => { if (!PART()) return []; const v = Number(lsGet(filVuKey(), 0)) || 0, me = who()?.archer_id; return (St.data?.fil || []).filter((m) => m.auteur !== me && (m.createdAt || 0) > v); };
+  function vFilAr() {
+    const msgs = St.data.fil, me = who()?.archer_id, vu = Number(lsGet(filVuKey(), 0)) || 0;
+    if (msgs == null) return `<p class="notice">Le fil n'est pas disponible pour l'instant (ton entraîneur doit mettre l'appli à jour).</p>`;
+    setTimeout(() => { lsSet(filVuKey(), Date.now()); header(); const l = $("#ar-fil-l"); if (l) l.scrollTop = l.scrollHeight; }, 0);
+    return `<div class="card"><span class="tirline" style="margin:0">Le fil entre ton entraîneur et tous les archers partenaires : tout le monde lit tout.</span>
+      <div class="fil-l" id="ar-fil-l">${msgs.length ? msgs.map((m) => `<div class="fil-m${m.auteur === me ? " moi" : ""}${m.auteur !== me && (m.createdAt || 0) > vu ? " nv" : ""}"><span class="fil-n">${esc(m.auteur === me ? "Toi" : m.auteur === "coach" ? "Ton entraîneur" : m.nom || "Partenaire")} · ${esc(new Date(m.createdAt || 0).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }))}</span><span class="fil-t">${esc(m.texte)}</span></div>`).join("") : `<p class="tirline">Aucun message pour l'instant.</p>`}</div>
+      ${API.filEcrire ? `<div class="bar" style="align-items:flex-end"><textarea id="ar-fil-txt" maxlength="1500" rows="2" style="flex:1;min-height:44px" placeholder="Écris au groupe…" aria-label="Message au fil des partenaires"></textarea><button class="btn primary" data-act="fil-ar-send">Envoyer</button></div>` : ""}
+      <div class="bar"><span class="grow"></span><button class="btn ghost" data-act="fil-ar-maj">↻ Actualiser</button></div></div>`;
+  }
+  function vCarte() {
+    const a = St.data.archer, end = saisonOf(today()), clubs = (St.data.clubs || []).map((c) => c.nom).filter(Boolean).join(" · "), logo = window.CARNET_AUTEUR?.logo;
+    return `<div class="pcard"><div class="pcard-top">${logo ? `<img src="${logo}" alt="" width="54" height="54">` : ""}<div><b>Dumoulin Consulting</b><small>Saison ${end - 1}-${end}</small></div></div>
+      <div class="pcard-mid">${window.CarnetAvatar ? window.CarnetAvatar.svg(a, 76) : ""}<div><span class="pcard-nom">${esc(name(a))}</span><span class="pcard-titre">★ Archer partenaire</span>${clubs ? `<small>${esc(clubs)}</small>` : ""}</div></div>
+      <div class="pcard-bas">Carte de partenaire · Carnet d'entraînement</div></div>
+      <div class="bar"><button class="btn" data-act="print-pcard">🖨 Imprimer / PDF</button><span class="tirline" style="margin:0">À montrer, ou à imprimer.</span></div>`;
+  }
+  function vBilan() {
+    const end = St.saison, key = `${end - 1}-${end}`, ok = (d) => d && saisonOf(d) === end;
+    const ent = (St.data.entrees || []).filter((e) => ok(e.date)), tot = ent.reduce((n, e) => n + vol(e), 0);
+    const mois = {}; ent.forEach((e) => { const k = e.date.slice(0, 7); mois[k] = (mois[k] || 0) + vol(e); });
+    const ms = Object.keys(mois).filter((k) => mois[k] > 0).sort(), max = Math.max(1, ...Object.values(mois));
+    const tc = {}; ent.filter((e) => !e.concoursId).forEach((e) => { const p = num(e.scoreCompte ?? e.auto?.scoreCompte); if (p == null) return; const d = e.tcDistance ? e.tcDistance + " m" : "tir compté"; if (!tc[d] || p > tc[d].p) tc[d] = { p, date: e.date }; });
+    const co = (St.data.concours || []).filter((c) => ok(c.date) && num(c.resultat?.score) != null).sort((p, q) => p.date.localeCompare(q.date));
+    const ev = (St.data.evaluations || []).filter((x) => ok(x.date)).sort((p, q) => p.date.localeCompare(q.date)), acq = (x) => Object.values(x.notes || {}).filter((v) => v === 2).length;
+    const o = (St.data.carnets || []).find((x) => x.saison === key)?.objectifs || {};
+    const sec = (t, h) => h ? `<div class="bl-sec"><h4>${t}</h4>${h}</div>` : "";
+    return `<div class="bar"><button class="btn" data-saison="-1" aria-label="Saison précédente">‹</button><b>Saison ${end - 1}-${end}</b><button class="btn" data-saison="1" aria-label="Saison suivante">›</button><span class="grow"></span><button class="btn" data-act="print-bilan">🖨 Imprimer / PDF</button></div>
+      <div class="bilan-page card"><div class="bl-head"><div>${window.CarnetAvatar ? window.CarnetAvatar.svg(St.data.archer, 56) : ""}</div><div><span class="bl-t">Bilan de saison ${end - 1}-${end}</span><b class="bl-nom">${esc(name(St.data.archer))}</b><small>★ Archer partenaire · Dumoulin Consulting</small></div></div>
+        <div class="hub-stats"><div class="hub-stat"><div class="hub-stat-top"><span>Flèches tirées</span></div><b class="c-gold">${tot.toLocaleString("fr-FR")}</b><small>notées dans ton carnet</small></div>
+          <div class="hub-stat"><div class="hub-stat-top"><span>Concours avec score</span></div><b class="c-cyan">${co.length}</b><small>${co.length ? "meilleur : " + Math.max(...co.map((c) => num(c.resultat.score))) + " pts" : "—"}</small></div></div>
+        ${sec("Volume mois par mois", ms.length ? `<div class="bl-mois">${ms.map((k) => `<div class="bl-m"><span>${esc(dObj(k + "-15").toLocaleDateString("fr-FR", { month: "short" }))}</span><i style="width:${Math.round((mois[k] / max) * 100)}%"></i><b>${mois[k]}</b></div>`).join("")}</div>` : "")}
+        ${sec("Meilleurs tirs comptés", Object.keys(tc).length ? Object.entries(tc).map(([d, x]) => `<div class="eq-l"><span>${esc(d)}</span><b>${x.p} pts</b></div>`).join("") : "")}
+        ${sec("Concours", co.map((c) => `<div class="eq-l"><span>${esc(dObj(c.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }))} · ${esc(c.nom || c.lieu || "Concours")}</span><b>${esc(c.resultat.score)} pts</b></div>`).join(""))}
+        ${sec("Évaluations techniques", ev.length >= 2 ? `<div class="eq-l"><span>Critères acquis</span><b>${acq(ev[0])} → ${acq(ev[ev.length - 1])}</b></div>` : ev.length === 1 ? `<div class="eq-l"><span>Critères acquis</span><b>${acq(ev[0])}</b></div>` : "")}
+        ${sec("Mes objectifs", [["processus", "Processus"], ["classement", "Classement"], ["score", "Score"]].filter(([k]) => o[k]).map(([k, l]) => `<div class="eq-l"><span>${l}</span><b>${esc(o[k])}</b></div>`).join(""))}
+        ${!tot && !co.length && !ev.length ? `<p class="tirline">Rien de noté pour cette saison.</p>` : ""}</div>`;
+  }
+  function vStagePerso() {
+    const dem = (St.data.retours || []).filter((r) => r.type === "stage");
+    return `<div class="card ar-avant"><h3 class="hub-h">🎯 Stage personnalisé</h3><span class="tirline" style="margin:0">Demande à ton entraîneur un stage rien que pour toi : ce que tu veux travailler, tes disponibilités. Quand il l'organise, le stage apparaît dans tes entraînements.</span>
+      ${API.retour ? `<div><button class="btn primary" data-act="stage-dem">Demander un stage</button></div>` : ""}</div>
+      ${dem.map((r) => `<div class="card" style="gap:4px"><div class="bar" style="align-items:center"><b>🎯 Ma demande</b><span class="grow"></span><span class="rt-st s-${esc(r.statut)}">${esc(RT().lib(r.statut))}</span></div><span class="tirline" style="margin:0">${esc(dObj(r.date).toLocaleDateString("fr-FR", { day: "numeric", month: "long" }))}</span><span style="white-space:pre-wrap">${esc(r.texte)}</span>${r.reponse ? `<div class="rt-rep"><b>Ton entraîneur :</b> <span style="white-space:pre-wrap">${esc(r.reponse)}</span></div>` : ""}</div>`).join("")}`;
+  }
+  function stageForm() {
+    const el = $("#sheet");
+    el.innerHTML = `<div class="sheet-bg" data-close><form class="sheet" id="st-form"><h3>🎯 Demander un stage personnalisé</h3>
+      <label class="f">Ce que tu veux travailler<textarea name="obj" required maxlength="800" rows="4" placeholder="Ex. préparer le championnat, mental en finale, réglage de mon arc…"></textarea></label>
+      <label class="f">Tes disponibilités<input name="dispo" maxlength="300" placeholder="Ex. week-ends de février, vacances de printemps"></label>
+      <label class="f">Durée souhaitée<select name="duree"><option>Une demi-journée</option><option selected>Une journée</option><option>Deux jours</option><option>À voir ensemble</option></select></label>
+      <div class="acts"><button type="button" class="btn" data-close>Annuler</button><button class="btn primary">Envoyer</button></div></form></div>`;
+    el.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", (ev) => { if (ev.target === b) el.innerHTML = ""; }));
+    $("#st-form").addEventListener("submit", async (ev) => {
+      ev.preventDefault(); const f = new FormData(ev.target), t = `${String(f.get("obj")).trim()}\nDisponibilités : ${String(f.get("dispo") || "à voir").trim() || "à voir"}\nDurée : ${f.get("duree")}`;
+      const btn = ev.target.querySelector(".primary"); btn.disabled = true;
+      try { await API.retour(who(), "stage", t); el.innerHTML = ""; toast("Demande de stage envoyée à ton entraîneur"); try { St.data.retours = await API.mesRetours(who()); } catch (e) { /* rien */ } render(); }
+      catch (err) { btn.disabled = false; toast(/type inconnu|function/i.test(err.message) ? "Ton entraîneur doit d'abord mettre l'appli à jour (script 19)." : "Non envoyé : " + err.message); }
+    });
+  }
+  function vPartenaire() {
+    const pt = St.ptab || "fil", nf = filNonLus().length, nr = rtNonVus().length;
+    const tabs = [["fil", `💬 Fil${nf ? ` (${nf})` : ""}`], ["carte", "Ma carte"], ["bilan", "Mon bilan"], ["stage", "Stage perso"], ["retours", `Mes retours${nr ? ` (${nr})` : ""}`]];
+    const body = { fil: vFilAr, carte: vCarte, bilan: vBilan, stage: vStagePerso, retours: () => vRetours(true) }[pt] || vFilAr;
+    return `<div class="chips" role="tablist" aria-label="Espace partenaire">${tabs.map(([k, l]) => `<button class="chip" role="tab" data-ptab="${k}" aria-pressed="${pt === k}">${l}</button>`).join("")}</div>${body()}`;
+  }
+  function vRetours(dansPart) {
+    if (PART() && !dansPart) return vPartenaire();
     const rts = St.data.retours || [];
     const h = `<div class="card ar-avant"><h3 class="hub-h">${PART() ? "★ Mes retours de partenaire" : "✓ Mes retours de testeur"}</h3>
       <span class="tirline" style="margin:0">Envoie à ton entraîneur un problème rencontré dans l'appli ou une idée. Tu suis ici où ça en est et ses réponses.</span>
@@ -559,8 +628,9 @@ window.CarnetArcherUI = (API, opts = {}) => {
   }
   function vAvantages() {
     const rts = St.data.retours || [];
-    const nv = rtNonVus().length;
-    return `${nv ? `<div class="card rt-notif"><div class="bar" style="align-items:center"><span>🔔 <b>Ton entraîneur a répondu à ${nv > 1 ? nv + " de tes retours" : "un de tes retours"}</b></span><span class="grow"></span><button class="btn primary" data-atab="retours">Voir</button></div></div>` : ""}
+    const nv = rtNonVus().length, nf = filNonLus().length;
+    return `${nv ? `<div class="card rt-notif"><div class="bar" style="align-items:center"><span>🔔 <b>Ton entraîneur a répondu à ${nv > 1 ? nv + " de tes retours" : "un de tes retours"}</b></span><span class="grow"></span><button class="btn primary" data-atab="retours" data-ptab-go="retours">Voir</button></div></div>` : ""}
+      ${nf ? `<div class="card rt-notif"><div class="bar" style="align-items:center"><span>💬 <b>${nf} nouveau${nf > 1 ? "x" : ""} message${nf > 1 ? "s" : ""}</b> dans le fil des partenaires</span><span class="grow"></span><button class="btn primary" data-atab="retours" data-ptab-go="fil">Voir</button></div></div>` : ""}
       <div class="card ar-avant"><h3 class="hub-h">${PART() ? "★ Ton espace partenaire" : "✓ Ton espace testeur"}</h3>
       <span class="tirline" style="margin:0">${PART() ? "Merci pour ton partenariat ! Tes idées de terrain font avancer l'appli." : "Merci de tester les nouveautés !"} Un problème, une idée ? Envoie-les directement à ton entraîneur.</span>
       <div class="acts-w">${API.retour && !PREVIEW ? `<button class="btn" data-act="retour-bug">🐞 Signaler un problème</button><button class="btn" data-act="retour-idee">💡 Proposer une idée</button>` : ""}
@@ -1294,12 +1364,12 @@ window.CarnetArcherUI = (API, opts = {}) => {
     if (t.hasAttribute("data-pref-chrono")) { chronoStore.setLast(t.value); toast("Réglage du chrono enregistré"); }
   });
   root.addEventListener("click", async (ev) => {
-    const t = ev.target.closest("[data-demande],[data-an-ouv],[data-an-jeu],[data-an-saisie],[data-an-essai],[data-an-del],[data-an-garder],[data-atab],[data-who],[data-act],[data-saison],[data-entry],[data-eval],[data-arcombo],[data-rep],[data-artc],[data-artcp],[data-asub],[data-seance-ar],[data-mot-rep],[data-mot-arch],#ar-out,#ar-coach"); if (!t) return;
+    const t = ev.target.closest("[data-demande],[data-ptab],[data-an-ouv],[data-an-jeu],[data-an-saisie],[data-an-essai],[data-an-del],[data-an-garder],[data-atab],[data-who],[data-act],[data-saison],[data-entry],[data-eval],[data-arcombo],[data-rep],[data-artc],[data-artcp],[data-asub],[data-seance-ar],[data-mot-rep],[data-mot-arch],#ar-out,#ar-coach"); if (!t) return;
     ev.stopPropagation();
     if (t.dataset.act === "close-preview") { root.remove(); return; }
     if (t.id === "ar-out") return API.deconnexion();
     if (t.id === "ar-coach") return API.versCoach();
-    if (t.dataset.atab) { St.tab = t.dataset.atab; render(); return; }
+    if (t.dataset.atab) { St.tab = t.dataset.atab; if (t.dataset.ptabGo) St.ptab = t.dataset.ptabGo; render(); return; }
     if (t.dataset.anJeu) { const [aid, jid] = t.dataset.anJeu.split("|"); St.anJeu = { ...(St.anJeu || {}), [aid]: jid }; render(); return; }
     if (t.dataset.anSaisie) { const [aid, jid, es, cid] = t.dataset.anSaisie.split("|"); anSaisie(aid, jid, es, cid); return; }
     if (t.dataset.anOuv) { const es = t.dataset.anOuv; St.anOuv = { ...(St.anOuv || {}), [es]: t.getAttribute("aria-expanded") !== "true" }; render(); return; }
@@ -1342,6 +1412,12 @@ window.CarnetArcherUI = (API, opts = {}) => {
     if (t.dataset.act === "all-ent") { St.allEnt = !St.allEnt; render(); return; }
     if (t.dataset.act === "retour-bug" || t.dataset.act === "retour-idee") { retourForm(t.dataset.act === "retour-bug" ? "bug" : "idee"); return; }
     if (t.dataset.act === "retours") { St.tab = "retours"; render(); return; }
+    if (t.dataset.ptab) { St.ptab = t.dataset.ptab; render(); return; }
+    if (t.dataset.act === "stage-dem") { stageForm(); return; }
+    if (t.dataset.act === "fil-ar-maj") { try { St.data.fil = await API.fil(who()); } catch (e) { toast("Pas de réseau"); } render(); return; }
+    if (t.dataset.act === "fil-ar-send") { const tx = ($("#ar-fil-txt")?.value || "").trim(); if (!tx) return; t.disabled = true;
+      try { await API.filEcrire(who(), tx); St.data.fil = await API.fil(who()); lsSet(filVuKey(), Date.now()); render(); } catch (e) { t.disabled = false; toast(/function/i.test(e.message) ? "Ton entraîneur doit d'abord mettre l'appli à jour (script 19)." : "Message non envoyé : " + e.message); } return; }
+    if (t.dataset.act === "print-bilan" || t.dataset.act === "print-pcard") { document.body.classList.add(t.dataset.act === "print-bilan" ? "pr-bilan" : "pr-pcard"); setTimeout(() => { window.print(); setTimeout(() => document.body.classList.remove("pr-bilan", "pr-pcard"), 500); }, 50); return; }
     if (t.dataset.act === "avatar" && window.CarnetAvatar) {
       window.CarnetAvatar.choisir(St.data.archer, async (v) => {
         if (PREVIEW) { toast("Aperçu : l'archer choisira son avatar ici"); return; }

@@ -621,6 +621,27 @@ svg.chart .szl { stroke: var(--line-2, var(--line)); stroke-dasharray: 3 3; }
 .rt-st.s-retenu, .rt-st.s-encours { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--accent); }
 .rt-st.s-fait { background: var(--ok-soft); color: var(--ok); }
 .rt-st.s-nonretenu { background: color-mix(in srgb, var(--danger) 15%, transparent); color: var(--danger); }
+.fil-l { display: grid; gap: 8px; max-height: 60vh; overflow: auto; padding: 4px 2px; }
+.fil-m { display: grid; gap: 2px; max-width: min(560px, 88%); padding: 8px 12px; border-radius: 14px; background: var(--sunk); justify-self: start; }
+.fil-m.moi { justify-self: end; background: color-mix(in srgb, var(--accent) 16%, var(--surface)); }
+.fil-m.nv { outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent); }
+.fil-n { font-size: .75rem; color: var(--muted); } .fil-t { white-space: pre-wrap; }
+/* V.1.10 : carte de partenaire et bilan de saison (imprimables) */
+.pcard { max-width: 420px; aspect-ratio: 1.586; border-radius: 18px; padding: 16px 18px; display: grid; grid-template-rows: auto 1fr auto; gap: 8px; color: #F8F3E3; background: linear-gradient(135deg, #13294B 0%, #1E3A6B 55%, #13294B 100%); border: 2px solid #D4A017; box-shadow: 0 10px 30px rgba(0,0,0,.35), inset 0 0 0 1px rgba(246,211,101,.25); }
+.pcard-top { display: flex; align-items: center; gap: 10px; } .pcard-top img { border-radius: 10px; background: #fff; } .pcard-top b { display: block; letter-spacing: .04em; } .pcard-top small { color: #F6D365; }
+.pcard-mid { display: flex; align-items: center; gap: 14px; } .pcard-mid > div { display: grid; gap: 2px; min-width: 0; }
+.pcard-nom { font-size: 1.35rem; font-weight: 800; } .pcard-titre { color: #F6D365; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; font-size: .8rem; } .pcard-mid small { opacity: .8; }
+.pcard-bas { font-size: .7rem; opacity: .7; letter-spacing: .08em; text-transform: uppercase; }
+.bilan-page { gap: 14px; } .bl-head { display: flex; gap: 12px; align-items: center; } .bl-head > div:last-child { display: grid; } .bl-t { font-size: .78rem; text-transform: uppercase; letter-spacing: .08em; color: var(--accent); font-weight: 800; } .bl-nom { font-size: 1.3rem; }
+.bl-sec { display: grid; gap: 6px; } .bl-sec h4 { margin: 0; font-size: .9rem; color: var(--muted); }
+.bl-mois { display: grid; gap: 4px; } .bl-m { display: grid; grid-template-columns: 44px 1fr 56px; gap: 8px; align-items: center; font-size: .85rem; } .bl-m i { height: 10px; border-radius: 6px; background: var(--accent); display: block; } .bl-m b { text-align: right; }
+@media print {
+  body.pr-bilan *, body.pr-pcard * { visibility: hidden !important; }
+  body.pr-bilan .bilan-page, body.pr-bilan .bilan-page *, body.pr-pcard .pcard, body.pr-pcard .pcard * { visibility: visible !important; }
+  body.pr-bilan .bilan-page, body.pr-pcard .pcard { position: absolute; left: 0; top: 0; }
+  body.pr-bilan .bilan-page { width: 100%; background: #fff; color: #111; border: 0; box-shadow: none; } body.pr-bilan .bilan-page .hub-stat { border: 1px solid #ccc; background: #fff; }
+  .pcard { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
 .rt-notif { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
 .rt-rep { border-left: 3px solid var(--accent); padding: 4px 0 4px 10px; margin-top: 6px; }
 .ar-nom { display: grid; gap: 5px; min-width: 0; } .ar-nom h1 { margin: 0; } .ar-nom .badges { display: flex; gap: 5px; } .ar-nom .badge { font-size: .68rem; padding: 2px 9px; box-shadow: 0 0 0 1px rgba(255,255,255,.18); }
@@ -906,7 +927,7 @@ window.CarnetBadges = { liste: BADGES, de: (a) => badgesOf(a), html: (a) => badg
 // V.1.10 : avantages des badges — retours (problèmes, idées) envoyés par les testeurs et partenaires (script 17)
 const RT_ST = [["nouveau", "Nouveau"], ["vu", "Vu"], ["retenu", "Retenu"], ["encours", "En cours"], ["fait", "Fait"], ["nonretenu", "Pas retenu"]];
 const rtStLib = (k) => (RT_ST.find(([x]) => x === k) || RT_ST[0])[1];
-const RT_TYPE = { bug: "🐞 Problème", idee: "💡 Idée" };
+const RT_TYPE = { bug: "🐞 Problème", idee: "💡 Idée", stage: "🎯 Demande de stage" };
 const RT_CLOS = ["fait", "nonretenu"];
 window.CarnetMat = { ligne: (m) => [mtLab(mtype(m)) + " n°" + m.numero, m.nature, tailleTxt(m), m.puissance ? m.puissance + " lbs" : "", m.spine ? "spine " + m.spine : "", m.quantite ? "×" + m.quantite : "", m.modele].filter(Boolean).join(" · ") };
 window.CarnetRetours = { statuts: RT_ST, lib: rtStLib, type: RT_TYPE, clos: RT_CLOS, parcours: "https://cedr-cmyk.github.io/tir-parcours/" };
@@ -1006,7 +1027,7 @@ const PALETTE = [
   ["#6aa84f", "Vert pomme"], ["#8a9a3b", "Olive"], ["#8b5a2b", "Marron"], ["#a8896c", "Sable"], ["#7d8a96", "Gris"], ["#3a4652", "Ardoise"],
 ];
 const COLORS = PALETTE.map(([c]) => c);
-const S = { clubs: [], archers: [], seances: [], mots: [], tab: "accueil", club: "all", q: "", seance: null, archer: null, loaded: {}, db: null, canWrite: true, past: false, suivi: null, tirOpen: null, overlay: {}, tt: {}, stale: false, evaluations: [], evaluation: null, evalFrom: null, evalOv: {}, evalT: {}, dossiers: [], documents: [], fiches: [], animations: [], anim: null, animVue: null, exMode: null, fTheme: "all", folder: null, assets: null, uploading: 0, parametres: [], attributions: [], concours: [], materiel: [], matEtat: "all", concoursId: null, coSaison: null, carnets: [], centrees: [], annonces: [], reponses: [], retours: [], carnet: null, cSaison: null, cTab: null, cMonth: 9 };
+const S = { clubs: [], archers: [], seances: [], mots: [], tab: "accueil", club: "all", q: "", seance: null, archer: null, loaded: {}, db: null, canWrite: true, past: false, suivi: null, tirOpen: null, overlay: {}, tt: {}, stale: false, evaluations: [], evaluation: null, evalFrom: null, evalOv: {}, evalT: {}, dossiers: [], documents: [], fiches: [], animations: [], anim: null, animVue: null, exMode: null, fTheme: "all", folder: null, assets: null, uploading: 0, parametres: [], attributions: [], concours: [], materiel: [], matEtat: "all", concoursId: null, coSaison: null, carnets: [], centrees: [], annonces: [], reponses: [], retours: [], filPartenaires: [], carnet: null, cSaison: null, cTab: null, cMonth: 9 };
 const $ = (s) => document.querySelector(s);
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const todayISO = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
@@ -1232,7 +1253,7 @@ function renderTabs() {
   chargerNouv();
   const counts = { seances: S.seances.length, archers: S.archers.length, clubs: S.clubs.length, exos: S.documents.length, concours: S.concours.filter((c) => (c.dateFin || c.date) >= todayISO()).length };
   if (!tabOk(S.tab)) S.tab = "accueil";
-  $("#tabs").innerHTML = TABS.filter(([k]) => tabOk(k) && (k !== "retours" || retoursVisibles())).map(([k, l]) => `<button class="tab" role="tab" aria-selected="${S.tab === k && !S.seance && !S.archer}" data-tab="${k}">${l}${counts[k] ? `<span class="n">${counts[k]}</span>` : ""}${k === "archers" && nouvTotal() ? `<span class="bulle" title="Séances notées par tes archers, pas encore regardées">${nouvTotal()}</span>` : ""}${k === "retours" && rtNouveaux().length ? `<span class="bulle" title="Nouveaux retours de tes testeurs et partenaires">${rtNouveaux().length}</span>` : ""}</button>`).join("");
+  $("#tabs").innerHTML = TABS.filter(([k]) => tabOk(k) && (k !== "retours" || retoursVisibles())).map(([k, l]) => `<button class="tab" role="tab" aria-selected="${S.tab === k && !S.seance && !S.archer}" data-tab="${k}">${l}${counts[k] ? `<span class="n">${counts[k]}</span>` : ""}${k === "archers" && nouvTotal() ? `<span class="bulle" title="Séances notées par tes archers, pas encore regardées">${nouvTotal()}</span>` : ""}${k === "retours" && rtNouveaux().length + filNonLus().length ? `<span class="bulle" title="Nouveaux retours et messages des partenaires">${rtNouveaux().length + filNonLus().length}</span>` : ""}</button>`).join("");
 }
 
 function clubChips() {
@@ -3706,31 +3727,74 @@ function dashResRow(x) {
 // V.1.10 : retours (problèmes, idées) des archers testeurs / partenaires — onglet « Retours » et rappel sur l'accueil
 const rtTous = () => (S.retours || []).filter((r) => S.archers.some((a) => a.id === r.archerId));
 const rtNouveaux = () => ENC() ? [] : rtTous().filter((r) => (r.statut || "nouveau") === "nouveau");
-const retoursVisibles = () => !ENC() && (rtTous().length > 0 || S.archers.some((a) => a.espace?.badges?.testeur === true || a.espace?.badges?.partenaire === true));
+// Fil des partenaires (script 19) : messages de l'entraîneur (auteur « coach ») et des archers partenaires
+const filMsgs = () => (S.filPartenaires || []).slice().sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+const filNonLus = () => ENC() ? [] : filMsgs().filter((m) => m.auteur !== "coach" && (m.createdAt || 0) > Number(LS.get("filVu", "0") || 0));
+const partenaires = () => S.archers.filter((a) => a.actif !== false && a.espace?.badges?.partenaire === true).sort(byName);
+const retoursVisibles = () => !ENC() && (rtTous().length > 0 || filMsgs().length > 0 || S.archers.some((a) => a.espace?.badges?.testeur === true || a.espace?.badges?.partenaire === true));
 function retourRow(r) {
   const a = S.archers.find((x) => x.id === r.archerId);
   return `<div class="row" style="flex-wrap:wrap;align-items:flex-start"><span class="main"><span class="t">${RT_TYPE[r.type] || "Retour"} · <button class="lnk" data-archer="${esc(r.archerId)}">${esc(fullName(a))}</button> ${(r.statut || "nouveau") === "nouveau" ? `<span class="tag today">Nouveau</span>` : `<span class="rt-st s-${esc(r.statut)}">${rtStLib(r.statut)}</span>`}</span>
     <span class="m">${esc(fmtLong(r.date))}</span><span class="m" style="white-space:pre-wrap;color:var(--ink)">${esc(r.texte)}</span>${r.reponse ? `<span class="m rt-rep">Ta réponse : ${esc(r.reponse)}</span>` : ""}</span>
-    ${S.canWrite ? `<button class="btn" data-retour="${esc(r.id)}">${r.reponse ? "Modifier" : "Répondre"}</button>` : ""}</div>`;
+    <span class="bar">${S.canWrite && r.type === "stage" ? `<button class="btn primary" data-stage-perso="${esc(r.id)}">Créer le stage</button>` : ""}${S.canWrite ? `<button class="btn" data-retour="${esc(r.id)}">${r.reponse ? "Modifier" : "Répondre"}</button>` : ""}</span></div>`;
 }
 // Accueil : simple rappel quand il y a des retours pas encore lus
 function retoursCard() {
-  const n = rtNouveaux(); if (!n.length) return "";
-  const nb = (t) => n.filter((r) => r.type === t).length, parts = [nb("bug") ? `${nb("bug")} problème${nb("bug") > 1 ? "s" : ""}` : "", nb("idee") ? `${nb("idee")} idée${nb("idee") > 1 ? "s" : ""}` : ""].filter(Boolean);
+  const n = rtNouveaux(), fl = filNonLus(); if (!n.length && !fl.length) return "";
+  if (!n.length) return `<div class="card rt-notif" data-carte="retours"><div class="bar" style="align-items:center"><span>💬 <b>${fl.length} nouveau${fl.length > 1 ? "x" : ""} message${fl.length > 1 ? "s" : ""}</b> dans le fil des partenaires</span><span class="grow"></span><button class="btn primary" data-tab="retours" data-rtvue="fil">Voir le fil</button></div></div>`;
+  const nb = (t) => n.filter((r) => r.type === t).length, parts = [nb("bug") ? `${nb("bug")} problème${nb("bug") > 1 ? "s" : ""}` : "", nb("idee") ? `${nb("idee")} idée${nb("idee") > 1 ? "s" : ""}` : "", nb("stage") ? `${nb("stage")} demande${nb("stage") > 1 ? "s" : ""} de stage` : "", fl.length ? `${fl.length} message${fl.length > 1 ? "s" : ""} du fil` : ""].filter(Boolean);
   return `<div class="card rt-notif" data-carte="retours"><div class="bar" style="align-items:center"><span>🔔 <b>${n.length} nouveau${n.length > 1 ? "x" : ""} retour${n.length > 1 ? "s" : ""}</b> de tes testeurs et partenaires${parts.length ? ` (${parts.join(", ")})` : ""}</span><span class="grow"></span><button class="btn primary" data-tab="retours">Voir les retours</button></div></div>`;
 }
+function viewFil() {
+  const msgs = filMsgs(), parts = partenaires(), vu = Number(LS.get("filVu", "0") || 0);
+  setTimeout(() => { LS.set("filVu", String(Date.now())); renderTabs(); const l = $("#fil-l"); if (l) l.scrollTop = l.scrollHeight; }, 0);
+  return `<div class="card"><span class="tirline" style="margin:0">Un espace d'échange entre toi et tes archers partenaires${parts.length ? ` (${parts.map((a) => esc(a.prenom || fullName(a))).join(", ")})` : ""} : tout le monde lit tout. Pratique pour une idée à discuter ensemble, l'organisation d'un événement, la tenue…</span>
+    <div class="fil-l" id="fil-l">${msgs.length ? msgs.map((m) => `<div class="fil-m${m.auteur === "coach" ? " moi" : ""}${m.auteur !== "coach" && (m.createdAt || 0) > vu ? " nv" : ""}"><span class="fil-n">${esc(m.auteur === "coach" ? "Toi" : m.nom || fullName(S.archers.find((a) => a.id === m.auteur) || {}))} · ${esc(new Date(m.createdAt || 0).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }))}${S.canWrite ? ` <button class="lnk" data-fil-del="${esc(m.id)}" aria-label="Supprimer ce message" title="Supprimer">✕</button>` : ""}</span><span class="fil-t">${esc(m.texte)}</span></div>`).join("") : `<p class="tirline">Aucun message pour l'instant. Lance la discussion !</p>`}</div>
+    ${S.canWrite ? `<div class="bar" style="align-items:flex-end"><textarea id="fil-txt" maxlength="1500" rows="2" style="flex:1;min-height:44px" placeholder="Écris à tes partenaires…" aria-label="Message aux partenaires"></textarea><button class="btn primary" data-act="fil-send">Envoyer</button></div>` : ""}</div>`;
+}
 function viewRetours() {
+  const vue = S.rtVue || "retours", nfl = filNonLus().length;
+  const vueChips = `<div class="chips" role="tablist" aria-label="Vue">${[["retours", `Retours${rtNouveaux().length ? ` (${rtNouveaux().length})` : ""}`], ["fil", `💬 Fil des partenaires${nfl ? ` (${nfl})` : ""}`]].map(([k, l]) => `<button class="chip" role="tab" data-rtvue="${k}" aria-pressed="${vue === k}">${l}</button>`).join("")}</div>`;
+  if (vue === "fil") return `<div class="head"><span class="pill">Testeurs et partenaires</span><h2>Fil des partenaires</h2></div>${vueChips}${viewFil()}`;
+  return retoursListeVue(vueChips);
+}
+function retoursListeVue(vueChips) {
   const f = S.rtFiltre || "atraiter", t = S.rtType || "tous", rec = (p, q) => (q.createdAt || 0) - (p.createdAt || 0);
   const all = rtTous().filter((r) => t === "tous" || r.type === t);
   const l = all.filter((r) => f === "tous" ? true : f === "traites" ? RT_CLOS.includes(r.statut) : !RT_CLOS.includes(r.statut)).sort(rec);
   const nAt = all.filter((r) => !RT_CLOS.includes(r.statut)).length, nTr = all.length - nAt;
   const chip = (attr, k, lab, cur) => `<button class="chip" ${attr}="${k}" aria-pressed="${cur === k}">${lab}</button>`;
-  return `<div class="head"><span class="pill">Testeurs et partenaires</span><h2>Retours</h2><span class="m">Les problèmes et les idées que t'envoient les archers qui ont un badge. Ta réponse et le statut s'affichent dans leur espace.</span></div>
-    <div class="chips" role="group" aria-label="Filtrer">${chip("data-rtf", "atraiter", `À traiter (${nAt})`, f)}${chip("data-rtf", "traites", `Traités (${nTr})`, f)}${chip("data-rtf", "tous", "Tous", f)}</div>
-    <div class="chips" role="group" aria-label="Type">${chip("data-rtt", "tous", "Problèmes et idées", t)}${chip("data-rtt", "bug", "🐞 Problèmes", t)}${chip("data-rtt", "idee", "💡 Idées", t)}</div>
+  return `<div class="head"><span class="pill">Testeurs et partenaires</span><h2>Retours</h2><span class="m">Les problèmes, les idées et les demandes de stage que t'envoient les archers qui ont un badge. Ta réponse et le statut s'affichent dans leur espace.</span></div>
+    ${vueChips}<div class="chips" role="group" aria-label="Filtrer">${chip("data-rtf", "atraiter", `À traiter (${nAt})`, f)}${chip("data-rtf", "traites", `Traités (${nTr})`, f)}${chip("data-rtf", "tous", "Tous", f)}</div>
+    <div class="chips" role="group" aria-label="Type">${chip("data-rtt", "tous", "Problèmes et idées", t)}${chip("data-rtt", "bug", "🐞 Problèmes", t)}${chip("data-rtt", "idee", "💡 Idées", t)}${chip("data-rtt", "stage", "🎯 Stages", t)}</div>
     ${l.length ? `<div class="card"><div class="list">${l.map(retourRow).join("")}</div></div>` : `<p class="notice">${f === "atraiter" ? "Rien à traiter ✓" : "Aucun retour ici pour l'instant."} Les archers avec un badge Testeur ou Archer partenaire envoient leurs retours depuis leur accueil.</p>`}`;
 }
-document.addEventListener("click", (e) => { const b = e.target.closest("[data-rtf],[data-rtt]"); if (!b) return; if (b.dataset.rtf) S.rtFiltre = b.dataset.rtf; else S.rtType = b.dataset.rtt; render(); });
+document.addEventListener("click", (e) => {
+  const v = e.target.closest("[data-rtvue]"); if (v) { S.rtVue = v.dataset.rtvue; if (v.dataset.tab) return; /* le changement d'onglet suit */ render(); return; }
+  const d = e.target.closest("[data-fil-del]"); if (d && S.canWrite) { if (!d.dataset.confirm) { d.dataset.confirm = 1; d.textContent = "Supprimer ?"; return; } S.filPartenaires = S.filPartenaires.filter((x) => x.id !== d.dataset.filDel); remove("filPartenaires", d.dataset.filDel); render(); return; }
+  const sp = e.target.closest("[data-stage-perso]"); if (sp) { formStagePerso(sp.dataset.stagePerso); return; }
+  if (e.target.closest('[data-act="fil-send"]') && S.canWrite) { const t = ($("#fil-txt")?.value || "").trim(); if (!t) return; const id = newId("filPartenaires"), d0 = { auteur: "coach", nom: prm().nom || "Entraîneur", texte: t.slice(0, 1500), createdAt: Date.now() }; S.filPartenaires.push({ id, ...d0 }); save("filPartenaires", id, d0); LS.set("filVu", String(Date.now())); render(); return; }
+  const b = e.target.closest("[data-rtf],[data-rtt]"); if (!b) return; if (b.dataset.rtf) S.rtFiltre = b.dataset.rtf; else S.rtType = b.dataset.rtt; render(); });
+// Demande de stage personnalisé d'un partenaire → séance dans un club de stages, l'archer y est invité
+function formStagePerso(rid) {
+  const r = (S.retours || []).find((x) => x.id === rid); if (!r) return; const a = S.archers.find((x) => x.id === r.archerId); if (!a) return;
+  const clubsSt = S.clubs.filter((c) => c.stage), cl = clubsSt.length ? clubsSt : S.clubs;
+  sheet(`Stage personnalisé · ${fullName(a)}`, `
+    <p class="tirline" style="white-space:pre-wrap;margin:0">Sa demande : ${esc(r.texte)}</p>
+    <div class="grid2"><label class="f" for="sp-club">Club<select id="sp-club" name="clubId">${cl.map((c) => `<option value="${c.id}">${esc(c.nom)}</option>`).join("")}</select></label>
+      <label class="f" for="sp-date">Date<input type="date" id="sp-date" name="date" required value="${todayISO()}"></label></div>
+    <div class="grid2"><label class="f" for="sp-h">Horaire<input type="text" id="sp-h" name="heure" placeholder="Ex. 9h–17h"></label><label class="f" for="sp-l">Lieu<input type="text" id="sp-l" name="lieu"></label></div>
+    <label class="f" for="sp-t">Thème du stage<input type="text" id="sp-t" name="theme" maxlength="120" value="Stage personnalisé · ${esc(a.prenom || "")}"></label>
+    <span class="tirline">La séance est créée${clubsSt.length ? " dans ton club de stages" : ""} avec ${esc(a.prenom || "l'archer")} invité : elle apparaît dans son espace. Tu pourras ensuite y ajouter les fiches et d'autres archers. Sa demande passe « En cours ».</span>`, {
+    onSave(fd) {
+      const date = fd.get("date"); if (!date) { toast("Choisis une date"); return false; }
+      const clubId = fd.get("clubId"), id = newId("seances"), inv = (a.clubIds || []).includes(clubId) ? [] : [a.id];
+      save("seances", id, { clubId, date, heure: String(fd.get("heure") || "").trim(), lieu: String(fd.get("lieu") || "").trim(), theme: String(fd.get("theme") || "").trim(), groupe: "Stage personnalisé", public: "", periodeId: null, exercices: [], presents: [], invites: inv, createdAt: Date.now() });
+      const up = { statut: "encours", reponse: `Stage prévu le ${fmtLong(date)}${fd.get("heure") ? " · " + String(fd.get("heure")).trim() : ""}. Tu le retrouves dans tes entraînements.`, reponseLe: Date.now() };
+      Object.assign(r, up); patch("retours", r.id, up); S.seance = id; S.archer = null; toast("Stage créé, l'archer est invité"); render();
+    },
+  });
+}
 function formRetour(id) {
   const r = (S.retours || []).find((x) => x.id === id); if (!r) return; const a = S.archers.find((x) => x.id === r.archerId);
   const cur = (r.statut || "nouveau") === "nouveau" ? "vu" : r.statut;
@@ -3968,7 +4032,7 @@ async function previewArcher(aid, testWrite = false) {
       seances: S.seances.filter((x) => (x.presents || []).includes(aid)).map((x) => ({ id: x.id, date: x.date, heure: x.heure, groupe: x.groupe, theme: x.theme, lieu: x.lieu, clubId: x.clubId, exercices: (x.exercices || []).map((d) => docOf(d)?.titre).filter(Boolean) })),
       annonces: S.annonces.filter((n) => annActive(n) && (!(n.clubIds || []).length || n.clubIds.some((id) => (a.clubIds || []).includes(id)))),
       animations: S.animations.filter((n) => (n.partage && (n.participants || []).includes(aid)) || animEquipes(n).some((e) => e.chefId === aid || (arModules(S.archers.find((x) => x.id === aid), nbConcoursOf(aid)).has("animations") && e.membres.includes(aid)))).sort((x, y) => (y.date || "").localeCompare(x.date || "")).map((n) => animPourArcher(n, aid)),
-      documents: S.documents.filter((d) => (d.partageArchers || []).includes(a.id) || (((d.partageClubs || []).some((id) => id === "*" || (a.clubIds || []).includes(id)) || viaBadge(d, a)) && !(d.partageExclus || []).includes(a.id))).map((d) => ({ id: d.id, titre: d.titre, description: d.description, assetId: d.assetId, contentType: d.contentType, nomFichier: d.nomFichier, video: d.video, partageLe: d.partageLe })),
+      documents: S.documents.filter((d) => (d.partageArchers || []).includes(a.id) || ((((d.clubsLe || "") <= todayISO() && (d.partageClubs || []).some((id) => id === "*" || (a.clubIds || []).includes(id))) || viaBadge(d, a)) && !(d.partageExclus || []).includes(a.id))).map((d) => ({ id: d.id, titre: d.titre, description: d.description, assetId: d.assetId, contentType: d.contentType, nomFichier: d.nomFichier, video: d.video, partageLe: d.partageLe })),
       entrainements: S.seances.filter((s) => s.public && s.date >= todayISO() && s.date <= addDaysISO(todayISO(), 42) && concerne(s, a)).sort((p, q) => (p.date + (p.heure || "")).localeCompare(q.date + (q.heure || ""))).map((s) => {
         const rs = repsOf(s.id), names = (v) => rs.filter((r) => r.reponse === v).map((r) => S.archers.find((x) => x.id === r.archerId)).sort(byName).map(fullName);
         return { id: s.id, date: s.date, heure: s.heure, groupe: s.groupe, theme: s.theme, lieu: s.lieu, clubId: s.clubId, public: s.public, reponse: rs.find((r) => r.archerId === aid)?.reponse || null,
@@ -4062,7 +4126,7 @@ function espaceArchersCard(inC) {
         ${n.texte ? `<span class="m">${esc(n.texte.slice(0, 120))}${n.texte.length > 120 ? "…" : ""}</span>` : ""}<span class="m">${esc(clubsLab(n.clubIds))}${n.jusquau ? ` · ${annActive(n) ? "jusqu'au" : "terminée le"} ${esc(dObj(n.jusquau).toLocaleDateString("fr-FR"))}` : ""}</span></span><span class="count" aria-hidden="true">›</span></button>`).join("")}</div>`
         : `<p class="notice">Les infos que tu écris ici s'affichent en haut de l'accueil des archers de chaque club concerné (date du concours du club, fermeture du gymnase, licences à renouveler…).</p>`}
       <div class="hub-bar" style="margin-top:6px"><h3 class="hub-h">Documents partagés</h3>${S.canWrite ? `<button class="btn" data-act="new-partage">+ Partager un document</button>` : ""}</div>
-      ${docs.length ? `<div class="list">${docs.map((d) => `<div class="row"><span class="thumb">${KIND_LAB[kind(d.contentType)] || "DOC"}</span><span class="main"><button class="lnk" data-doc="${d.id}">${esc(d.titre || d.nomFichier)}</button><span class="m">${esc([(d.partageClubs || []).length ? clubsLab(d.partageClubs) : "", (d.partageBadges || []).length ? "★ Réservé aux " + d.partageBadges.map((b) => BADGE_GROUPES[b] || b).join(" et ") : ""].filter(Boolean).join(" · "))}</span></span>
+      ${docs.length ? `<div class="list">${docs.map((d) => `<div class="row"><span class="thumb">${KIND_LAB[kind(d.contentType)] || "DOC"}</span><span class="main"><button class="lnk" data-doc="${d.id}">${esc(d.titre || d.nomFichier)}</button><span class="m">${esc([(d.partageClubs || []).length ? clubsLab(d.partageClubs) : "", d.clubsLe && d.clubsLe > todayISO() ? "★ Avant-première, clubs le " + fmtDateL(d.clubsLe) : (d.partageBadges || []).length ? "★ Réservé aux " + d.partageBadges.map((b) => BADGE_GROUPES[b] || b).join(" et ") : ""].filter(Boolean).join(" · "))}</span></span>
         ${S.canWrite ? `<button class="btn ghost" data-partage="${d.id}">Modifier</button>` : ""}</div>`).join("")}</div>`
         : `<p class="notice">Calendrier des concours, règlement intérieur, fiche d'inscription… Les documents partagés sont visibles par tous les archers des clubs choisis, dans l'onglet « Documents » de leur espace.</p>`}</div>
     <div class="card"><div class="hub-bar"><h3 class="hub-h">Entraînements proposés</h3><button class="btn ghost" data-tab="seances">Séances</button></div>
@@ -4140,22 +4204,27 @@ function formPartage(d = null) {
     <div class="f">Visible par les archers de<div class="checks"><label><input type="checkbox" name="club" value="*" ${ids.includes("*") || (!d && !ids.length) ? "checked" : ""}>Tous les clubs</label>${S.clubs.map((c) => `<label><input type="checkbox" name="club" value="${c.id}" ${ids.includes(c.id) ? "checked" : ""}>${esc(c.nom)}</label>`).join("")}</div></div>
     <div class="f">Réservé aux archers qui ont un badge<div class="checks">${BADGES.map(([k, l]) => `<label><input type="checkbox" name="badge" value="${k}" ${bIds.includes(k) ? "checked" : ""}>${esc(l)} (${S.archers.filter((a) => a.actif !== false && a.espace?.badges?.[k] === true).length})</label>`).join("")}</div>
       <span class="tirline">Pour un contenu réservé, décoche les clubs : seuls les archers qui ont ce badge le verront, même ceux qui le recevront plus tard.</span></div>
+    <div class="f"><label><input type="checkbox" name="avp" id="pa-avp" ${d?.clubsLe && d.clubsLe > todayISO() ? "checked" : ""}> ★ En avant-première pour les archers partenaires</label>
+      <label class="f" for="pa-cle">Les clubs cochés le voient à partir du<input type="date" id="pa-cle" name="clubsLe" value="${esc(d?.clubsLe && d.clubsLe > todayISO() ? d.clubsLe : addDaysISO(todayISO(), 7))}"></label>
+      <span class="tirline">Les partenaires le reçoivent tout de suite, les clubs seulement à cette date.</span></div>
     <details class="f" ${arIds.length ? "open" : ""}><summary>Ou seulement certains archers${arIds.length ? ` (${arIds.length})` : ""}</summary>
       <span class="tirline">Coche-les ici et décoche les clubs au-dessus : le document n'apparaîtra que dans leur onglet Documents.</span>
       <div class="checks" style="max-height:260px;overflow:auto">${arChoix.map((a) => `<label><input type="checkbox" name="archer" value="${a.id}" ${arIds.includes(a.id) ? "checked" : ""}>${esc(fullName(a))}</label>`).join("")}</div></details>`, {
     onSave(fd) {
       const clubs = fd.getAll("club"), cl = clubs.includes("*") ? ["*"] : clubs, ars = fd.getAll("archer"), bg = fd.getAll("badge");
+      const avp = !!fd.get("avp") && cl.length && String(fd.get("clubsLe") || "") > todayISO(), clubsLe = avp ? String(fd.get("clubsLe")) : "";
+      if (avp && !bg.includes("partenaire")) bg.push("partenaire");
       if (!cl.length && !ars.length && !bg.length) { toast("Coche au moins un club, un badge ou un archer, ou utilise « Ne plus partager »"); return false; }
       const f = fd.get("file");
       if (!d && f && f.size) {
         const type = guessType(f); if (!type) { toast("Format non accepté. Enregistre-le en PDF."); return false; }
         (async () => { try { const r = await S.assets.upload(f, { type }); const id = newId("documents");
-          await save("documents", id, { dossierId: null, titre: f.name.replace(/\.[^.]+$/, ""), description: "", assetId: r.id, nomFichier: f.name, contentType: r.contentType, taille: r.sizeBytes, createdAt: Date.now(), partageClubs: cl, partageArchers: ars, partageBadges: bg, partageLe: Date.now() });
+          await save("documents", id, { dossierId: null, titre: f.name.replace(/\.[^.]+$/, ""), description: "", assetId: r.id, nomFichier: f.name, contentType: r.contentType, taille: r.sizeBytes, createdAt: Date.now(), partageClubs: cl, partageArchers: ars, partageBadges: bg, clubsLe, partageLe: Date.now() });
           toast("Document partagé avec les archers"); render(); } catch (e) { console.error(e); toast("Envoi impossible"); } })();
         return;
       }
       const doc = d || S.documents.find((x) => x.id === fd.get("docId")); if (!doc) { toast("Choisis un document ou un fichier"); return false; }
-      doc.partageClubs = cl; doc.partageArchers = ars; doc.partageBadges = bg; doc.partageLe = doc.partageLe || Date.now(); patch("documents", doc.id, { partageClubs: cl, partageArchers: ars, partageBadges: bg, partageLe: doc.partageLe }); toast(cl.length ? "Document partagé avec les archers" : bg.length && !ars.length ? "Document réservé aux " + bg.map((b) => BADGE_GROUPES[b]).join(" et ") : `Document partagé avec ${ars.length} archer${ars.length > 1 ? "s" : ""}`); render();
+      doc.partageClubs = cl; doc.partageArchers = ars; doc.partageBadges = bg; doc.clubsLe = clubsLe; doc.partageLe = doc.partageLe || Date.now(); patch("documents", doc.id, { partageClubs: cl, partageArchers: ars, partageBadges: bg, clubsLe, partageLe: doc.partageLe }); toast(avp ? `Avant-première : les partenaires l'ont, les clubs le ${fmtDateL(clubsLe)}` : cl.length ? "Document partagé avec les archers" : bg.length && !ars.length ? "Document réservé aux " + bg.map((b) => BADGE_GROUPES[b]).join(" et ") : `Document partagé avec ${ars.length} archer${ars.length > 1 ? "s" : ""}`); render();
     },
     onDelete: d && ((d.partageClubs || []).length || (d.partageArchers || []).length || (d.partageBadges || []).length) ? () => { d.partageClubs = []; d.partageArchers = []; d.partageBadges = []; patch("documents", d.id, { partageClubs: [], partageArchers: [], partageBadges: [] }); toast("Le document n'est plus partagé"); render(); } : null, deleteLabel: "Ne plus partager",
   });
@@ -4322,7 +4391,7 @@ const viaBadge = (d, a) => (d.partageBadges || []).filter((b) => a?.espace?.badg
 function docsArcher(a) {
   const cl = a.clubIds || [], vus = [], retires = [];
   S.documents.forEach((d) => {
-    const pc = d.partageClubs || [], club = pc.includes("*") || pc.some((c) => cl.includes(c)), seul = (d.partageArchers || []).includes(a.id), exclu = (d.partageExclus || []).includes(a.id);
+    const pc = (d.clubsLe || "") > todayISO() ? [] : d.partageClubs || [], club = pc.includes("*") || pc.some((c) => cl.includes(c)), seul = (d.partageArchers || []).includes(a.id), exclu = (d.partageExclus || []).includes(a.id);
     const bdg = viaBadge(d, a), viaClub = club ? (pc.includes("*") ? "Partagé à tous les archers" : "Partagé au club " + pc.filter((c) => cl.includes(c)).map(clubName).join(", ")) : bdg ? "Réservé aux " + bdg : "";
     if (seul) vus.push({ d, pourquoi: "Donné à " + (a.prenom || "lui"), seul: true, club: viaClub });
     else if ((club || bdg) && !exclu) vus.push({ d, pourquoi: viaClub, club: viaClub });
@@ -5812,7 +5881,7 @@ async function showStorage() {
   } catch (e) { console.error(e); }
 }
 // ---------- Restauration d'une sauvegarde ----------
-const BK_COLS = [["clubs", "clubs"], ["archers", "archers"], ["seances", "séances"], ["evaluations", "évaluations"], ["carnets", "carnets de saison"], ["carnetEntrees", "lignes de carnet"], ["dossiers", "dossiers"], ["documents", "documents"], ["fiches", "fiches d'exercices"], ["animations", "animations"], ["parametres", "paramètres"], ["attributions", "exercices attribués"], ["concours", "concours"], ["materiel", "matériel"], ["annonces", "infos du club"], ["reponses", "réponses aux entraînements"], ["mots", "mots aux archers"], ["retours", "retours des testeurs"]];
+const BK_COLS = [["clubs", "clubs"], ["archers", "archers"], ["seances", "séances"], ["evaluations", "évaluations"], ["carnets", "carnets de saison"], ["carnetEntrees", "lignes de carnet"], ["dossiers", "dossiers"], ["documents", "documents"], ["fiches", "fiches d'exercices"], ["animations", "animations"], ["parametres", "paramètres"], ["attributions", "exercices attribués"], ["concours", "concours"], ["materiel", "matériel"], ["annonces", "infos du club"], ["reponses", "réponses aux entraînements"], ["mots", "mots aux archers"], ["retours", "retours des testeurs"], ["filPartenaires", "fil des partenaires"]];
 function startRestore() {
   const inp = document.createElement("input"); inp.type = "file"; inp.accept = "application/json,.json,application/zip,.zip";
   inp.addEventListener("change", async () => {
@@ -6654,7 +6723,7 @@ render();
   S.db = db;
   if (user) { const w = await user.can("data.write"); if (w === false) S.canWrite = false; }
   S.seesData = user ? (user.isOwner() || user.canEdit()) : null;
-  ["clubs", "archers", "seances", "evaluations", "dossiers", "documents", "fiches", "animations", "carnets", "parametres", "attributions", "concours", "materiel", "annonces", "reponses", "mots", "retours"].forEach(subscribe);
+  ["clubs", "archers", "seances", "evaluations", "dossiers", "documents", "fiches", "animations", "carnets", "parametres", "attributions", "concours", "materiel", "annonces", "reponses", "mots", "retours", "filPartenaires"].forEach(subscribe);
   claude.use("assets").then((as) => { S.assets = as; render(); });
   render();
 })();
