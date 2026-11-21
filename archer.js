@@ -862,6 +862,10 @@ window.CarnetArcherUI = (API, opts = {}) => {
   // ---------- Tir compté sur la cible : toucher l'impact ou taper la valeur ----------
   const kv = (k) => (k === "X" ? 10 : k === "M" ? 0 : Number(k) || 0), krank = (k) => (k === "X" ? 11 : kv(k));
   // Cible : clic à la souris ; au doigt, une loupe grossit la zone pendant qu'on glisse, la flèche se place quand on lève le doigt
+  // Après une flèche posée au doigt, le téléphone envoie aussi un « clic » au même endroit : l'écran vient d'être redessiné,
+  // ce clic pouvait tomber sur une touche du clavier (souvent « M ») et ajouter une flèche manquée. On l'ignore pendant un court instant.
+  let tapGarde = 0;
+  document.addEventListener("click", (ev) => { if (Date.now() < tapGarde && ev.target.closest?.(".ar-tgt-layer")) { ev.stopPropagation(); ev.preventDefault(); } }, true);
   function bindTarget(svg, onPlace, valueAt) {
     const pos = (ev) => { const r = svg.getBoundingClientRect(); return { r, px: ev.clientX - r.left, py: ev.clientY - r.top, x: ((ev.clientX - r.left) / r.width * 500 - 250) / 240, y: ((ev.clientY - r.top) / r.height * 500 - 250) / 240 }; };
     let loupe = null, last = null;
@@ -876,14 +880,16 @@ window.CarnetArcherUI = (API, opts = {}) => {
       loupe.querySelector(".lp-v").textContent = Math.hypot(p.x, p.y) > 1.05 ? "hors cible" : valueAt(p.x, p.y);
     };
     const hide = () => { loupe?.remove(); loupe = null; };
+    let sourisBas = false;
     svg.addEventListener("pointerdown", (ev) => {
-      if (ev.pointerType === "mouse") return;
+      if (ev.pointerType === "mouse") { sourisBas = true; return; }
       ev.preventDefault(); try { svg.setPointerCapture(ev.pointerId); } catch (err) { /* pointeur déjà relâché */ } show(ev);
     });
     svg.addEventListener("pointermove", (ev) => { if (loupe) { ev.preventDefault(); show(ev); } });
     svg.addEventListener("pointerup", (ev) => {
-      if (ev.pointerType === "mouse") { const p = pos(ev); onPlace(p.x, p.y); return; }
-      if (!loupe) return; const p = last; hide(); if (p && Math.hypot(p.x, p.y) <= 1.05) onPlace(p.x, p.y);
+      // souris : seulement un vrai clic commencé sur la cible (pas un événement « souris » imité après un toucher)
+      if (ev.pointerType === "mouse") { if (!sourisBas) return; sourisBas = false; const p = pos(ev); if (Math.hypot(p.x, p.y) <= 1.05) onPlace(p.x, p.y); return; }
+      if (!loupe) return; const p = last; hide(); tapGarde = Date.now() + 700; ev.preventDefault(); if (p && Math.hypot(p.x, p.y) <= 1.05) onPlace(p.x, p.y);
     });
     svg.addEventListener("pointercancel", hide);
   }
@@ -906,14 +912,21 @@ window.CarnetArcherUI = (API, opts = {}) => {
       if (full()) { toast("Toutes les flèches sont notées"); return; }
       let last = T.volees[T.volees.length - 1]; if (!last || last.length >= T.fpv) { last = []; T.volees.push(last); }
       last.push(k); if (imp) T.impacts.push({ v: T.volees.length - 1, x: +imp.x.toFixed(4), y: +imp.y.toFixed(4), k });
+      (T.ordre = T.ordre || []).push({ v: T.volees.length - 1, k, imp: !!imp }); // ordre de saisie, pour « Annuler la flèche »
       if (last.length === T.fpv) last.sort((a, b) => krank(b) - krank(a));
       if (full()) toast(`Tir terminé : ${total()} points`);
       draw();
     }
     function undo() {
       const vi = T.volees.length - 1, last = T.volees[vi]; if (!last || !last.length) return;
-      const j = T.impacts.map((p, i) => [p, i]).filter(([p]) => p.v === vi).pop();
-      if (j) { T.impacts.splice(j[1], 1); last.splice(last.lastIndexOf(j[0].k), 1); } else last.pop();
+      const o = (T.ordre || []).length && T.ordre[T.ordre.length - 1].v === vi ? T.ordre.pop() : null;
+      if (o) { // la dernière flèche notée, qu'elle vienne du clavier ou de la cible
+        last.splice(last.lastIndexOf(o.k), 1);
+        if (o.imp) { const j = T.impacts.map((p, i) => [p, i]).filter(([p]) => p.v === vi && p.k === o.k).pop(); if (j) T.impacts.splice(j[1], 1); }
+      } else {
+        const j = T.impacts.map((p, i) => [p, i]).filter(([p]) => p.v === vi).pop();
+        if (j) { T.impacts.splice(j[1], 1); last.splice(last.lastIndexOf(j[0].k), 1); } else last.pop();
+      }
       if (!last.length) T.volees.pop(); draw();
     }
     let drawing = false, again = false, setOpen = false; // réglages repliés une fois le tir commencé (plus de place pour la cible)
@@ -943,7 +956,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
         ${C.carte(T, "data-vv", view ?? curIdx())}${C.groupe({ ...T, impacts: view === "all" ? T.impacts : T.impacts.filter((p) => p.v === (view ?? curIdx())) })}
         <div class="acts">${shot() ? `<button type="button" class="btn danger left" id="tg-del">Effacer le tir</button>` : `<button type="button" class="btn" id="tg-no">Annuler</button>`}<button type="button" class="btn primary" id="tg-ok">${shot() && !full() ? "Enregistrer et quitter" : "Valider le tir"}</button></div></div>`;
       bindTarget(layer.querySelector("svg.tgt"), (x, y) => add(C.scoreAt(C.face(T), Math.hypot(x, y)), { x, y }), (x, y) => C.scoreAt(C.face(T), Math.hypot(x, y)));
-      layer.querySelectorAll("[data-k]").forEach((b) => b.addEventListener("click", () => add(b.dataset.k)));
+      layer.querySelectorAll("[data-k]").forEach((b) => b.addEventListener("click", () => { if (Date.now() < tapGarde) return; add(b.dataset.k); }));
       layer.querySelectorAll("[data-vv]").forEach((b) => b.addEventListener("click", () => { const x = b.dataset.vv; view = x === "cur" ? null : x === "all" ? "all" : Number(x) === curIdx() ? null : Number(x); draw(); }));
       $("#tg-undo").onclick = undo;
       const ts = $("#tg-set"); if (ts) ts.onclick = () => { setOpen = true; draw(); };
