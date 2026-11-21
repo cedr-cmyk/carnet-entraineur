@@ -69,12 +69,29 @@ details summary { cursor: pointer; font-weight: 700; }
     const avecRegle = jeux.filter((j) => j.regle);
     if (A.regles || avecRegle.length) h += `<details class="card"><summary>📜 Les règles</summary>${A.regles ? `<h3>Règles générales</h3>${para(A.regles)}` : ""}${avecRegle.map((j) => `<h3>${esc(j.nom)}</h3>${para(j.regle)}`).join("")}</details>`;
     if (E && A.equipeInconnue) h += `<div class="notice">Ce lien d'équipe n'est plus valable : demande le nouveau QR code de ton équipe.</div>`;
-    const mon = A.monEquipe;
+    const mon = A.monEquipe, cib = A.maCible;
+    // inscription sur place
+    if (A.inscription && !E) {
+      const moi = (() => { try { return JSON.parse(localStorage.getItem("anim-inscrit:" + T) || "null"); } catch (e) { return null; } })();
+      h += moi ? `<div class="card"><b>✓ ${esc(moi.prenom)}, tu es inscrit${moi.groupe ? " (" + esc(moi.groupe) + ")" : ""}.</b><span class="m">L'organisateur te place sur une cible ou dans une équipe. Bonne animation !</span><div><button class="btn" data-insc-autre="1">Inscrire une autre personne</button></div></div>`
+        : `<form class="card" id="insc"><h3>✍️ Je m'inscris</h3><div style="display:grid;gap:8px;grid-template-columns:1fr 1fr"><input class="btn" style="text-align:left;font-weight:400" name="prenom" required maxlength="40" placeholder="Prénom" aria-label="Prénom"><input class="btn" style="text-align:left;font-weight:400" name="nom" maxlength="40" placeholder="Nom (facultatif)" aria-label="Nom"></div>
+          ${(A.groupes || []).length ? `<select class="btn" name="groupe" aria-label="Groupe"><option value="">Groupe…</option>${A.groupes.map((g) => `<option>${esc(g)}</option>`).join("")}</select>` : `<input class="btn" style="text-align:left;font-weight:400" name="groupe" maxlength="40" placeholder="Groupe (ex. Enfants, Adultes)" aria-label="Groupe">`}
+          <button class="btn primary">M'inscrire</button><span class="m">Ton prénom et l'initiale de ton nom apparaîtront dans les résultats.</span></form>`;
+    }
+    if (E && cib) {
+      const mb = P.filter((p) => cib.membres.includes(p.id)).sort((x, y) => (x.nom || "").localeCompare(y.nom || "", "fr")), j = jeux.find((x) => x.id === jeu), mq = cib.marqueur && P.find((p) => p.id === cib.marqueur);
+      const detail = (c) => (c || []).map((n, i) => (Number(n) ? `${esc(j?.zones?.[i]?.nom || "Zone " + (i + 1))} ×${n}` : "")).filter(Boolean).join(" · ") || "Aucune flèche dans les zones";
+      h += `<div class="card"><h3>${esc(cib.nom)} : je compte les flèches</h3>${mq ? `<span class="m">Marqueur : <b>${esc(mq.nom)}</b></span>` : ""}
+        <span class="m">${A.saisie ? "Choisis le jeu, puis touche chaque personne pour compter ses flèches." : "La saisie est fermée : les scores ne bougent plus."}</span>
+        <div class="chips">${jeux.map((x) => `<button class="chip" data-jeu="${esc(x.id)}" aria-pressed="${x.id === jeu}">${esc(x.nom)}</button>`).join("")}</div>
+        <div class="list">${mb.map((p) => { const c = cib.scores?.[p.id]?.[jeu]; return `<${A.saisie ? `button class="row" data-cible="${p.id}"` : `div class="row"`}><span><b>${esc(p.nom)}</b><br><span class="m">${c ? detail(c) : A.saisie ? "Pas encore compté · touche pour compter" : "Pas compté"}</span></span>${A.saisie ? "<span>›</span>" : ""}</${A.saisie ? "button" : "div"}>`; }).join("")}</div></div>`;
+    }
     if (mon) {
       const L = mon.essais?.[jeu] || [], mb = P.filter((p) => mon.membres.includes(p.id)).sort((x, y) => (x.nom || "").localeCompare(y.nom || "", "fr")), j = jeux.find((x) => x.id === jeu);
       const detail = (c) => (c || []).map((n, i) => (Number(n) ? `${esc(j?.zones?.[i]?.nom || "Zone " + (i + 1))} ×${n}` : "")).filter(Boolean).join(" · ") || "Aucune flèche dans les zones";
       const edit = (es) => A.saisie && !es.retenu;
-      h += `<div class="card"><h3>Équipe ${esc(mon.nom)} : je compte les flèches</h3>
+      const mq = mon.marqueur && P.find((p) => p.id === mon.marqueur);
+      h += `<div class="card"><h3>Équipe ${esc(mon.nom)} : je compte les flèches</h3>${mq ? `<span class="m">Marqueur : <b>${esc(mq.nom)}</b></span>` : ""}
         <span class="m">${A.saisie ? "Choisis le jeu, lance une partie, puis touche chaque archer pour compter ses flèches. L'organisateur valide ensuite la partie qui compte." : "La saisie est fermée : les scores ne bougent plus."}</span>
         <div class="chips">${jeux.map((x) => `<button class="chip" data-jeu="${esc(x.id)}" aria-pressed="${x.id === jeu}">${esc(x.nom)}</button>`).join("")}</div>
         ${L.length ? "" : `<span class="m">Aucune partie pour l'instant sur ce jeu.</span>`}
@@ -109,8 +126,15 @@ details summary { cursor: pointer; font-weight: 700; }
     catch (err) { toast(/trop de fleches/.test(err.message) ? "Trop de flèches pour ce jeu" : /saisie fermee/.test(err.message) ? "La saisie est fermée" : /essai retenu/.test(err.message) ? "Partie déjà validée : elle ne bouge plus" : /lien invalide/.test(err.message) ? "Ce lien n'est plus actif" : "Pas enregistré : " + err.message); }
     finally { occupe = false; }
   }
+  async function envoyerCible(cible, compte, msg) {
+    if (occupe) return; occupe = true;
+    try { const { error } = await sb.rpc("anim_public_cible", { p_token: T, p_jeton: E, p_jeu: jeu, p_cible: cible, p_compte: compte }); if (error) throw error; toast(msg); await charger(); }
+    catch (err) { toast(/trop de fleches/.test(err.message) ? "Trop de flèches pour ce jeu" : /saisie fermee/.test(err.message) ? "La saisie est fermée" : /lien invalide/.test(err.message) ? "Ce lien n'est plus actif" : /anim_public_cible|function/.test(err.message) ? "L'organisateur doit mettre l'appli à jour" : "Pas enregistré : " + err.message); }
+    finally { occupe = false; }
+  }
   function saisie(essaiId, cible) {
-    const j = A.jeux.find((x) => x.id === jeu), p = A.participants.find((x) => x.id === cible), es = A.monEquipe.essais?.[jeu]?.find((x) => x.id === essaiId); if (!j || !p || !es) return;
+    const j = A.jeux.find((x) => x.id === jeu), p = A.participants.find((x) => x.id === cible);
+    const es = essaiId ? A.monEquipe?.essais?.[jeu]?.find((x) => x.id === essaiId) : { scores: { [cible]: A.maCible?.scores?.[cible]?.[jeu] } }; if (!j || !p || !es) return;
     const c = j.zones.map((_, i) => Number(es.scores?.[cible]?.[i]) || 0), F = Number(A.fleches) || 0, bg = document.createElement("div");
     bg.className = "sheet-bg"; bg.innerHTML = `<form class="sheet"><h3>${esc(p.nom)} · ${esc(j.nom)}</h3><span class="m">Compte les flèches tombées dans chaque zone.</span>
       ${j.zones.map((z, i) => `<div class="z"><b>${esc(z.nom)}</b><button type="button" class="btn" data-z="${i}" data-d="-1" aria-label="Une de moins">−</button><output id="z${i}">${c[i]}</output><button type="button" class="btn" data-z="${i}" data-d="1" aria-label="Une de plus">+</button></div>`).join("")}
@@ -120,15 +144,17 @@ details summary { cursor: pointer; font-weight: 700; }
     const maj = () => { const n = c.reduce((t, x) => t + x, 0); bg.querySelector("#zt").textContent = F ? `${n} / ${F} flèches dans les zones` : `${n} flèche${n > 1 ? "s" : ""} dans les zones`; bg.querySelectorAll('[data-d="1"]').forEach((b) => (b.disabled = !!F && n >= F)); };
     bg.addEventListener("click", (ev) => {
       if (ev.target === bg || ev.target.closest("[data-fermer]")) { bg.remove(); return; }
-      if (ev.target.closest("[data-eff]")) { bg.remove(); envoyer(essaiId, cible, null, "Effacé"); return; }
+      if (ev.target.closest("[data-eff]")) { bg.remove(); essaiId ? envoyer(essaiId, cible, null, "Effacé") : envoyerCible(cible, null, "Effacé"); return; }
       const b = ev.target.closest("[data-z]"); if (!b) return; const i = +b.dataset.z, d = +b.dataset.d, n = c.reduce((t, x) => t + x, 0);
       if (d > 0 && F && n >= F) return; c[i] = Math.max(0, Math.min(99, c[i] + d)); bg.querySelector("#z" + i).textContent = c[i]; maj();
     });
-    bg.querySelector("form").addEventListener("submit", (ev) => { ev.preventDefault(); bg.remove(); envoyer(essaiId, cible, c, `${p.nom} : c'est noté`); });
+    bg.querySelector("form").addEventListener("submit", (ev) => { ev.preventDefault(); bg.remove(); essaiId ? envoyer(essaiId, cible, c, `${p.nom} : c'est noté`) : envoyerCible(cible, c, `${p.nom} : c'est noté`); });
     maj();
   }
   app.addEventListener("click", (ev) => {
-    const t = ev.target.closest("[data-jeu],[data-ouv],[data-essai],[data-garder],[data-suppr],[data-saisie],[data-grp]"); if (!t) return;
+    const t = ev.target.closest("[data-jeu],[data-ouv],[data-essai],[data-garder],[data-suppr],[data-saisie],[data-grp],[data-cible],[data-insc-autre]"); if (!t) return;
+    if (t.dataset.cible) { saisie(null, t.dataset.cible); return; }
+    if (t.dataset.inscAutre) { try { localStorage.removeItem("anim-inscrit:" + T); } catch (e) {} rendre(); return; }
     if (t.dataset.grp !== undefined) { grp = t.dataset.grp; rendre(); return; }
     if (t.dataset.jeu) { jeu = t.dataset.jeu; rendre(); }
     else if (t.dataset.ouv) { ouvert[t.dataset.ouv] = t.getAttribute("aria-expanded") !== "true"; rendre(); }
@@ -136,6 +162,13 @@ details summary { cursor: pointer; font-weight: 700; }
     else if (t.dataset.garder) envoyer(t.dataset.garder, "@garder", null, "C'est noté : l'organisateur va valider cette partie");
     else if (t.dataset.suppr) { if (!t.dataset.ok) { t.dataset.ok = 1; t.textContent = "Supprimer ?"; return; } envoyer(t.dataset.suppr, null, null, "Partie supprimée"); }
     else if (t.dataset.saisie) { const [e, c] = t.dataset.saisie.split("|"); saisie(e, c); }
+  });
+  app.addEventListener("submit", async (ev) => {
+    if (ev.target.id !== "insc") return; ev.preventDefault(); const f = new FormData(ev.target), b = ev.target.querySelector(".primary"); b.disabled = true;
+    const v = { prenom: String(f.get("prenom") || "").trim(), nom: String(f.get("nom") || "").trim(), groupe: String(f.get("groupe") || "").trim() };
+    const { error } = await sb.rpc("anim_public_inscrire", { p_token: T, p_prenom: v.prenom, p_nom: v.nom, p_groupe: v.groupe });
+    if (error) { b.disabled = false; toast(/fermees/.test(error.message) ? "Les inscriptions sont fermées" : /complet/.test(error.message) ? "C'est complet" : "Inscription impossible : " + error.message); return; }
+    try { localStorage.setItem("anim-inscrit:" + T, JSON.stringify(v)); } catch (e) {} toast(`Bienvenue ${v.prenom} !`); charger();
   });
   charger();
   // résultats : mise à jour toutes les 30 secondes (pas pendant une saisie)

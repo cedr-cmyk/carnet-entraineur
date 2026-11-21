@@ -648,6 +648,19 @@ svg.chart .szl { stroke: var(--line-2, var(--line)); stroke-dasharray: 3 3; }
 .qr-url { word-break: break-all; margin: 0; }
 @media print { body.pr-qr * { visibility: hidden !important; } body.pr-qr .qr-zone, body.pr-qr .qr-zone * { visibility: visible !important; } body.pr-qr .qr-zone { position: absolute; left: 0; top: 0; width: 100%; } body.pr-qr .qr-b { break-inside: avoid; background: #fff; color: #000; border-color: #999; grid-template-columns: 200px 1fr; } body.pr-qr .qr-img { width: 200px; height: 200px; } body.pr-qr .btn { display: none; } }
 .an-inv { display: grid; gap: 6px; } .an-invr { display: grid; grid-template-columns: 1fr 1fr .8fr auto; gap: 6px; } @media (max-width: 520px) { .an-invr { grid-template-columns: 1fr 1fr auto; } .an-invr input:nth-child(3) { grid-column: 1 / 3; } }
+#print-zone { display: none; }
+@media print {
+  body.pr-anim > *:not(#print-zone) { display: none !important; } body.pr-anim #print-zone { display: block; color: #000; background: #fff; font-family: system-ui, sans-serif; }
+  .pz-p { page-break-after: always; break-after: page; padding: 8mm; } .pz-p:last-child { page-break-after: auto; }
+  .pz-h { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #000; padding-bottom: 4mm; margin-bottom: 5mm; } .pz-h b { font-size: 16pt; display: block; } .pz-h span { font-size: 10pt; } .pz-t { font-size: 14pt; font-weight: 700; text-align: right; }
+  .pz-tab { width: 100%; border-collapse: collapse; font-size: 11pt; } .pz-tab th, .pz-tab td { border: 1px solid #000; padding: 3mm 2mm; text-align: left; } .pz-tab td { height: 9mm; } .pz-tab th { background: #eee; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .pz-n { font-size: 10pt; margin-top: 5mm; }
+  .pz-pod { display: flex; justify-content: center; align-items: flex-end; gap: 6mm; margin: 6mm 0 10mm; } .pz-m { width: 50mm; text-align: center; display: grid; gap: 2mm; } .pz-m span { font-size: 28pt; } .pz-m b { font-size: 13pt; } .pz-m i { font-style: normal; font-size: 10pt; }
+  .pz-marche { background: #ddd; border: 1px solid #000; font-size: 22pt; font-weight: 800; display: grid; place-items: center; -webkit-print-color-adjust: exact; print-color-adjust: exact; } .pz-m1 .pz-marche { height: 40mm; } .pz-m2 .pz-marche { height: 28mm; } .pz-m3 .pz-marche { height: 18mm; }
+  .pz-dip { display: grid; place-items: center; min-height: 260mm; } .pz-cadre { border: 3mm double #B8860B; padding: 14mm 12mm; width: 100%; text-align: center; display: grid; gap: 5mm; justify-items: center; }
+  .pz-logo { width: 34mm; } .pz-dt { font-size: 34pt; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #B8860B; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .pz-dn { font-size: 30pt; font-weight: 800; margin: 0; } .pz-dr { font-size: 20pt; margin: 0; } .pz-da { font-size: 14pt; margin: 0; } .pz-dp { font-size: 13pt; margin: 0; } .pz-ds { font-size: 12pt; margin-top: 10mm; }
+}
 .prog-s { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
 .rt-notif { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
 .rt-rep { border-left: 3px solid var(--accent); padding: 4px 0 4px 10px; margin-top: 6px; }
@@ -6338,7 +6351,7 @@ function viewAnimations() {
 }
 function viewAnimation(a) {
   let jeux = a.jeux || [], ars = animArchers(a), vue = S.animVue && (S.animVue === "total" || jeux.some((j) => j.id === S.animVue)) ? S.animVue : (jeux[0]?.id || "total");
-  let h = `<div class="bar"><button class="btn ghost" data-act="anim-back">← Animations</button><span class="grow"></span>${prm().animCode ? `<button class="btn" data-act="${ptsVus() ? "anim-verrou" : "anim-ouvrir"}" aria-label="${ptsVus() ? "Reverrouiller les points" : "Voir les points"}">${ptsVus() ? "🔓" : "🔒"}</button>` : ""}${S.canWrite ? `<button class="btn" data-act="anim-lien">🔗 Lien et QR</button>` : ""}${S.canWrite ? `<button class="btn" data-act="anim-equipes">Équipes${animEquipes(a).length ? ` (${animEquipes(a).length})` : ""}</button><button class="btn" data-act="anim-edit">Modifier</button>` : ""}</div>
+  let h = `<div class="bar"><button class="btn ghost" data-act="anim-back">← Animations</button><span class="grow"></span>${prm().animCode ? `<button class="btn" data-act="${ptsVus() ? "anim-verrou" : "anim-ouvrir"}" aria-label="${ptsVus() ? "Reverrouiller les points" : "Voir les points"}">${ptsVus() ? "🔓" : "🔒"}</button>` : ""}${S.canWrite ? `<button class="btn" data-act="anim-lien">🔗 Lien et QR</button><button class="btn" data-act="anim-cibles">🎯 Cibles</button>` : ""}<button class="btn" data-act="anim-print">🖨 Imprimer</button>${S.canWrite ? `<button class="btn" data-act="anim-equipes">Équipes${animEquipes(a).length ? ` (${animEquipes(a).length})` : ""}</button><button class="btn" data-act="anim-edit">Modifier</button>` : ""}</div>
     <h2 class="sec" style="margin:4px 0 2px">${esc(a.nom || "Animation")}</h2><p class="tirline" style="margin:0 0 10px">${esc([fmtDateL(a.date), a.lieu, club(a.clubId)?.nom, a.parEquipe ? `${a.parEquipe} archers par équipe` : "", a.fleches ? `${a.fleches} flèches par archer et par jeu` : ""].filter(Boolean).join(" · "))}${a.partage ? " · ouverte aux archers participants" : ""}</p>`;
   const eqs = animEquipes(a);
   if (eqs.length) h += `<div class="an-eqs">${eqs.map((e) => { const ch = animPers(a, e.chefId); return `<span class="an-eq${a.parEquipe && e.membres.length !== a.parEquipe ? " an-ko" : ""}"><b>${esc(e.nom)}</b> · ${e.membres.length}${a.parEquipe ? "/" + a.parEquipe : ""} archer${e.membres.length > 1 ? "s" : ""}${ch ? ` · chef : ${esc(fullName(ch))}` : ""}</span>`; }).join("")}</div>
@@ -6519,18 +6532,21 @@ function formLienAnim(a) {
   const bloc = (titre, url, sous) => `<div class="qr-b"><div class="qr-img" data-qr="${esc(url)}"><span class="tirline">QR code…</span></div><div style="display:grid;gap:6px;min-width:0"><b>${esc(titre)}</b>${sous ? `<span class="tirline" style="margin:0">${esc(sous)}</span>` : ""}<a class="tirline qr-url" href="${esc(url)}" target="_blank" rel="noopener">${esc(url)}</a><div class="bar"><button type="button" class="btn" data-copier="${esc(url)}">Copier le lien</button></div></div></div>`;
   sheet("Lien public et QR codes", L ? `
     <label class="chk" style="display:flex;gap:8px;align-items:center;border:0"><input type="checkbox" name="actif" ${L.actif ? "checked" : ""}> Lien actif (décoche pour couper tous les QR codes)</label>
+    <label class="chk" style="display:flex;gap:8px;align-items:center;border:0"><input type="checkbox" name="inscription" ${L.inscription ? "checked" : ""}> Inscription sur place : chacun s'ajoute lui-même aux invités depuis la page du QR code</label>
     <label class="chk" style="display:flex;gap:8px;align-items:center;border:0"><input type="checkbox" name="scores" ${L.scores !== false ? "checked" : ""}> Montrer les scores${a.classement === false ? "" : " et le classement"} sur la page</label>
     <div class="qr-zone">${bloc("Page de l'animation", animUrl(L.token), "Règles, jeux, équipes" + (L.scores !== false ? " et résultats" : "") + ". Sans compte, sans appli.")}
-    ${a.saisieChefs !== false && eqs.length ? `<h3 class="hub-h" style="margin-top:6px">Saisie des équipes</h3><span class="tirline">Un QR par équipe : la personne qui l'a compte les flèches de son équipe, comme un chef d'équipe. Tu valides ensuite les parties.</span>${eqs.map((e) => e.jeton ? bloc("Équipe " + e.nom, animUrl(L.token, e.jeton), e.membres.map((id) => S.archers.find((x) => x.id === id)?.prenom || "").filter(Boolean).join(", ")) : "").join("")}${eqs.some((e) => !e.jeton) ? `<span class="tirline">Nouvelles équipes sans QR : « Enregistrer » les crée.</span>` : ""}` : eqs.length ? `<span class="tirline">La saisie des chefs d'équipe est fermée : pas de QR de saisie.</span>` : `<span class="tirline">Pas d'équipes : la page sert à voir les règles et les résultats. Tu comptes les points depuis ton carnet.</span>`}</div>
+    ${a.saisieChefs !== false && eqs.length ? `<h3 class="hub-h" style="margin-top:6px">Saisie des équipes</h3><span class="tirline">Un QR par équipe : la personne qui l'a compte les flèches de son équipe, comme un chef d'équipe. Tu valides ensuite les parties.</span>${eqs.map((e) => e.jeton ? bloc("Équipe " + e.nom, animUrl(L.token, e.jeton), (e.marqueurId && animPers(a, e.marqueurId) ? "Marqueur : " + fullName(animPers(a, e.marqueurId)) + " · " : "") + e.membres.map((id) => animPers(a, id)?.prenom || "").filter(Boolean).join(", ")) : "").join("")}${eqs.some((e) => !e.jeton) ? `<span class="tirline">Nouvelles équipes sans QR : « Enregistrer » les crée.</span>` : ""}` : eqs.length ? `<span class="tirline">La saisie des chefs d'équipe est fermée : pas de QR de saisie.</span>` : `<span class="tirline">Pas d'équipes : la page sert à voir les règles et les résultats${(a.cibles || []).length ? "" : ". Pour faire compter les points sans équipe, crée des cibles (🎯 Cibles)"}.</span>`}
+    ${a.saisieChefs !== false && (a.cibles || []).some((c) => (c.membres || []).length) ? `<h3 class="hub-h" style="margin-top:6px">Saisie par cible</h3><span class="tirline">Un QR par cible : la personne à la cible compte les flèches de chacun.</span>${(a.cibles || []).filter((c) => (c.membres || []).length).map((c) => c.jeton ? bloc(c.nom, animUrl(L.token, c.jeton), (c.marqueurId && animPers(a, c.marqueurId) ? "Marqueur : " + fullName(animPers(a, c.marqueurId)) + " · " : "") + c.membres.map((id) => animPers(a, id)?.prenom || "").filter(Boolean).join(", ")) : "").join("")}${(a.cibles || []).some((c) => (c.membres || []).length && !c.jeton) ? `<span class="tirline">Nouvelles cibles sans QR : « Enregistrer » les crée.</span>` : ""}` : ""}</div>
     <div class="bar"><button type="button" class="btn" data-act="qr-print">🖨 Imprimer les QR codes</button><span class="grow"></span><button type="button" class="btn ghost" data-act="qr-new">Changer les liens</button></div>
     <span class="tirline">Les participants apparaissent en « Prénom N. ». Les points des zones ne sont jamais montrés.</span>` : `
     <p style="margin:0">Crée un lien (et son QR code) pour les archers et le public qui n'ont pas l'appli : ils voient l'animation sans compte. Avec des équipes, chaque équipe a aussi son QR pour compter ses flèches.</p>
     <span class="tirline">Tu peux couper le lien à tout moment.</span>`, {
     saveLabel: L ? "Enregistrer" : "Créer le lien",
     onSave(fd) {
-      const lien = L ? { ...L, actif: !!fd.get("actif"), scores: !!fd.get("scores") } : { token: jetonAlea() + jetonAlea().slice(0, 6), actif: true, scores: true };
+      const lien = L ? { ...L, actif: !!fd.get("actif"), scores: !!fd.get("scores"), inscription: !!fd.get("inscription") } : { token: jetonAlea() + jetonAlea().slice(0, 6), actif: true, scores: true, inscription: false };
       const equipes = (a.equipes || []).map((e) => (e.membres || []).length && !e.jeton ? { ...e, jeton: jetonAlea() + jetonAlea().slice(0, 6) } : e);
-      Object.assign(a, { lienPublic: lien, equipes }); patch("animations", a.id, { lienPublic: lien, equipes, updatedAt: Date.now() });
+      const cibles = (a.cibles || []).map((c) => (c.membres || []).length && !c.jeton ? { ...c, jeton: jetonAlea() + jetonAlea().slice(0, 6) } : c);
+      Object.assign(a, { lienPublic: lien, equipes, cibles }); patch("animations", a.id, { lienPublic: lien, equipes, cibles, updatedAt: Date.now() });
       toast(L ? (lien.actif ? "Lien enregistré" : "Lien coupé : les QR codes ne marchent plus") : "Lien créé"); render(); if (!L) setTimeout(() => formLienAnim(a), 60);
     },
   });
@@ -6540,9 +6556,91 @@ function formLienAnim(a) {
     const c = e.target.closest("[data-copier]"); if (c) { navigator.clipboard?.writeText(c.dataset.copier).then(() => toast("Lien copié"), () => toast("Copie impossible : appuie longuement sur le lien")); return; }
     if (e.target.closest('[data-act="qr-print"]')) { document.body.classList.add("pr-qr"); setTimeout(() => { window.print(); setTimeout(() => document.body.classList.remove("pr-qr"), 500); }, 50); return; }
     const n = e.target.closest('[data-act="qr-new"]'); if (n) { if (!n.dataset.ok) { n.dataset.ok = 1; n.textContent = "Les anciens QR ne marcheront plus. Confirmer ?"; return; }
-      const lien = { ...L, token: jetonAlea() + jetonAlea().slice(0, 6) }, equipes = (a.equipes || []).map((x) => (x.membres || []).length ? { ...x, jeton: jetonAlea() + jetonAlea().slice(0, 6) } : x);
-      Object.assign(a, { lienPublic: lien, equipes }); patch("animations", a.id, { lienPublic: lien, equipes, updatedAt: Date.now() }); toast("Nouveaux liens créés"); formLienAnim(a); }
+      const lien = { ...L, token: jetonAlea() + jetonAlea().slice(0, 6) }, equipes = (a.equipes || []).map((x) => (x.membres || []).length ? { ...x, jeton: jetonAlea() + jetonAlea().slice(0, 6) } : x), cibles = (a.cibles || []).map((x) => (x.membres || []).length ? { ...x, jeton: jetonAlea() + jetonAlea().slice(0, 6) } : x);
+      Object.assign(a, { lienPublic: lien, equipes, cibles }); patch("animations", a.id, { lienPublic: lien, equipes, cibles, updatedAt: Date.now() }); toast("Nouveaux liens créés"); formLienAnim(a); }
   });
+}
+// V.1.10 (script 22) : cibles, pour faire compter les flèches sans équipe — un QR par cible
+function formCibles(a) {
+  if (!a) return; const ars = animArchers(a); if (!ars.length) { toast("Choisis d'abord les participants (Modifier)"); return; }
+  let cb = JSON.parse(JSON.stringify(a.cibles || [])); const aff = {}; cb.forEach((c, i) => (c.membres || []).forEach((m) => { aff[m] = i; }));
+  const draw = () => {
+    $("#cb-box").innerHTML = `${cb.length ? cb.map((c, i) => { const mb = ars.filter((x) => aff[x.id] === i);
+      return `<div class="an-eqf"><div class="bar"><b>${esc(c.nom)}</b><span class="tirline" style="margin:0">${mb.length} personne${mb.length > 1 ? "s" : ""}</span><span class="grow"></span><button type="button" class="btn ghost" data-cbdel="${i}" aria-label="Supprimer ${esc(c.nom)}">✕</button></div>
+        <label class="f">Marqueur (la personne qui aura le QR)<select data-cbmq="${i}"><option value="">—</option>${mb.map((x) => `<option value="${x.id}" ${c.marqueurId === x.id ? "selected" : ""}>${esc(fullName(x))}</option>`).join("")}</select></label></div>`; }).join("") : `<p class="tirline">Pas encore de cible.</p>`}
+      <div class="list">${ars.map((x) => `<div class="row"><span class="main"><span class="t">${esc(fullName(x))}</span><span class="m">${esc(animGroupe(x))}</span></span><select data-cbar="${x.id}" aria-label="Cible de ${esc(fullName(x))}"><option value="">—</option>${cb.map((c, i) => `<option value="${i}" ${aff[x.id] === i ? "selected" : ""}>${esc(c.nom)}</option>`).join("")}</select></div>`).join("")}</div>`;
+  };
+  sheet("Cibles", `<p class="tirline">Sans équipe, mets chaque participant sur une cible : la personne qui a le QR de la cible compte les flèches de tous ceux qui y tirent. Les QR se trouvent dans « 🔗 Lien et QR ».</p>
+    <div class="bar"><label class="f" style="margin:0" for="cb-n">Nombre de cibles<input type="number" id="cb-n" min="1" max="60" value="${cb.length || Math.max(1, Math.ceil(ars.length / 4))}" style="width:90px"></label>
+      <label class="f" style="margin:0" for="cb-par">Par cible<input type="number" id="cb-par" min="1" max="20" value="4" style="width:80px"></label>
+      <button type="button" class="btn" id="cb-rep">Répartir dans l'ordre</button><button type="button" class="btn" id="cb-hasard">🎲 Au hasard</button><button type="button" class="btn ghost" id="cb-grp">Par groupe</button></div>
+    <div id="cb-box"></div>`, {
+    onSave() {
+      const out = cb.map((c, i) => ({ ...c, membres: ars.filter((x) => aff[x.id] === i).map((x) => x.id) })).map((c) => ({ ...c, marqueurId: c.membres.includes(c.marqueurId) ? c.marqueurId : null }));
+      Object.assign(a, { cibles: out }); patch("animations", a.id, { cibles: out, updatedAt: Date.now() });
+      const sans = ars.filter((x) => aff[x.id] == null).length; toast(["Cibles enregistrées", sans ? `${sans} sans cible` : ""].filter(Boolean).join(" · ")); render();
+    },
+  });
+  const mk = (n) => { while (cb.length < n) cb.push({ id: "c" + Date.now().toString(36) + cb.length, nom: "Cible " + (cb.length + 1), membres: [] }); cb = cb.slice(0, n); };
+  const rep = (ordre) => { const par = Math.max(1, +$("#cb-par").value || 4), n = Math.max(+$("#cb-n").value || 1, Math.ceil(ordre.length / par)); mk(n); $("#cb-n").value = n; Object.keys(aff).forEach((k) => delete aff[k]); ordre.forEach((x, i) => { aff[x.id] = Math.floor(i / par) % n; }); draw(); };
+  $("#cb-rep").onclick = () => rep(ars);
+  $("#cb-hasard").onclick = () => { const m = ars.slice(); for (let i = m.length - 1; i > 0; i--) { const k = Math.floor(Math.random() * (i + 1)); [m[i], m[k]] = [m[k], m[i]]; } rep(m); };
+  $("#cb-grp").onclick = () => rep(ars.slice().sort((x, y) => animGroupe(x).localeCompare(animGroupe(y), "fr") || byName(x, y)));
+  $("#cb-n").onchange = () => { const n = Math.max(1, +$("#cb-n").value || 1); mk(n); Object.keys(aff).forEach((k) => { if (aff[k] >= n) delete aff[k]; }); draw(); };
+  const box = $("#cb-box");
+  box.addEventListener("change", (e) => { const t = e.target;
+    if (t.dataset.cbar) { if (t.value === "") delete aff[t.dataset.cbar]; else aff[t.dataset.cbar] = +t.value; draw(); }
+    if (t.dataset.cbmq) cb[+t.dataset.cbmq].marqueurId = t.value || null; });
+  box.addEventListener("click", (e) => { const b = e.target.closest("[data-cbdel]"); if (!b) return; const i = +b.dataset.cbdel; cb.splice(i, 1); Object.keys(aff).forEach((k) => { if (aff[k] === i) delete aff[k]; else if (aff[k] > i) aff[k]--; }); $("#cb-n").value = cb.length; draw(); });
+  draw();
+}
+// V.1.10 : impressions d'une animation — feuilles de marque, podiums par groupe, diplômes
+function formImprimerAnim(a) {
+  if (!a) return; const eqs = animEquipes(a), cbs = (a.cibles || []).filter((c) => (c.membres || []).length), grps = [...new Set(animArchers(a).map(animGroupe))].sort((x, y) => x.localeCompare(y, "fr"));
+  sheet("Imprimer", `
+    <div class="f">Feuilles de marque<div class="checks">${[eqs.length ? ["equipe", "Une feuille par équipe"] : null, cbs.length ? ["cible", "Une feuille par cible"] : null, ["liste", "Une feuille avec tout le monde"], ["vierge", "Feuilles vierges (à remplir à la main)"]].filter(Boolean).map(([k, l], i) => `<label><input type="radio" name="fm" value="${k}" ${i === 0 ? "checked" : ""}>${l}</label>`).join("")}</div></div>
+    <div class="f">Jeux<div class="checks">${(a.jeux || []).map((j) => `<label><input type="checkbox" name="jeu" value="${j.id}" checked>${esc(j.nom)}</label>`).join("")}</div></div>
+    <div class="bar"><button type="button" class="btn primary" data-pr="feuilles">🖨 Feuilles de marque</button></div>
+    <h3 class="hub-h">Résultats</h3>
+    <div class="f">Groupes<div class="checks">${["", ...(grps.length > 1 ? grps : [])].map((g) => `<label><input type="checkbox" name="grp" value="${esc(g)}" checked>${g ? esc(g) : "Tout le monde"}</label>`).join("")}</div></div>
+    <div class="bar"><button type="button" class="btn" data-pr="podium">🏆 Podiums</button><button type="button" class="btn" data-pr="dipl-podium">🎖 Diplômes des podiums</button><button type="button" class="btn" data-pr="dipl-tous">🎖 Diplômes pour tous</button></div>
+    <span class="tirline">Les points des zones n'apparaissent pas sur les feuilles de marque : on y compte les flèches par zone.</span>`, { saveLabel: "Fermer", onSave: () => true });
+  $("#sheet-form").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-pr]"); if (!b) return; const f = new FormData($("#sheet-form")), jx = (a.jeux || []).filter((j) => f.getAll("jeu").includes(j.id)), gs = f.getAll("grp");
+    const k = b.dataset.pr;
+    if (k !== "feuilles" && !ptsVus()) { demanderCode(() => formImprimerAnim(a)); return; }
+    imprimerAnim(a, k, { fm: f.get("fm"), jeux: jx, groupes: gs });
+  });
+}
+function imprimerAnim(a, k, o) {
+  const ars = animArchers(a), ent = esc(prm().nom || ""), tete = (t) => `<div class="pz-h"><div><b>${esc(a.nom || "Animation")}</b><span>${esc([fmtDateL(a.date), a.lieu].filter(Boolean).join(" · "))}</span></div><div class="pz-t">${t}</div></div>`;
+  const F = Number(a.fleches) || 0, pages = [];
+  const feuille = (titre, gens, j, mq) => `<section class="pz-p">${tete(esc(titre) + " · " + esc(j.nom))}<table class="pz-tab"><thead><tr><th>Nom</th>${(j.zones || []).map((z) => `<th>${esc(z.nom)}</th>`).join("")}<th>Flèches</th></tr></thead>
+      <tbody>${gens.map((x) => `<tr><td>${x ? esc(fullName(x)) : ""}</td>${(j.zones || []).map(() => "<td></td>").join("")}<td>${F ? `/ ${F}` : ""}</td></tr>`).join("")}</tbody></table>
+      <p class="pz-n">Compte les flèches tombées dans chaque zone (un bâton par flèche).${F ? ` ${F} flèches par personne.` : ""} Marqueur : ${mq ? esc(fullName(mq)) : "______________________"}</p></section>`;
+  if (k === "feuilles") {
+    const blocs = o.fm === "equipe" ? animEquipes(a).map((e) => [e.nom, e.membres.map((m) => animPers(a, m)).filter(Boolean).sort(byName), animPers(a, e.marqueurId)])
+      : o.fm === "cible" ? (a.cibles || []).filter((c) => (c.membres || []).length).map((c) => [c.nom, c.membres.map((m) => animPers(a, m)).filter(Boolean).sort(byName), animPers(a, c.marqueurId)])
+      : o.fm === "vierge" ? [["Feuille de marque", Array(12).fill(null)]] : [["Tout le monde", ars]];
+    o.jeux.forEach((j) => blocs.forEach(([t, g, mq]) => { for (let i = 0; i < Math.max(1, g.length); i += 18) pages.push(feuille(t, g.slice(i, i + 18).length ? g.slice(i, i + 18) : [null], j, mq)); }));
+  } else {
+    const groupes = o.groupes.length ? o.groupes : [""];
+    groupes.forEach((g) => {
+      const L = ars.filter((x) => (!g || animGroupe(x) === g) && animJoue(a, x.id)), r = animRangs(L, (x) => animTotal(a, x.id)), titreG = g || "Tout le monde";
+      if (k === "podium") pages.push(`<section class="pz-p">${tete("Podium · " + esc(titreG))}<div class="pz-pod">${[2, 1, 3].map((n) => { const w = r.filter((o2) => o2.rang === n); return `<div class="pz-m pz-m${n}"><span>${n === 1 ? "🥇" : n === 2 ? "🥈" : "🥉"}</span><b>${w.map((o2) => esc(fullName(o2.x))).join("<br>") || "—"}</b><i>${w[0] ? w[0].v + " pts" : ""}</i><div class="pz-marche">${n}</div></div>`; }).join("")}</div>
+          <table class="pz-tab"><thead><tr><th>Place</th><th>Nom</th><th>Total</th></tr></thead><tbody>${r.map((o2) => `<tr><td>${o2.rang}</td><td>${esc(fullName(o2.x))}</td><td>${o2.v}</td></tr>`).join("")}</tbody></table></section>`);
+      else {
+        const qui = k === "dipl-podium" ? r.filter((o2) => o2.rang <= 3) : r.concat(ars.filter((x) => (!g || animGroupe(x) === g) && !animJoue(a, x.id)).map((x) => ({ x, rang: null, v: null })));
+        qui.forEach((o2) => pages.push(`<section class="pz-p pz-dip"><div class="pz-cadre">${window.CARNET_AUTEUR?.logo ? `<img src="${window.CARNET_AUTEUR.logo}" alt="" class="pz-logo">` : ""}<span class="pz-dt">Diplôme</span>
+          <p class="pz-dn">${esc(fullName(o2.x))}</p><p class="pz-dr">${o2.rang ? (o2.rang === 1 ? "🥇 1re place" : o2.rang === 2 ? "🥈 2e place" : o2.rang === 3 ? "🥉 3e place" : o2.rang + "e place") + (g ? " · " + esc(g) : "") : "a participé avec brio"}</p>
+          <p class="pz-da">${esc(a.nom || "Animation tir à l'arc")}<br>${esc([fmtDateL(a.date), a.lieu].filter(Boolean).join(" · "))}</p>${o2.v != null ? `<p class="pz-dp">${o2.v} points</p>` : ""}<p class="pz-ds">${ent ? "L'animateur : " + ent : ""}</p></div></section>`));
+      }
+    });
+  }
+  if (!pages.length) { toast("Rien à imprimer pour ce choix (pas encore de score ?)"); return; }
+  let z = $("#print-zone"); if (!z) { z = document.createElement("div"); z.id = "print-zone"; document.body.appendChild(z); }
+  z.innerHTML = pages.join(""); document.body.classList.add("pr-anim");
+  setTimeout(() => { window.print(); setTimeout(() => { document.body.classList.remove("pr-anim"); z.innerHTML = ""; }, 800); }, 80);
 }
 function formEquipes(a) {
   const ars = animArchers(a); let eqs = JSON.parse(JSON.stringify(a.equipes || []));
@@ -6554,7 +6652,8 @@ function formEquipes(a) {
     $("#eq-sans").className = "an-sans" + (sans.length ? "" : " ok");
     $("#eq-box").innerHTML = eqs.map((e, i) => `<div class="an-eqf"><div class="an-zr" style="grid-template-columns:1fr auto"><input type="text" class="eqn" data-i="${i}" value="${esc(e.nom)}" aria-label="Nom de l'équipe"><button type="button" class="btn eq-del" data-i="${i}" aria-label="Retirer cette équipe">✕</button></div>
       <div class="checks an-eqchk">${ars.map((x) => { const autre = eqs.find((q, k) => k !== i && q.membres.includes(x.id)); return `<label class="${autre ? "an-pris" : ""}"><input type="checkbox" class="eqm" data-i="${i}" value="${x.id}" ${e.membres.includes(x.id) ? "checked" : ""}>${esc(fullName(x))}${autre ? ` <small>(${esc(autre.nom)})</small>` : ""}</label>`; }).join("")}</div>
-      <label class="f">Chef d'équipe<select class="eqc" data-i="${i}"><option value="">Pas de chef</option>${ars.filter((x) => e.membres.includes(x.id) && !x.invite).map((x) => `<option value="${x.id}" ${x.id === e.chefId ? "selected" : ""}>${esc(fullName(x))}</option>`).join("")}</select></label>
+      <label class="f">Marqueur (la personne qui aura le QR de l'équipe)<select class="eqmq" data-i="${i}"><option value="">—</option>${ars.filter((x) => e.membres.includes(x.id)).map((x) => `<option value="${x.id}" ${x.id === e.marqueurId ? "selected" : ""}>${esc(fullName(x))}${x.invite ? " (invité)" : ""}</option>`).join("")}</select></label>
+      <label class="f">Chef d'équipe avec l'appli (facultatif)<select class="eqc" data-i="${i}"><option value="">Pas de chef</option>${ars.filter((x) => e.membres.includes(x.id) && !x.invite).map((x) => `<option value="${x.id}" ${x.id === e.chefId ? "selected" : ""}>${esc(fullName(x))}</option>`).join("")}</select></label>
       <span class="tirline${a.parEquipe && e.membres.length > a.parEquipe ? " an-warn" : ""}">${e.membres.length}${a.parEquipe ? " / " + a.parEquipe : ""} archer${e.membres.length > 1 ? "s" : ""}${a.parEquipe && e.membres.length > a.parEquipe ? " · une personne de trop" + (e.membres.length - a.parEquipe > 1 ? ` (${e.membres.length - a.parEquipe})` : "") : a.parEquipe && e.membres.length < a.parEquipe ? ` · il manque ${a.parEquipe - e.membres.length} archer${a.parEquipe - e.membres.length > 1 ? "s" : ""}` : ""}</span></div>`).join("");
   };
   sheet("Équipes", `<p class="tirline">Coche les archers de chaque équipe. Un archer coché dans une autre équipe y est déplacé. Le chef d'équipe voit l'animation dans son espace dès qu'il est nommé et marque les points de son équipe.</p>
@@ -6571,8 +6670,9 @@ function formEquipes(a) {
   el.addEventListener("change", (e) => {
     const t = e.target;
     if (t.classList.contains("eqc")) { eqs[t.dataset.i].chefId = t.value || null; return; }
+    if (t.classList.contains("eqmq")) { eqs[t.dataset.i].marqueurId = t.value || null; return; }
     if (t.classList.contains("eqm")) { const aid = t.value, i = Number(t.dataset.i);
-      eqs.forEach((q, k) => { if (k !== i || !t.checked) { q.membres = q.membres.filter((m) => m !== aid); if (q.chefId === aid) q.chefId = null; } });
+      eqs.forEach((q, k) => { if (k !== i || !t.checked) { q.membres = q.membres.filter((m) => m !== aid); if (q.chefId === aid) q.chefId = null; if (q.marqueurId === aid) q.marqueurId = null; } });
       if (t.checked) eqs[i].membres.push(aid); draw(); }
   });
   el.addEventListener("click", (e) => { const b = e.target.closest(".eq-del"); if (!b) return; eqs.splice(Number(b.dataset.i), 1); draw(); });
@@ -7904,6 +8004,8 @@ document.addEventListener("click", (e) => {
   if (t.dataset.act === "anim-new") { formAnimation(); return; }
   if (t.dataset.act === "anim-edit") { formAnimation(animCur()); return; }
   if (t.dataset.act === "anim-lien") { formLienAnim(animCur()); return; }
+  if (t.dataset.act === "anim-cibles") { formCibles(animCur()); return; }
+  if (t.dataset.act === "anim-print") { formImprimerAnim(animCur()); return; }
   if (t.dataset.act === "anim-back") { S.anim = null; render(); return; }
   if (t.dataset.act === "anim-jeux") { listeJeux(); return; }
   if (t.dataset.act === "anim-ouvrir") { demanderCode(); return; }
