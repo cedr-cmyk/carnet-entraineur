@@ -3,6 +3,8 @@
 --    en « Prénom N. ») et, si l'entraîneur l'a choisi, les scores finaux. Les points des zones ne sont jamais envoyés.
 --  • equipes[].jeton : lien de saisie d'une équipe — la personne qui l'a compte les flèches de son équipe, comme un chef d'équipe.
 --  • L'entraîneur coupe le lien quand il veut (actif = false) : les QR codes ne marchent plus.
+--  • Invités sans l'appli (invites = [{id, prenom, nom, groupe}] sur l'animation) : ils apparaissent comme les archers,
+--    sur la page publique et dans l'espace des archers (archer_animations, réécrite ici avec les invités).
 -- À lancer une fois dans Supabase (SQL Editor), après le script 20. Peut être relancé sans risque. Ne change rien pour la 1.9.
 
 create or replace function public.anim_public(p_token text, p_jeton text default null) returns jsonb language plpgsql stable security definer set search_path = public as $$
@@ -20,10 +22,12 @@ begin
     into jeux from jsonb_array_elements(coalesce(r.data->'jeux', '[]'::jsonb)) j;
   select coalesce(jsonb_agg(jsonb_build_object('id', q->>'id', 'nom', q->>'nom', 'membres', q->'membres')), '[]'::jsonb)
     into eqs from jsonb_array_elements(coalesce(r.data->'equipes', '[]'::jsonb)) q where jsonb_array_length(coalesce(q->'membres', '[]'::jsonb)) > 0;
-  select coalesce(jsonb_agg(jsonb_build_object('id', p.id,
+  select coalesce(jsonb_agg(jsonb_build_object('id', p.id, 'groupe', p.grp,
       'nom', trim(coalesce(p.data->>'prenom', '') || ' ' || case when coalesce(p.data->>'nom', '') <> '' then left(p.data->>'nom', 1) || '.' else '' end),
       'scores', case when sc then (select coalesce(jsonb_object_agg(j->>'id', public.anim_points(r.data, p.id, j->>'id')), '{}'::jsonb) from jsonb_array_elements(coalesce(r.data->'jeux', '[]'::jsonb)) j) else '{}'::jsonb end)), '[]'::jsonb)
-    into parts from docs p where p.owner = r.owner and p.col = 'archers' and coalesce(r.data->'participants', '[]'::jsonb) ? p.id;
+    into parts from (select a.id, a.data, 'Archers du club' as grp from docs a where a.owner = r.owner and a.col = 'archers'
+                     union all select g->>'id', g, coalesce(nullif(g->>'groupe', ''), 'Invités') from jsonb_array_elements(coalesce(r.data->'invites', '[]'::jsonb)) g where coalesce(g->>'id', '') <> '') p
+    where coalesce(r.data->'participants', '[]'::jsonb) ? p.id;
   if e is not null then
     select coalesce(jsonb_object_agg(j->>'id', (select coalesce(jsonb_agg(jsonb_build_object('id', s->>'id', 'le', s->'le',
           'retenu', coalesce(r.data->'retenus'->(e->>'id')->>(j->>'id') = s->>'id', false),
@@ -96,6 +100,58 @@ begin
   end if;
   return case when not nouv and p_cible is null and p_compte is null then null else p_essai end;
 end $$;
+
+-- Espace des archers : les invités apparaissent dans les scores et les équipes (copie du script 9, avec les invités)
+create or replace function public.archer_animations(p_owner uuid, p_archer text) returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare r record; e jsonb; jeux jsonb; eqs jsonb; parts jsonb; mon jsonb; ess jsonb; out jsonb := '[]'::jsonb; ouvert boolean; autorise boolean;
+begin
+  if not exists (select 1 from acces where user_id = auth.uid() and owner = p_owner and archer_id = p_archer) then raise exception 'acces refuse'; end if;
+  -- sans l'onglet Animations autorisé, seul le chef d'équipe reçoit son animation (sa saisie, sans résultats)
+  autorise := coalesce(public.anim_autorise(p_owner, p_archer), false);
+  for r in select id, data from docs where owner = p_owner and col = 'animations' order by data->>'date' desc loop
+    ouvert := coalesce(r.data->>'partage', 'false') = 'true' and autorise;
+    e := null;
+    select q into e from jsonb_array_elements(coalesce(r.data->'equipes', '[]'::jsonb)) q where q->>'chefId' = p_archer limit 1;
+    -- un archer autorisé voit aussi les parties de son équipe (en lecture)
+    if e is null and autorise then
+      select q into e from jsonb_array_elements(coalesce(r.data->'equipes', '[]'::jsonb)) q where coalesce(q->'membres', '[]'::jsonb) ? p_archer limit 1;
+    end if;
+    if not ((ouvert and coalesce(r.data->'participants', '[]'::jsonb) ? p_archer) or e is not null) then continue; end if;
+    -- jeux sans les points
+    select coalesce(jsonb_agg(jsonb_build_object('id', j->>'id', 'nom', j->>'nom', 'regle', coalesce(j->>'regle', ''),
+        'regleAsset', (select g.data->>'assetId' from docs g where g.owner = p_owner and g.col = 'documents' and g.id = j->>'regleDoc'),
+        'regleType', (select g.data->>'contentType' from docs g where g.owner = p_owner and g.col = 'documents' and g.id = j->>'regleDoc'),
+        'zones', (select coalesce(jsonb_agg(jsonb_build_object('nom', z->>'nom') order by i), '[]'::jsonb) from jsonb_array_elements(coalesce(j->'zones', '[]'::jsonb)) with ordinality t(z, i)))), '[]'::jsonb)
+      into jeux from jsonb_array_elements(coalesce(r.data->'jeux', '[]'::jsonb)) j;
+    select coalesce(jsonb_agg(jsonb_build_object('id', q->>'id', 'nom', q->>'nom', 'chefId', q->>'chefId', 'membres', q->'membres')), '[]'::jsonb)
+      into eqs from jsonb_array_elements(coalesce(r.data->'equipes', '[]'::jsonb)) q where jsonb_array_length(coalesce(q->'membres', '[]'::jsonb)) > 0;
+    -- participants : tous si l'animation est ouverte, sinon l'équipe du chef ; scores finaux seulement si ouverte
+    select coalesce(jsonb_agg(jsonb_build_object('id', p.id, 'moi', p.id = p_archer,
+        'nom', trim(coalesce(p.data->>'prenom', '') || ' ' || case when coalesce(p.data->>'nom', '') <> '' then left(p.data->>'nom', 1) || '.' else '' end),
+        'scores', case when ouvert then (select coalesce(jsonb_object_agg(j->>'id', public.anim_points(r.data, p.id, j->>'id')), '{}'::jsonb) from jsonb_array_elements(coalesce(r.data->'jeux', '[]'::jsonb)) j) else '{}'::jsonb end)), '[]'::jsonb)
+      into parts from (select a.id, a.data from docs a where a.owner = p_owner and a.col = 'archers'
+                       union all select g->>'id', g from jsonb_array_elements(coalesce(r.data->'invites', '[]'::jsonb)) g where coalesce(g->>'id', '') <> '') p
+      where coalesce(r.data->'participants', '[]'::jsonb) ? p.id
+        and (ouvert or (e is not null and coalesce(e->'membres', '[]'::jsonb) ? p.id));
+    mon := null;
+    if e is not null then
+      select coalesce(jsonb_object_agg(j->>'id', (select coalesce(jsonb_agg(jsonb_build_object('id', s->>'id', 'le', s->'le',
+            'retenu', coalesce(r.data->'retenus'->(e->>'id')->>(j->>'id') = s->>'id', false),
+            'choisi', coalesce(r.data->'choix'->(e->>'id')->>(j->>'id') = s->>'id', false), 'scores', coalesce(s->'scores', '{}'::jsonb)) order by k), '[]'::jsonb)
+          from jsonb_array_elements(coalesce(r.data->'essais'->(e->>'id')->(j->>'id'), '[]'::jsonb)) with ordinality u(s, k))), '{}'::jsonb)
+        into ess from jsonb_array_elements(coalesce(r.data->'jeux', '[]'::jsonb)) j;
+      mon := jsonb_build_object('id', e->>'id', 'nom', e->>'nom', 'membres', coalesce(e->'membres', '[]'::jsonb), 'chef', e->>'chefId' = p_archer, 'essais', ess);
+    end if;
+    out := out || jsonb_build_array(jsonb_build_object('id', r.id, 'nom', r.data->>'nom', 'date', r.data->>'date', 'lieu', r.data->>'lieu',
+      'classement', coalesce(r.data->>'classement', 'true') <> 'false', 'partage', ouvert, 'saisie', coalesce(r.data->>'saisieChefs', 'true') <> 'false',
+      'fleches', r.data->'fleches', 'jeux', jeux, 'regles', coalesce(r.data->>'regles', ''),
+      'reglesAsset', (select g.data->>'assetId' from docs g where g.owner = p_owner and g.col = 'documents' and g.id = r.data->>'reglesDoc'),
+      'reglesType', (select g.data->>'contentType' from docs g where g.owner = p_owner and g.col = 'documents' and g.id = r.data->>'reglesDoc'), 'equipes', eqs, 'participants', parts, 'monEquipe', mon));
+  end loop;
+  return out;
+end $$;
+revoke execute on function public.archer_animations(uuid, text) from public, anon;
+grant execute on function public.archer_animations(uuid, text) to authenticated;
 
 revoke all on function public.anim_public(text, text), public.anim_public_essai(text, text, text, text, text, jsonb) from public;
 grant execute on function public.anim_public(text, text), public.anim_public_essai(text, text, text, text, text, jsonb) to anon, authenticated;

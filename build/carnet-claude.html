@@ -647,6 +647,7 @@ svg.chart .szl { stroke: var(--line-2, var(--line)); stroke-dasharray: 3 3; }
 .qr-img { width: 132px; height: 132px; background: #fff; border-radius: 8px; display: grid; place-items: center; padding: 4px; } .qr-img img { width: 100%; height: 100%; image-rendering: pixelated; }
 .qr-url { word-break: break-all; margin: 0; }
 @media print { body.pr-qr * { visibility: hidden !important; } body.pr-qr .qr-zone, body.pr-qr .qr-zone * { visibility: visible !important; } body.pr-qr .qr-zone { position: absolute; left: 0; top: 0; width: 100%; } body.pr-qr .qr-b { break-inside: avoid; background: #fff; color: #000; border-color: #999; grid-template-columns: 200px 1fr; } body.pr-qr .qr-img { width: 200px; height: 200px; } body.pr-qr .btn { display: none; } }
+.an-inv { display: grid; gap: 6px; } .an-invr { display: grid; grid-template-columns: 1fr 1fr .8fr auto; gap: 6px; } @media (max-width: 520px) { .an-invr { grid-template-columns: 1fr 1fr auto; } .an-invr input:nth-child(3) { grid-column: 1 / 3; } }
 .prog-s { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
 .rt-notif { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
 .rt-rep { border-left: 3px solid var(--accent); padding: 4px 0 4px 10px; margin-top: 6px; }
@@ -6311,7 +6312,10 @@ function formAnimCode() {
     },
   });
 }
-const animArchers = (a) => (a.participants || []).map((id) => S.archers.find((x) => x.id === id)).filter(Boolean).sort(byName);
+// V.1.10 : invités d'une animation (sans l'appli, pas dans la liste des archers) : a.invites = [{ id: "g…", prenom, nom, groupe }]
+const animPers = (a, id) => S.archers.find((x) => x.id === id) || (a?.invites || []).map((g) => ({ ...g, invite: true })).find((g) => g.id === id) || null;
+const animArchers = (a) => (a.participants || []).map((id) => animPers(a, id)).filter(Boolean).sort(byName);
+const animGroupe = (x) => (x?.invite ? x.groupe || "Invités" : "Archers du club");
 const fmtPts = (n) => (n > 0 ? "+" : "") + n;
 const fmtDateL = (d) => (d ? new Date(d + "T12:00").toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "long", year: "numeric" }) : "");
 // Rang avec ex æquo : deux scores égaux ont la même place
@@ -6337,7 +6341,7 @@ function viewAnimation(a) {
   let h = `<div class="bar"><button class="btn ghost" data-act="anim-back">← Animations</button><span class="grow"></span>${prm().animCode ? `<button class="btn" data-act="${ptsVus() ? "anim-verrou" : "anim-ouvrir"}" aria-label="${ptsVus() ? "Reverrouiller les points" : "Voir les points"}">${ptsVus() ? "🔓" : "🔒"}</button>` : ""}${S.canWrite ? `<button class="btn" data-act="anim-lien">🔗 Lien et QR</button>` : ""}${S.canWrite ? `<button class="btn" data-act="anim-equipes">Équipes${animEquipes(a).length ? ` (${animEquipes(a).length})` : ""}</button><button class="btn" data-act="anim-edit">Modifier</button>` : ""}</div>
     <h2 class="sec" style="margin:4px 0 2px">${esc(a.nom || "Animation")}</h2><p class="tirline" style="margin:0 0 10px">${esc([fmtDateL(a.date), a.lieu, club(a.clubId)?.nom, a.parEquipe ? `${a.parEquipe} archers par équipe` : "", a.fleches ? `${a.fleches} flèches par archer et par jeu` : ""].filter(Boolean).join(" · "))}${a.partage ? " · ouverte aux archers participants" : ""}</p>`;
   const eqs = animEquipes(a);
-  if (eqs.length) h += `<div class="an-eqs">${eqs.map((e) => { const ch = S.archers.find((x) => x.id === e.chefId); return `<span class="an-eq${a.parEquipe && e.membres.length !== a.parEquipe ? " an-ko" : ""}"><b>${esc(e.nom)}</b> · ${e.membres.length}${a.parEquipe ? "/" + a.parEquipe : ""} archer${e.membres.length > 1 ? "s" : ""}${ch ? ` · chef : ${esc(fullName(ch))}` : ""}</span>`; }).join("")}</div>
+  if (eqs.length) h += `<div class="an-eqs">${eqs.map((e) => { const ch = animPers(a, e.chefId); return `<span class="an-eq${a.parEquipe && e.membres.length !== a.parEquipe ? " an-ko" : ""}"><b>${esc(e.nom)}</b> · ${e.membres.length}${a.parEquipe ? "/" + a.parEquipe : ""} archer${e.membres.length > 1 ? "s" : ""}${ch ? ` · chef : ${esc(fullName(ch))}` : ""}</span>`; }).join("")}</div>
     ${window.CarnetArcherUI && eqs.some((e) => e.chefId) ? `<div class="bar"><span class="tirline">${a.saisieChefs === false ? "Saisie des chefs d'équipe fermée : les scores ne bougent plus." : "Les chefs d'équipe marquent les points de leur équipe depuis leur espace."}</span><span class="grow"></span>${S.canWrite ? `<button class="btn" data-act="anim-saisie-chefs">${a.saisieChefs === false ? "Rouvrir la saisie" : "Clore la saisie"}</button>` : ""}</div>` : ""}`;
   if (!jeux.length || !ars.length) return h + `<div class="empty"><h3>Animation à compléter</h3><p>Touche « Modifier » pour choisir ${!jeux.length ? "les jeux" : ""}${!jeux.length && !ars.length ? " et " : ""}${!ars.length ? "les archers participants" : ""}.</p></div>`;
   if (txtRegle(a.regles) || a.reglesDoc) h += `<details class="an-reg"><summary>Règles générales</summary>${regleHtml(txtRegle(a.regles), a.reglesDoc)}</details>`;
@@ -6352,15 +6356,19 @@ function viewAnimation(a) {
   if (vue === "equipes") {
     const r = cls ? animRangs(eqs, (e) => equipeTotal(a, e)) : eqs.slice().sort((x, y) => x.nom.localeCompare(y.nom, "fr")).map((x) => ({ x, v: equipeTotal(a, x) }));
     h += `<div class="an-wrap"><table class="an-tab"><thead><tr>${cls ? "<th>Place</th>" : ""}<th>Équipe</th>${jeux.map((j) => `<th class="n">${esc(j.nom)}</th>`).join("")}<th class="n">Total</th></tr></thead><tbody>
-      ${r.map((o) => `<tr class="${cls && o.rang <= 3 ? "an-pod" + o.rang : ""}">${cls ? `<td>${o.rang === 1 ? "🥇" : o.rang === 2 ? "🥈" : o.rang === 3 ? "🥉" : o.rang}</td>` : ""}<td>${esc(o.x.nom)}<span class="tirline" style="display:block">${o.x.membres.map((m) => S.archers.find((y) => y.id === m)).filter(Boolean).sort(byName).map((y) => esc(fullName(y))).join(", ")}</span></td>${jeux.map((j) => `<td class="n">${o.x.membres.reduce((t, m) => t + (animScore(a, m, j.id) || 0), 0)}</td>`).join("")}<td class="n"><b>${o.v}</b></td></tr>`).join("")}</tbody></table></div>
+      ${r.map((o) => `<tr class="${cls && o.rang <= 3 ? "an-pod" + o.rang : ""}">${cls ? `<td>${o.rang === 1 ? "🥇" : o.rang === 2 ? "🥈" : o.rang === 3 ? "🥉" : o.rang}</td>` : ""}<td>${esc(o.x.nom)}<span class="tirline" style="display:block">${o.x.membres.map((m) => animPers(a, m)).filter(Boolean).sort(byName).map((y) => esc(fullName(y))).join(", ")}</span></td>${jeux.map((j) => `<td class="n">${o.x.membres.reduce((t, m) => t + (animScore(a, m, j.id) || 0), 0)}</td>`).join("")}<td class="n"><b>${o.v}</b></td></tr>`).join("")}</tbody></table></div>
       <p class="tirline">Le score d'une équipe est la somme des scores de ses archers.</p>`;
     return h;
   }
   if (vue === "total") {
-    const r = cls ? animRangs(ars.filter((x) => animJoue(a, x.id)), (x) => animTotal(a, x.id)) : ars.filter((x) => animJoue(a, x.id)).map((x) => ({ x, v: animTotal(a, x.id) }));
-    const pas = ars.filter((x) => !animJoue(a, x.id));
+    // V.1.10 : classement par groupe (enfants, adultes, une classe… donné aux invités ; « Archers du club » pour les autres)
+    const grps = [...new Set(ars.map(animGroupe))].sort((x, y) => x.localeCompare(y, "fr")), gsel = grps.includes(S.animGrp) ? S.animGrp : "";
+    if (grps.length > 1) h += `<div class="chips" role="group" aria-label="Groupe">${["", ...grps].map((g) => `<button class="chip" data-animgrp="${esc(g)}" aria-pressed="${gsel === g}">${g ? esc(g) : "Tout le monde"}</button>`).join("")}</div>`;
+    const arsG = gsel ? ars.filter((x) => animGroupe(x) === gsel) : ars;
+    const r = cls ? animRangs(arsG.filter((x) => animJoue(a, x.id)), (x) => animTotal(a, x.id)) : arsG.filter((x) => animJoue(a, x.id)).map((x) => ({ x, v: animTotal(a, x.id) }));
+    const pas = arsG.filter((x) => !animJoue(a, x.id));
     h += `<div class="an-wrap"><table class="an-tab"><thead><tr>${cls ? "<th>Place</th>" : ""}<th>Archer</th>${jeux.map((j) => `<th class="n">${esc(j.nom)}</th>`).join("")}<th class="n">Total</th></tr></thead><tbody>
-      ${r.map((o) => `<tr class="${cls && o.rang <= 3 ? "an-pod" + o.rang : ""}">${cls ? `<td>${o.rang === 1 ? "🥇" : o.rang === 2 ? "🥈" : o.rang === 3 ? "🥉" : o.rang}</td>` : ""}<td>${esc(fullName(o.x))}</td>${jeux.map((j) => { const v = animScore(a, o.x.id, j.id); return `<td class="n">${v == null ? "–" : v}</td>`; }).join("")}<td class="n"><b>${o.v}</b></td></tr>`).join("")}</tbody></table></div>`;
+      ${r.map((o) => `<tr class="${cls && o.rang <= 3 ? "an-pod" + o.rang : ""}">${cls ? `<td>${o.rang === 1 ? "🥇" : o.rang === 2 ? "🥈" : o.rang === 3 ? "🥉" : o.rang}</td>` : ""}<td>${esc(fullName(o.x))}${grps.length > 1 && !gsel ? `<span class="tirline" style="display:block;margin:0">${esc(animGroupe(o.x))}</span>` : ""}</td>${jeux.map((j) => { const v = animScore(a, o.x.id, j.id); return `<td class="n">${v == null ? "–" : v}</td>`; }).join("")}<td class="n"><b>${o.v}</b></td></tr>`).join("")}</tbody></table></div>`;
     if (!r.length) h += `<p class="notice">Aucun score pour l'instant : choisis un jeu et touche le nom d'un archer pour compter ses flèches.</p>`;
     if (pas.length) h += `<p class="tirline">Pas encore tiré : ${pas.map((x) => esc(fullName(x))).join(", ")}</p>`;
     return h;
@@ -6375,7 +6383,7 @@ function viewAnimation(a) {
     <span class="m">${c ? detail(c) : "Pas encore tiré · touche pour compter ses flèches"}</span></span>${c && vu ? `<span class="an-sc">${v}${rg ? `<small>${rg === 1 ? "1er" : rg + "e"}</small>` : ""}</span>` : ""}</button>`;
   // archers en équipe : par équipe, avec ses essais
   eqs.forEach((e) => {
-    const L = animEssais(a, e.id, j.id), ret = essaiRetenu(a, e.id, j.id), mb = e.membres.map((m) => S.archers.find((y) => y.id === m)).filter(Boolean).sort(byName);
+    const L = animEssais(a, e.id, j.id), ret = essaiRetenu(a, e.id, j.id), mb = e.membres.map((m) => animPers(a, m)).filter(Boolean).sort(byName);
     h += `<div class="an-team"><div class="bar"><b>${esc(e.nom)}</b><span class="tirline">${L.length > 1 ? (a.retenus?.[e.id]?.[j.id] && ret ? `${L.length} parties · partie ${L.indexOf(ret) + 1} validée${a.choix?.[e.id]?.[j.id] && a.choix[e.id][j.id] !== ret.id ? ` · <span class="an-warn">l'équipe demande maintenant la partie ${L.findIndex((x) => x.id === a.choix[e.id][j.id]) + 1}</span>` : ""}` : `<span class="an-warn">${L.length} parties · ${a.choix?.[e.id]?.[j.id] ? `l'équipe a choisi la partie ${L.findIndex((x) => x.id === a.choix[e.id][j.id]) + 1}, à toi de valider` : "en attente du choix de l'équipe"}</span>`) : L.length ? (ret ? "1 partie · validée" : `<span class="an-warn">1 partie · à toi de valider</span>`) : ""}</span><span class="grow"></span>${S.canWrite ? `<button class="btn" data-anim-essai-new="${e.id}">+ Partie</button>` : ""}</div>`;
     if (!L.length) h += `<div class="list">${mb.map((x) => { const c = a.scores?.[x.id]?.[j.id]; return row(x, `data-anim-saisie="${x.id}|${e.id}|"`, c, c ? jeuScore(j, c) : null, rang[x.id]); }).join("")}</div>`;
     L.forEach((es, k) => {
@@ -6391,7 +6399,7 @@ function viewAnimation(a) {
   return h;
 }
 function saisieAnim(a, aid, jid, eid = "", essaiId = "") {
-  const j = (a.jeux || []).find((x) => x.id === jid), ar = S.archers.find((x) => x.id === aid); if (!j || !ar) return;
+  const j = (a.jeux || []).find((x) => x.id === jid), ar = animPers(a, aid); if (!j || !ar) return;
   const es0 = eid && essaiId ? animEssais(a, eid, jid).find((x) => x.id === essaiId) : null;
   const avant = eid ? (es0 ? es0.scores?.[aid] : animEssais(a, eid, jid).length ? null : a.scores?.[aid]?.[jid]) : a.scores?.[aid]?.[jid];
   const c = (avant || []).slice(); j.zones.forEach((_, i) => { c[i] = Number(c[i]) || 0; });
@@ -6431,7 +6439,7 @@ function animPourArcher(n, aid) {
     regles: txtRegle(n.regles), reglesAsset: S.documents.find((d) => d.id === n.reglesDoc)?.assetId || null, reglesType: S.documents.find((d) => d.id === n.reglesDoc)?.contentType || null,
     jeux: (n.jeux || []).map((j) => ({ id: j.id, nom: j.nom, zones: (j.zones || []).map((z) => ({ nom: z.nom })), regle: txtRegle(j.regle), regleAsset: S.documents.find((d) => d.id === j.regleDoc)?.assetId || null, regleType: S.documents.find((d) => d.id === j.regleDoc)?.contentType || null })),
     equipes: eqs.map((e) => ({ id: e.id, nom: e.nom, chefId: e.chefId, membres: e.membres })),
-    participants: (n.participants || []).filter((pid) => n.partage || mon?.membres.includes(pid)).map((pid) => S.archers.find((x) => x.id === pid)).filter(Boolean)
+    participants: (n.participants || []).filter((pid) => n.partage || mon?.membres.includes(pid)).map((pid) => animPers(n, pid)).filter(Boolean)
       .map((x) => ({ id: x.id, moi: x.id === aid, nom: court(x), scores: n.partage ? Object.fromEntries((n.jeux || []).map((j) => [j.id, animScore(n, x.id, j.id)])) : {} })),
     monEquipe: mon ? { id: mon.id, nom: mon.nom, membres: mon.membres, chef: mon.chefId === aid, essais: Object.fromEntries((n.jeux || []).map((j) => [j.id, animEssais(n, mon.id, j.id).map((es) => ({ id: es.id, le: es.le, retenu: n.retenus?.[mon.id]?.[j.id] === es.id, choisi: n.choix?.[mon.id]?.[j.id] === es.id, scores: es.scores || {} }))])) } : null };
 }
@@ -6454,6 +6462,10 @@ function formAnimation(a = null) {
     <label class="f" for="an-club">Club<select id="an-club" name="clubId"><option value="">Tous les clubs</option>${clubOptions(a?.clubId ?? (S.club !== "all" ? S.club : ""))}</select></label>
     <div class="f">Jeux<div class="checks">${jeuxOpts.map((j) => `<label><input type="checkbox" name="jeu" value="${j.id}" ${choisis.has(j.id) ? "checked" : ""}>${esc(j.nom)}</label>`).join("") || `<span class="tirline">Crée d'abord tes jeux dans « Mes jeux ».</span>`}</div></div>
     <div class="f">Archers participants <span class="tirline"><button type="button" class="btn" id="an-tous">Tout cocher</button></span><div class="checks" id="an-ars"></div></div>
+    <div class="f">Invités sans l'appli <span class="tirline">(public, famille, scolaires… : pas ajoutés à ta liste d'archers)</span>
+      <div id="an-inv" class="an-inv"></div>
+      <div class="bar"><button type="button" class="btn" id="an-inv-add">+ Ajouter un invité</button><button type="button" class="btn ghost" id="an-inv-coller">Coller une liste</button>${S.animations.some((x) => x.id !== a?.id && (x.invites || []).length) ? `<select id="an-inv-rep" aria-label="Reprendre les invités d'une autre animation"><option value="">Reprendre les invités de…</option>${S.animations.filter((x) => x.id !== a?.id && (x.invites || []).length).sort((p, q) => (q.date || "").localeCompare(p.date || "")).map((x) => `<option value="${x.id}">${esc(x.nom || "Animation")} (${x.invites.length})</option>`).join("")}</select>` : ""}</div>
+      <span class="tirline">Le groupe sert à faire un classement à part (ex. Enfants, Adultes, CM2). Pour les équipes, utilise ensuite « Équipes ».</span></div>
     <label class="f" for="an-reg">Règles générales (visibles par les chefs d'équipe et les participants)<textarea id="an-reg" name="regles" rows="3" placeholder="Facultatif : une ligne de secours, par exemple « Règles en image ci-dessous, demande à l'animateur si elle ne s'affiche pas »">${esc(dft.regles === ANIM_REGLES_ANC ? "" : dft.regles || "")}</textarea></label>
     <label class="f" for="an-regd">Règles en PDF ou en image<select id="an-regd" name="reglesDoc">${docOptions(dft.reglesDoc)}</select></label>
     ${regleDepot("an-regd")}
@@ -6465,13 +6477,31 @@ function formAnimation(a = null) {
       const ids = fd.getAll("jeu"), jeux = ids.map((id) => { const old = (a?.jeux || []).find((j) => j.id === id), l = lib.find((j) => j.id === id);
         return old ? { ...old, ...(l ? { regle: l.regle || "", regleDoc: l.regleDoc || "" } : {}) } : l ? JSON.parse(JSON.stringify(l)) : null; }).filter(Boolean);
       const garde = a ? (({ id, ...r }) => r)(a) : {};
-      const data = { ...garde, regles: String(fd.get("regles") || "").trim(), reglesDoc: fd.get("reglesDoc") || "", nom, date: fd.get("date"), lieu: fd.get("lieu").trim(), clubId: fd.get("clubId") || null, jeux, participants: fd.getAll("part"), classement: !!fd.get("classement"), partage: !!fd.get("partage"), parEquipe: Number(fd.get("parEquipe")) || null, fleches: Number(fd.get("fleches")) || null,
-        scores: a?.scores || {}, equipes: (a?.equipes || []).map((e) => ({ ...e, membres: (e.membres || []).filter((m) => fd.getAll("part").includes(m)), chefId: fd.getAll("part").includes(e.chefId) ? e.chefId : null })), saisieChefs: a?.saisieChefs !== false, createdAt: a?.createdAt || Date.now(), updatedAt: Date.now() };
+      const invites = invLire(), invIds = invites.map((g) => g.id), parts = [...fd.getAll("part"), ...invIds];
+      const data = { ...garde, invites, regles: String(fd.get("regles") || "").trim(), reglesDoc: fd.get("reglesDoc") || "", nom, date: fd.get("date"), lieu: fd.get("lieu").trim(), clubId: fd.get("clubId") || null, jeux, participants: parts, classement: !!fd.get("classement"), partage: !!fd.get("partage"), parEquipe: Number(fd.get("parEquipe")) || null, fleches: Number(fd.get("fleches")) || null,
+        scores: a?.scores || {}, equipes: (a?.equipes || []).map((e) => ({ ...e, membres: (e.membres || []).filter((m) => parts.includes(m)), chefId: fd.getAll("part").includes(e.chefId) ? e.chefId : null })), saisieChefs: a?.saisieChefs !== false, createdAt: a?.createdAt || Date.now(), updatedAt: Date.now() };
       const id = a?.id || newId("animations"); save("animations", id, data); toast(a ? "Animation enregistrée" : "Animation créée"); S.anim = id; S.animVue = null; render();
     },
     onDelete: a ? () => { remove("animations", a.id); S.anim = null; toast("Animation supprimée"); render(); } : null, deleteLabel: "Supprimer l'animation",
   });
   brancherRegleDepot("an-regd");
+  // invités : une ligne par personne (prénom, nom, groupe)
+  let inv = JSON.parse(JSON.stringify(a?.invites || []));
+  const invBox = $("#an-inv"), gid = () => "g" + Math.random().toString(36).slice(2, 10);
+  const invDraw = () => { invBox.innerHTML = inv.map((g, i) => `<div class="an-invr"><input type="text" data-inv="${i}|prenom" value="${esc(g.prenom || "")}" placeholder="Prénom" aria-label="Prénom"><input type="text" data-inv="${i}|nom" value="${esc(g.nom || "")}" placeholder="Nom (facultatif)" aria-label="Nom"><input type="text" data-inv="${i}|groupe" list="an-grl" value="${esc(g.groupe || "")}" placeholder="Groupe" aria-label="Groupe"><button type="button" class="btn ghost" data-invdel="${i}" aria-label="Retirer">✕</button></div>`).join("")
+    + `<datalist id="an-grl">${[...new Set([...inv.map((g) => g.groupe), "Enfants", "Adultes", "Famille"].filter(Boolean))].map((x) => `<option value="${esc(x)}">`).join("")}</datalist>`; };
+  window.invLire = () => inv.map((g) => ({ id: g.id, prenom: String(g.prenom || "").trim(), nom: String(g.nom || "").trim(), groupe: String(g.groupe || "").trim() })).filter((g) => g.prenom || g.nom);
+  invDraw();
+  invBox.addEventListener("input", (e) => { const d = e.target.dataset.inv; if (!d) return; const [i, k] = d.split("|"); inv[+i][k] = e.target.value; });
+  invBox.addEventListener("click", (e) => { const b = e.target.closest("[data-invdel]"); if (b) { inv.splice(+b.dataset.invdel, 1); invDraw(); } });
+  $("#an-inv-add").addEventListener("click", () => { inv.push({ id: gid(), prenom: "", nom: "", groupe: inv[inv.length - 1]?.groupe || "" }); invDraw(); invBox.querySelector(`[data-inv="${inv.length - 1}|prenom"]`)?.focus(); });
+  $("#an-inv-coller").addEventListener("click", () => {
+    const t = prompt("Colle la liste : une personne par ligne, « Prénom Nom ; groupe » (le groupe est facultatif)"); if (!t) return;
+    t.split(/\n+/).map((l) => l.trim()).filter(Boolean).forEach((l) => { const [n, g] = l.split(/[;,\t]/).map((x) => (x || "").trim()); const m = n.split(/\s+/); inv.push({ id: gid(), prenom: m.shift() || "", nom: m.join(" "), groupe: g || "" }); });
+    invDraw();
+  });
+  $("#an-inv-rep")?.addEventListener("change", (e) => { const src = S.animations.find((x) => x.id === e.target.value); if (!src) return; const deja = new Set(inv.map((g) => g.id));
+    (src.invites || []).forEach((g) => { if (!deja.has(g.id)) inv.push({ ...g }); }); e.target.value = ""; invDraw(); toast("Invités repris : vérifie la liste"); });
   const box = $("#an-ars"), sel = $("#an-club");
   const redraw = () => { box.querySelectorAll("input").forEach((i) => (i.checked ? parts.add(i.value) : parts.delete(i.value))); box.innerHTML = arsHtml(sel.value); };
   box.innerHTML = arsHtml(sel.value); sel.addEventListener("change", redraw);
@@ -6524,11 +6554,11 @@ function formEquipes(a) {
     $("#eq-sans").className = "an-sans" + (sans.length ? "" : " ok");
     $("#eq-box").innerHTML = eqs.map((e, i) => `<div class="an-eqf"><div class="an-zr" style="grid-template-columns:1fr auto"><input type="text" class="eqn" data-i="${i}" value="${esc(e.nom)}" aria-label="Nom de l'équipe"><button type="button" class="btn eq-del" data-i="${i}" aria-label="Retirer cette équipe">✕</button></div>
       <div class="checks an-eqchk">${ars.map((x) => { const autre = eqs.find((q, k) => k !== i && q.membres.includes(x.id)); return `<label class="${autre ? "an-pris" : ""}"><input type="checkbox" class="eqm" data-i="${i}" value="${x.id}" ${e.membres.includes(x.id) ? "checked" : ""}>${esc(fullName(x))}${autre ? ` <small>(${esc(autre.nom)})</small>` : ""}</label>`; }).join("")}</div>
-      <label class="f">Chef d'équipe<select class="eqc" data-i="${i}"><option value="">Pas de chef</option>${ars.filter((x) => e.membres.includes(x.id)).map((x) => `<option value="${x.id}" ${x.id === e.chefId ? "selected" : ""}>${esc(fullName(x))}</option>`).join("")}</select></label>
+      <label class="f">Chef d'équipe<select class="eqc" data-i="${i}"><option value="">Pas de chef</option>${ars.filter((x) => e.membres.includes(x.id) && !x.invite).map((x) => `<option value="${x.id}" ${x.id === e.chefId ? "selected" : ""}>${esc(fullName(x))}</option>`).join("")}</select></label>
       <span class="tirline${a.parEquipe && e.membres.length > a.parEquipe ? " an-warn" : ""}">${e.membres.length}${a.parEquipe ? " / " + a.parEquipe : ""} archer${e.membres.length > 1 ? "s" : ""}${a.parEquipe && e.membres.length > a.parEquipe ? " · une personne de trop" + (e.membres.length - a.parEquipe > 1 ? ` (${e.membres.length - a.parEquipe})` : "") : a.parEquipe && e.membres.length < a.parEquipe ? ` · il manque ${a.parEquipe - e.membres.length} archer${a.parEquipe - e.membres.length > 1 ? "s" : ""}` : ""}</span></div>`).join("");
   };
   sheet("Équipes", `<p class="tirline">Coche les archers de chaque équipe. Un archer coché dans une autre équipe y est déplacé. Le chef d'équipe voit l'animation dans son espace dès qu'il est nommé et marque les points de son équipe.</p>
-    <p id="eq-sans"></p><div id="eq-box"></div><div><button type="button" class="btn" id="eq-add">+ Ajouter une équipe</button></div>`, {
+    <p id="eq-sans"></p><div id="eq-box"></div><div class="bar"><button type="button" class="btn" id="eq-add">+ Ajouter une équipe</button><button type="button" class="btn" id="eq-hasard">🎲 Répartir au hasard</button><button type="button" class="btn ghost" id="eq-groupes">Une équipe par groupe</button></div>`, {
     onSave() {
       const out = eqs.map((e) => ({ ...e, nom: e.nom.trim() || "Équipe" })).filter((e) => e.membres.length);
       const f = animCur() || a, { id, ...data } = f; save("animations", a.id, { ...data, equipes: out, updatedAt: Date.now() });
@@ -6547,6 +6577,17 @@ function formEquipes(a) {
   });
   el.addEventListener("click", (e) => { const b = e.target.closest(".eq-del"); if (!b) return; eqs.splice(Number(b.dataset.i), 1); draw(); });
   $("#eq-add").addEventListener("click", () => { eqs.push({ id: "e" + Date.now().toString(36), nom: "Équipe " + (eqs.length + 1), chefId: null, membres: [] }); draw(); });
+  // V.1.10 : tout le monde réparti au hasard (équipes de même taille, en gardant les noms d'équipes), ou une équipe par groupe d'invités
+  $("#eq-hasard").addEventListener("click", () => {
+    const n = a.parEquipe ? Math.max(1, Math.ceil(ars.length / a.parEquipe)) : Math.max(2, eqs.length);
+    while (eqs.length < n) eqs.push({ id: "e" + Date.now().toString(36) + eqs.length, nom: "Équipe " + (eqs.length + 1), chefId: null, membres: [] });
+    eqs = eqs.slice(0, n); eqs.forEach((q) => { q.membres = []; q.chefId = null; });
+    const m = ars.map((x) => x.id); for (let i = m.length - 1; i > 0; i--) { const k = Math.floor(Math.random() * (i + 1)); [m[i], m[k]] = [m[k], m[i]]; }
+    m.forEach((id, i) => eqs[i % n].membres.push(id)); draw(); toast("Équipes tirées au sort : tu peux encore les modifier");
+  });
+  $("#eq-groupes").addEventListener("click", () => {
+    const g = [...new Set(ars.map(animGroupe))]; eqs = g.map((nom, i) => ({ id: "e" + Date.now().toString(36) + i, nom, chefId: null, membres: ars.filter((x) => animGroupe(x) === nom).map((x) => x.id) })); draw();
+  });
   draw();
 }
 function listeJeux() {
@@ -7816,7 +7857,7 @@ function formSeance(s = null) {
 
 // ---------- Événements ----------
 document.addEventListener("click", (e) => {
-  const t = e.target.closest("[data-cofed],[data-nouv-open],[data-docar-retirer],[data-docar-rendre],[data-docar-attr],[data-disc-ok],[data-disc-non],[data-tab],[data-ftab],[data-mattri],[data-rqdel],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-enc-edit],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab],[data-qsort],[data-coptab],[data-com-edit],[data-fmtfed],[data-fmt-del],[data-type-del],[data-fete-ap],[data-fete-new],[data-fete-edit],[data-fete-imgdel],[data-mot-edit],[data-centry-open],[data-cd-exp],[data-cd-arch],[data-exmode],[data-ftheme],[data-fiche],[data-anim],[data-animvue],[data-animtri],[data-anim-saisie],[data-anim-essai-new],[data-anim-retenir],[data-anim-essai-del]");
+  const t = e.target.closest("[data-cofed],[data-nouv-open],[data-docar-retirer],[data-docar-rendre],[data-docar-attr],[data-disc-ok],[data-disc-non],[data-tab],[data-ftab],[data-mattri],[data-rqdel],[data-club],[data-seance],[data-archer],[data-club-edit],[data-toggle],[data-act],[data-suivi],[data-arrow],[data-open-suivi],[data-eval],[data-crit],[data-pf],[data-folder],[data-doc],[data-combo],[data-ctab],[data-cmonth],[data-csaison],[data-centry],[data-cdel-date],[data-attr-del],[data-attr-here],[data-concours],[data-cosaison],[data-co-retirer],[data-cocombo],[data-co-addserie],[data-co-delserie],[data-cls],[data-cls-del],[data-mat],[data-matetat],[data-mattype],[data-saisie],[data-dash-suivi],[data-ptab],[data-acc-del],[data-enc-edit],[data-annonce],[data-partage],[data-tccombo],[data-tcper],[data-tcopen],[data-esptab],[data-qsort],[data-coptab],[data-com-edit],[data-fmtfed],[data-fmt-del],[data-type-del],[data-fete-ap],[data-fete-new],[data-fete-edit],[data-fete-imgdel],[data-mot-edit],[data-centry-open],[data-cd-exp],[data-cd-arch],[data-exmode],[data-ftheme],[data-fiche],[data-anim],[data-animvue],[data-animtri],[data-animgrp],[data-anim-saisie],[data-anim-essai-new],[data-anim-retenir],[data-anim-essai-del]");
   if (!t || t.closest("#sheet")) return;
   if (t.dataset.dashSuivi) { const [sid, aid] = t.dataset.dashSuivi.split("|"); S.seance = sid; S.suivi = aid; S.tirOpen = null; render(); window.scrollTo(0, 0); return; }
   if (t.dataset.tab) { go(t.dataset.tab); try { history.replaceState(null, "", "#" + t.dataset.tab); } catch (_) {} return; }
@@ -7849,6 +7890,7 @@ document.addEventListener("click", (e) => {
   if (t.dataset.anim) { S.anim = t.dataset.anim; S.animVue = null; render(); window.scrollTo(0, 0); return; }
   if (t.dataset.animvue) { S.animVue = t.dataset.animvue; render(); return; }
   if (t.dataset.animtri) { S.animTri = t.dataset.animtri; render(); return; }
+  if (t.dataset.animgrp !== undefined) { S.animGrp = t.dataset.animgrp; render(); return; }
   if (t.dataset.animSaisie) { const a = animCur(); if (a && S.canWrite) { const vue = S.animVue && !["total", "equipes"].includes(S.animVue) ? S.animVue : a.jeux?.[0]?.id; const [aid, eid, es] = t.dataset.animSaisie.split("|"); saisieAnim(a, aid, vue, eid || "", es || ""); } return; }
   if (t.dataset.animEssaiNew) { const eid = t.dataset.animEssaiNew, jid = S.animVue && !["total", "equipes"].includes(S.animVue) ? S.animVue : animCur()?.jeux?.[0]?.id;
     majEssais((d) => { d.essais[eid] = d.essais[eid] || {}; const L = d.essais[eid][jid] = d.essais[eid][jid] || [];

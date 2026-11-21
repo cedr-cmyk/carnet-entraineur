@@ -51,7 +51,7 @@ details summary { cursor: pointer; font-weight: 700; }
   const C = window.CARNET_CONFIG || {};
   if (!T || !window.supabase || !C.supabaseUrl) { app.innerHTML = `<div class="notice">Ce lien n'est pas complet. Demande un nouveau QR code à l'organisateur.</div>`; return; }
   const sb = window.supabase.createClient(C.supabaseUrl, C.supabaseAnonKey, { auth: { persistSession: false, autoRefreshToken: false } });
-  let A = null, jeu = null, ouvert = {}, occupe = false;
+  let A = null, jeu = null, ouvert = {}, occupe = false, grp = "";
   const fmtDate = (d) => { try { return new Date(d + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }); } catch (e) { return d; } };
   const heure = (ms) => (ms ? new Date(ms).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "");
   const med = (n) => (n === 1 ? "🥇" : n === 2 ? "🥈" : n === 3 ? "🥉" : n);
@@ -85,11 +85,13 @@ details summary { cursor: pointer; font-weight: 700; }
         ${A.saisie ? `<div><button class="btn primary" data-essai="1">${L.length ? "↻ Refaire une partie" : "+ Lancer la première partie"}</button></div>` : ""}</div>`;
     }
     if (A.scores) {
-      const joues = P.filter((p) => p.joue);
+      const grps = [...new Set(P.map((p) => p.groupe).filter(Boolean))].sort((x, y) => x.localeCompare(y, "fr")); if (!grps.includes(grp)) grp = "";
+      const joues = P.filter((p) => p.joue && (!grp || p.groupe === grp));
       const eqs = (A.equipes || []).map((e) => ({ ...e, total: P.filter((p) => e.membres.includes(p.id)).reduce((t, p) => t + p.total, 0), moi: mon?.id === e.id }));
       h += `<h2>${A.classement ? "🏆 Classement" : "Scores"}</h2>`;
       if (eqs.length) { const r = A.classement ? rang(eqs, (e) => e.total) : eqs;
         h += `<div class="card scroll"><table><thead><tr>${A.classement ? "<th>Place</th>" : ""}<th>Équipe</th><th class="n">Total</th></tr></thead><tbody>${r.map((e) => `<tr>${A.classement ? `<td>${med(e.rang)}</td>` : ""}<td>${esc(e.nom)}</td><td class="n"><b>${e.total}</b></td></tr>`).join("")}</tbody></table></div>`; }
+      if (grps.length > 1) h += `<div class="chips">${["", ...grps].map((g) => `<button class="chip" data-grp="${esc(g)}" aria-pressed="${grp === g}">${g ? esc(g) : "Tout le monde"}</button>`).join("")}</div>`;
       const r = A.classement ? rang(joues, (p) => p.total) : joues.slice().sort((x, y) => (x.nom || "").localeCompare(y.nom || "", "fr"));
       h += r.length ? `<div class="card scroll"><table><thead><tr>${A.classement ? "<th>Place</th>" : ""}<th>Archer</th>${jeux.map((j) => `<th class="n">${esc(j.nom)}</th>`).join("")}<th class="n">Total</th></tr></thead><tbody>
         ${r.map((p) => `<tr>${A.classement ? `<td>${med(p.rang)}</td>` : ""}<td>${esc(p.nom)}</td>${jeux.map((j) => `<td class="n">${p.sc[j.id] ?? "–"}</td>`).join("")}<td class="n"><b>${p.total}</b></td></tr>`).join("")}</tbody></table></div>`
@@ -126,7 +128,8 @@ details summary { cursor: pointer; font-weight: 700; }
     maj();
   }
   app.addEventListener("click", (ev) => {
-    const t = ev.target.closest("[data-jeu],[data-ouv],[data-essai],[data-garder],[data-suppr],[data-saisie]"); if (!t) return;
+    const t = ev.target.closest("[data-jeu],[data-ouv],[data-essai],[data-garder],[data-suppr],[data-saisie],[data-grp]"); if (!t) return;
+    if (t.dataset.grp !== undefined) { grp = t.dataset.grp; rendre(); return; }
     if (t.dataset.jeu) { jeu = t.dataset.jeu; rendre(); }
     else if (t.dataset.ouv) { ouvert[t.dataset.ouv] = t.getAttribute("aria-expanded") !== "true"; rendre(); }
     else if (t.dataset.essai) envoyer(null, null, null, "Partie lancée : compte les flèches de chacun");
