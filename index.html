@@ -663,6 +663,11 @@ svg.chart .szl { stroke: var(--line-2, var(--line)); stroke-dasharray: 3 3; }
 }
 .mb-c { gap: 10px; } .mb-b { cursor: pointer; } .mb-b .sr, .sr { position: absolute; opacity: 0; width: 1px; height: 1px; }
 .mb-avs { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; }
+.qr-b { display: grid; grid-template-columns: 132px 1fr; gap: 12px; align-items: center; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--sunk); margin-top: 8px; }
+.qr-img { width: 132px; height: 132px; background: #fff; border-radius: 8px; display: grid; place-items: center; padding: 4px; } .qr-img img { width: 100%; height: 100%; image-rendering: pixelated; }
+.qr-url { word-break: break-all; margin: 0; }
+@media print { body.pr-qr * { visibility: hidden !important; } body.pr-qr .qr-zone, body.pr-qr .qr-zone * { visibility: visible !important; } body.pr-qr .qr-zone { position: absolute; left: 0; top: 0; width: 100%; } body.pr-qr .qr-b { break-inside: avoid; background: #fff; color: #000; border-color: #999; grid-template-columns: 200px 1fr; } body.pr-qr .qr-img { width: 200px; height: 200px; } body.pr-qr .btn { display: none; } }
+.prog-s { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
 .rt-notif { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
 .rt-rep { border-left: 3px solid var(--accent); padding: 4px 0 4px 10px; margin-top: 6px; }
 .ar-nom { display: grid; gap: 5px; min-width: 0; } .ar-nom h1 { margin: 0; } .ar-nom .badges { display: flex; gap: 5px; } .ar-nom .badge { font-size: .68rem; padding: 2px 9px; box-shadow: 0 0 0 1px rgba(255,255,255,.18); }
@@ -927,7 +932,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
 <div id="toast" class="toast" hidden></div>
 <input type="file" id="file-in" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.mp4,.webm,.txt,.md,.csv,application/pdf,image/*,video/mp4,video/webm,text/plain,text/markdown,text/csv">
 
-<script>window.CARNET_VERSION = { v: "1.10", date: "2026-11-20", site: "1.10", test: false };</script>
+<script>window.CARNET_VERSION = { v: "1.10", date: "2026-11-21", site: "1.10", test: false };</script>
 <script>
 // Espace archer : l'archer (ou son parent) voit uniquement ses propres informations,
 // telles que les renvoie la base (fonction espace_archer), et remplit son carnet.
@@ -1866,6 +1871,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
           ${C.svg({ id: "ar-tir", ...T, showAll: true, only: view ?? curIdx(), volees: T.volees.length ? T.volees : [[]] })}
           ${view != null ? `<span class="tirline">Tu regardes ${view === "all" ? "tout le tir" : "la volée " + (view + 1)}. Touche la cible pour continuer la volée en cours.</span>` : ""}</div>
           <div class="kp" role="group" aria-label="Valeur de la flèche">${keys.filter((k) => k === "X" || k === "M" || Number(k) >= minV).map((k) => `<button type="button" class="${cls(k)}" data-k="${k}">${k}</button>`).join("")}<button type="button" class="undo" id="tg-undo">↶ Annuler la flèche</button></div></div>
+        ${face.zones < 10 ? `<div class="notice tg-reduit"><b>${esc(T.blason)} : seules les zones de 10 à ${minV} comptent</b>, une flèche en dehors est manquée (M). Tu tires sur un blason complet ? <button type="button" class="lnk" id="tg-chg">Changer de blason</button></div>` : ""}
         <span class="tirline">${matchMedia("(pointer: coarse)").matches ? "Pose le doigt sur la cible, ajuste avec la loupe, puis lève le doigt pour placer la flèche" : "Touche la cible là où la flèche s'est plantée"} : la valeur se calcule toute seule. Tu peux aussi taper la valeur sans placer la flèche.</span>
         <div class="bar"><b>Volée en cours : ${Math.min(vcur, T.nbVolees)} / ${T.nbVolees}</b><span class="grow"></span><span>${n} / ${plan()} flèches${n ? ` · ${(total() / n).toFixed(2).replace(".", ",")} par flèche` : ""}</span></div>
         <div class="tgt-bar"><span style="width:${Math.min(100, (n / plan()) * 100)}%"></span></div>
@@ -1877,8 +1883,13 @@ window.CarnetArcherUI = (API, opts = {}) => {
       layer.querySelectorAll("[data-vv]").forEach((b) => b.addEventListener("click", () => { const x = b.dataset.vv; view = x === "cur" ? null : x === "all" ? "all" : Number(x) === curIdx() ? null : Number(x); draw(); }));
       $("#tg-undo").onclick = undo;
       const ts = $("#tg-set"); if (ts) ts.onclick = () => { setOpen = true; draw(); };
+      const tc = $("#tg-chg"); if (tc) tc.onclick = () => { setOpen = true; draw(); setTimeout(() => { const b = $("#tg-b"); if (b) { b.focus(); b.scrollIntoView({ block: "center" }); } }, 30); };
       if ($("#tg-d")) $("#tg-d").onchange = (ev) => { T.distance = ev.target.value; };
-      if ($("#tg-b")) $("#tg-b").onchange = (ev) => { T.blason = ev.target.value; T.volees.forEach((v, vi) => { T.impacts.filter((p) => p.v === vi).forEach((p) => { const i = v.indexOf(p.k); const nk = C.scoreAt(C.face(T), Math.hypot(p.x, p.y)); if (i >= 0) v[i] = nk; p.k = nk; }); }); draw(); };
+      if ($("#tg-b")) $("#tg-b").onchange = (ev) => {
+        // les flèches placées gardent leur place réelle sur le blason (ex. trispot → blason complet : une flèche dans le 6 reste dans le 6)
+        const f0 = C.face(T); T.blason = ev.target.value; const f1 = C.face(T), k = (f0.diam || 1) / (f1.diam || 1);
+        T.volees.forEach((v, vi) => { T.impacts.filter((p) => p.v === vi).forEach((p) => { p.x = +(p.x * k).toFixed(4); p.y = +(p.y * k).toFixed(4); const i = v.indexOf(p.k); const nk = C.scoreAt(f1, Math.hypot(p.x, p.y)); if (i >= 0) v[i] = nk; p.k = nk; }); });
+        if (shot()) toast("Blason changé : les flèches tapées au clavier gardent leur valeur, corrige-les avec ↶ si besoin"); draw(); };
       if ($("#tg-f")) $("#tg-f").onchange = (ev) => { if (shot()) { toast("Change le nombre de flèches par volée avant de commencer"); ev.target.value = T.fpv; return; } T.fpv = +ev.target.value; T.nbVolees = T.fpv === 6 ? 6 : 10; draw(); };
       if ($("#tg-v")) $("#tg-v").onchange = (ev) => { T.nbVolees = Math.max(Math.ceil(shot() / T.fpv) || 1, Math.min(40, +ev.target.value || 1)); draw(); };
       if ($("#tg-no")) $("#tg-no").onclick = () => layer.remove();
@@ -2851,6 +2862,9 @@ function viewSeance() {
       <span class="m">${esc(fmtLong(s.date))}${s.heure ? " · " + esc(s.heure) : ""}${s.groupe ? " · " + esc(s.groupe) : ""}${s.lieu ? " · " + esc(s.lieu) : ""}</span>
       ${s.periodeId && folderName(s.periodeId) ? `<span><span class="tag fed">${esc(folderName(s.periodeId))}</span></span>` : ""}${s.public ? `<span><span class="tag">Proposée : ${esc(pubLab(s.public).toLowerCase())}</span></span>` : ""}</div>
     ${s.public ? reponsesBlock(s) : ""}
+    ${(() => { const pg = roster.map((a) => [a, progPour(a, s)]).filter(([, l]) => l.length); if (!pg.length) return "";
+      return `<div class="card prog-s"><h3 class="hub-h">🎯 Prévu pour cette séance</h3>${pg.map(([a, l]) => `<div class="row" style="align-items:flex-start"><span class="main"><span class="t">${esc(fullName(a))}</span>${l.map((x) => `<span class="m" style="white-space:pre-wrap;color:var(--ink)">• ${esc(x.texte)}</span>`).join("")}</span>
+        ${S.canWrite ? `<span class="bar">${l.map((x) => `<button class="btn" data-prog-fait="${x.id}" data-aid="${a.id}" data-v="1" title="${esc(x.texte.slice(0, 60))}">✓ Fait${l.length > 1 ? " (" + esc(x.texte.slice(0, 14)) + "…)" : ""}</button>`).join("")}</span>` : ""}</div>`).join("")}</div>`; })()}
     ${(() => { const enc = roster.filter((a) => pres.has(a.id) && encadre(s, a.id)).length, arc = pres.size - enc; return `<div class="bar"><div class="score"><b>${arc}</b><span>archer${arc > 1 ? "s" : ""}${enc ? ` · ${enc} encadrant${enc > 1 ? "s" : ""}` : ""} sur ${roster.length} personnes</span></div><span class="grow"></span>`; })()}
       ${S.canWrite && roster.length ? `<button class="btn" data-act="all-present">Tous présents</button><button class="btn" data-act="none-present">Tout décocher</button>` : ""}${S.canWrite && clubStage(s.clubId) ? `<button class="btn" data-act="inviter">+ Inviter des archers${(s.invites || []).length ? ` (${s.invites.length})` : ""}</button>` : ""}</div>
     ${roster.length ? (() => {
@@ -4756,7 +4770,7 @@ function formMatBulk() {
 // Impacts stockés en coordonnées normalisées (-1..1 sur le rayon visible), par volée : t.impacts = [{v, x, y, k}]
 function faceOf(t) {
   const b = String(t.blason || ""), co = /\bCO\b/.test(b) || /réduit/i.test(b), tri = /trispot/i.test(b);
-  const d = parseFloat(b.replace(",", ".")) || 122;
+  const mm = b.match(/(\d+(?:[.,]\d+)?)\s*cm/i), d = (mm ? parseFloat(mm[1].replace(",", ".")) : parseFloat(b.replace(",", "."))) || 122; // « Trispot 40 cm CL » → 40
   // zones visibles : 10 zones sur un blason complet, 5 (10 à 6) sur un trispot ; diamètre visible en cm
   return tri ? { zones: 5, diam: d / 2, co } : /réduit/i.test(b) ? { zones: 6, diam: d * 0.6, co } : { zones: 10, diam: d, co };
 }
@@ -5814,12 +5828,63 @@ function coachTir(id) {
   const box = $("#ct-tv");
   if (box) box.addEventListener("click", (ev) => { const b = ev.target.closest("[data-tv]"); if (!b) return; ev.preventDefault(); box.innerHTML = tirViewer(e.tcTir, b.dataset.tv === "all" ? "all" : Number(b.dataset.tv), "data-tv", others); });
 }
+// ---------- V.1.10 : fiche › Séances — ce que l'entraîneur prévoit de faire avec l'archer, et ses séances ----------
+// a.programme = [{ id, texte, seanceId (vide = la prochaine séance), fait, faitLe, createdAt }] — visible par l'entraîneur seulement
+const prochaineSeance = (a) => S.seances.filter((s) => dansSeance(a, s) && s.date >= todayISO()).sort((x, y) => (x.date + (x.heure || "")).localeCompare(y.date + (y.heure || "")))[0] || null;
+const progPour = (a, s) => (a.programme || []).filter((x) => !x.fait && (x.seanceId === s.id || (!x.seanceId && prochaineSeance(a)?.id === s.id)));
+function programmeCard(a) {
+  const pr = a.programme || [], todo = pr.filter((x) => !x.fait), faits = pr.filter((x) => x.fait).sort((p, q) => (q.faitLe || 0) - (p.faitLe || 0)), nx = prochaineSeance(a);
+  const cible = (x) => { const s = x.seanceId && S.seances.find((y) => y.id === x.seanceId); return s ? `Séance du ${fmtLong(s.date)}${s.heure ? " · " + s.heure : ""} · ${clubName(s.clubId)}` : nx ? `Prochaine séance (${fmtLong(nx.date)} · ${clubName(nx.clubId)})` : "Prochaine séance"; };
+  const dt = (x) => { const s = x.seanceId && S.seances.find((y) => y.id === x.seanceId); return s ? s.date : nx?.date || "9999"; };
+  const row = (x) => `<div class="row" style="align-items:flex-start"><span class="main"><span class="t" style="white-space:pre-wrap">${esc(x.texte)}</span><span class="m">${esc(x.fait ? "Fait" + (x.faitLe ? " le " + new Date(x.faitLe).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }) : "") : cible(x))}</span></span>
+    ${S.canWrite ? `<span class="bar">${x.fait ? `<button class="btn ghost" data-prog-fait="${x.id}" data-v="0">Remettre</button>` : `<button class="btn" data-prog-fait="${x.id}" data-v="1">✓ Fait</button>`}<button class="btn ghost" data-prog-edit="${x.id}" aria-label="Modifier">✎</button></span>` : ""}</div>`;
+  return `<div class="bar"><h2 class="sec" style="margin:0">Programme des prochaines séances</h2><span class="grow"></span>${S.canWrite ? `<button class="btn primary" data-prog-edit="">+ Prévoir</button>` : ""}</div>
+    ${todo.length ? `<div class="list">${todo.sort((p, q) => dt(p).localeCompare(dt(q)) || (p.createdAt || 0) - (q.createdAt || 0)).map(row).join("")}</div>` : `<p class="notice">Rien de prévu. Note ici ce que tu veux travailler avec ${esc(a.prenom || "lui")} : ça s'affichera aussi sur la séance concernée. Ton archer ne le voit pas.</p>`}
+    ${faits.length ? `<details><summary class="tirline">Déjà fait (${faits.length})</summary><div class="list">${faits.slice(0, 30).map(row).join("")}</div></details>` : ""}`;
+}
+function formProgramme(a, id) {
+  const x = (a.programme || []).find((y) => y.id === id), avenir = S.seances.filter((s) => dansSeance(a, s) && s.date >= todayISO()).sort((p, q) => p.date.localeCompare(q.date)).slice(0, 12);
+  sheet(x ? "Modifier ce qui est prévu" : `Prévoir avec ${a.prenom || fullName(a)}`, `
+    <label class="f" for="pg-t">À travailler<textarea id="pg-t" name="texte" required maxlength="600" placeholder="Ex. revoir l'ancrage, filmer le tir de profil, test au clicker à 18 m…">${esc(x?.texte || "")}</textarea></label>
+    <label class="f" for="pg-s">Pour quelle séance ?<select id="pg-s" name="seanceId"><option value="">La prochaine séance, quelle qu'elle soit</option>${avenir.map((s) => `<option value="${s.id}" ${x?.seanceId === s.id ? "selected" : ""}>${esc(fmtLong(s.date))}${s.heure ? " · " + esc(s.heure) : ""} · ${esc(clubName(s.clubId))}${s.theme ? " · " + esc(s.theme) : ""}</option>`).join("")}</select></label>
+    <span class="tirline">Visible par toi seulement. Le jour de la séance, c'est rappelé en haut de la séance.</span>`, {
+    onSave(fd) {
+      const t = String(fd.get("texte") || "").trim(); if (!t) { toast("Écris ce que tu veux travailler"); return false; }
+      const pr = (a.programme || []).slice(), v = { texte: t, seanceId: fd.get("seanceId") || "" };
+      if (x) Object.assign(pr[pr.findIndex((y) => y.id === id)], v); else pr.push({ id: Math.random().toString(36).slice(2, 10), ...v, fait: false, createdAt: Date.now() });
+      a.programme = pr; patch("archers", a.id, { programme: pr }); toast(x ? "Programme modifié" : "Ajouté au programme"); render();
+    },
+    onDelete: x ? () => { a.programme = (a.programme || []).filter((y) => y.id !== id); patch("archers", a.id, { programme: a.programme }); toast("Retiré du programme"); render(); } : null, deleteLabel: "Supprimer",
+  });
+}
+function progFait(aid, id, v) {
+  const a = S.archers.find((x) => x.id === aid); if (!a || !S.canWrite) return;
+  const pr = (a.programme || []).map((y) => y.id === id ? { ...y, fait: v, faitLe: v ? Date.now() : null } : y);
+  a.programme = pr; patch("archers", a.id, { programme: pr }); toast(v ? "Marqué comme fait" : "Remis dans le programme"); render();
+}
+document.addEventListener("click", (e) => {
+  const f = e.target.closest("[data-prog-fait]"); if (f) { const aid = f.dataset.aid || S.archer; progFait(aid, f.dataset.progFait, f.dataset.v === "1"); return; }
+  const ed = e.target.closest("[data-prog-edit]"); if (ed && S.archer) { const a = S.archers.find((x) => x.id === S.archer); if (a) formProgramme(a, ed.dataset.progEdit); }
+});
+function seancesArcherCard(a) {
+  loadTc(a.id);
+  const mes = S.seances.filter((s) => dansSeance(a, s)), t = todayISO();
+  const avenir = mes.filter((s) => s.date >= t).sort((p, q) => p.date.localeCompare(q.date)).slice(0, 6), passees = mes.filter((s) => s.date < t).sort((p, q) => q.date.localeCompare(p.date));
+  const ents = tcCache.aid === a.id ? tcCache.list : [], lim = S.ficheSeancesTout ? passees.length : 15;
+  const row = (s) => { const v = getSuivi(s, a.id), e = ents.find((x) => x.seanceId === s.id), nf = S.attributions.filter((x) => x.archerId === a.id && x.seanceId === s.id).length, pg = s.date >= t ? progPour(a, s).length : 0;
+    const tags = [hasSuivi(s, a.id) ? "📝 ton suivi" : "", e ? "📒 son carnet" + (e.note ? ` (${e.note}/10)` : "") : "", nf ? `📄 ${nf} fiche${nf > 1 ? "s" : ""}` : "", pg ? `🎯 ${pg} prévu${pg > 1 ? "s" : ""}` : "", (s.invites || []).includes(a.id) ? "invité" : ""].filter(Boolean);
+    return `<button class="row" data-open-suivi="${s.id}"><span class="main"><span class="t">${esc(fmtLong(s.date))}${s.heure ? " · " + esc(s.heure) : ""}</span>
+      <span class="m">${esc(clubName(s.clubId))} · ${esc(s.theme || "Entraînement")}</span>${v.note ? `<p class="prev">${esc(v.note)}</p>` : ""}${v.tirs.map((tt) => `<span class="tirline" style="display:block">${esc(tirSum(tt))}</span>`).join("")}
+      ${tags.length ? `<span class="tirline" style="display:block">${esc(tags.join(" · "))}</span>` : ""}</span><span class="count" aria-hidden="true">›</span></button>`; };
+  return `${avenir.length ? `<h2 class="sec">À venir</h2><div class="list">${avenir.map(row).join("")}</div>` : ""}
+    <h2 class="sec">Séances passées</h2>${passees.length ? `<div class="list">${passees.slice(0, lim).map(row).join("")}</div>${passees.length > lim ? `<button class="btn ghost" data-act="fiche-seances-tout">Voir les ${passees.length - lim} plus anciennes</button>` : ""}` : `<p class="notice">Aucune séance passée dans ses clubs pour l'instant.</p>`}`;
+}
 function viewArcher() {
   const a = S.archers.find((x) => x.id === S.archer);
   if (!a) { S.archer = null; return viewArchers(); }
   const evs = evalsOf(a.id);
   // V.1.9 : la fiche est rangée en rubriques (une seule visible à la fois) au lieu de tout empiler sur une page
-  const nHist = S.seances.filter((s) => hasSuivi(s, a.id)).length;
+  const nHist = (a.programme || []).filter((x) => !x.fait).length;
   const FT = [["suivi", "Suivi"], ["seances", "Séances" + (nHist ? ` <span class="n">${nHist}</span>` : "")], ["concours", "Concours et scores"], ["technique", "Technique" + (evs.length ? ` <span class="n">${evs.length}</span>` : "")], ["docs", "Documents" + (docsArcher(a).vus.length ? ` <span class="n">${docsArcher(a).vus.length}</span>` : "")], ["espace", "Espace et matériel"]];
   const ft = FT.some(([k]) => k === S.fTab) ? S.fTab : "suivi";
   const part = {
@@ -5838,18 +5903,7 @@ function viewArcher() {
     ${(() => { const ms = pretsOf(a.id); return ms.length ? `<div class="notice" style="font-family:var(--font-body)">Matériel prêté : ${ms.map((m) => `${esc(matShort(m))} (${[tailleTxt(m), m.puissance ? m.puissance + " lbs" : "", m.modele, clubName(m.clubId)].filter(Boolean).map(esc).join(", ")})`).join(" · ")}</div>` : ""; })()}
     <div class="card"><label class="f" for="archer-notes">Notes techniques et objectifs</label>
       <textarea id="archer-notes" placeholder="Points à travailler, réglages, objectifs de la saison…" ${S.canWrite ? "" : "readonly"}>${esc(a.notes || "")}</textarea></div>`,
-    seances: () => `    ${(() => {
-      const hist = S.seances.filter((s) => hasSuivi(s, a.id)).sort((x, y) => y.date.localeCompare(x.date));
-      if (!hist.length) return "";
-      return `<h2 class="sec">Suivi et scores par séance</h2><div class="list">${hist.map((s) => {
-        const v = getSuivi(s, a.id);
-        return `<button class="row" data-open-suivi="${s.id}"><span class="main"><span class="t">${esc(fmtLong(s.date))}</span>
-          <span class="m">${esc(clubName(s.clubId))} · ${esc(s.theme || "Entraînement")}</span>
-          ${v.note ? `<p class="prev">${esc(v.note)}</p>` : ""}
-          ${v.tirs.map((t) => `<span class="tirline" style="display:block">${esc(tirSum(t))}</span>`).join("")}</span>
-          <span class="count" aria-hidden="true">›</span></button>`;
-      }).join("")}</div>`;
-    })()}` || "",
+    seances: () => programmeCard(a) + seancesArcherCard(a),
     concours: () => `    ${archerConcours(a)}
     ${progressScores(a)}`,
     technique: () => `    ${evs.length >= 2 ? (() => {
@@ -6287,7 +6341,7 @@ function viewAnimations() {
 }
 function viewAnimation(a) {
   let jeux = a.jeux || [], ars = animArchers(a), vue = S.animVue && (S.animVue === "total" || jeux.some((j) => j.id === S.animVue)) ? S.animVue : (jeux[0]?.id || "total");
-  let h = `<div class="bar"><button class="btn ghost" data-act="anim-back">← Animations</button><span class="grow"></span>${prm().animCode ? `<button class="btn" data-act="${ptsVus() ? "anim-verrou" : "anim-ouvrir"}" aria-label="${ptsVus() ? "Reverrouiller les points" : "Voir les points"}">${ptsVus() ? "🔓" : "🔒"}</button>` : ""}${S.canWrite ? `<button class="btn" data-act="anim-equipes">Équipes${animEquipes(a).length ? ` (${animEquipes(a).length})` : ""}</button><button class="btn" data-act="anim-edit">Modifier</button>` : ""}</div>
+  let h = `<div class="bar"><button class="btn ghost" data-act="anim-back">← Animations</button><span class="grow"></span>${prm().animCode ? `<button class="btn" data-act="${ptsVus() ? "anim-verrou" : "anim-ouvrir"}" aria-label="${ptsVus() ? "Reverrouiller les points" : "Voir les points"}">${ptsVus() ? "🔓" : "🔒"}</button>` : ""}${S.canWrite ? `<button class="btn" data-act="anim-lien">🔗 Lien et QR</button>` : ""}${S.canWrite ? `<button class="btn" data-act="anim-equipes">Équipes${animEquipes(a).length ? ` (${animEquipes(a).length})` : ""}</button><button class="btn" data-act="anim-edit">Modifier</button>` : ""}</div>
     <h2 class="sec" style="margin:4px 0 2px">${esc(a.nom || "Animation")}</h2><p class="tirline" style="margin:0 0 10px">${esc([fmtDateL(a.date), a.lieu, club(a.clubId)?.nom, a.parEquipe ? `${a.parEquipe} archers par équipe` : "", a.fleches ? `${a.fleches} flèches par archer et par jeu` : ""].filter(Boolean).join(" · "))}${a.partage ? " · ouverte aux archers participants" : ""}</p>`;
   const eqs = animEquipes(a);
   if (eqs.length) h += `<div class="an-eqs">${eqs.map((e) => { const ch = S.archers.find((x) => x.id === e.chefId); return `<span class="an-eq${a.parEquipe && e.membres.length !== a.parEquipe ? " an-ko" : ""}"><b>${esc(e.nom)}</b> · ${e.membres.length}${a.parEquipe ? "/" + a.parEquipe : ""} archer${e.membres.length > 1 ? "s" : ""}${ch ? ` · chef : ${esc(fullName(ch))}` : ""}</span>`; }).join("")}</div>
@@ -6430,6 +6484,42 @@ function formAnimation(a = null) {
   box.innerHTML = arsHtml(sel.value); sel.addEventListener("change", redraw);
   box.addEventListener("click", (e) => { if (e.target.closest("#an-voir")) { box.querySelectorAll("input").forEach((i) => (i.checked ? parts.add(i.value) : parts.delete(i.value))); tous = true; box.innerHTML = arsHtml(sel.value); } });
   $("#an-tous").addEventListener("click", () => { const all = [...box.querySelectorAll("input")], on = all.some((i) => !i.checked); all.forEach((i) => (i.checked = on)); });
+}
+// V.1.10 (script 21) : lien public de l'animation (QR code), sans compte ; un lien de saisie par équipe
+const jetonAlea = () => { const b = new Uint8Array(18); crypto.getRandomValues(b); return Array.from(b, (x) => "abcdefghijklmnopqrstuvwxyz0123456789"[x % 36]).join(""); };
+const animUrl = (tok, jet) => location.href.split(/[?#]/)[0].replace(/[^/]*$/, "") + "anim.html?t=" + tok + (jet ? "&e=" + jet : "");
+let qrLib = null;
+const chargerQr = () => qrLib || (qrLib = new Promise((ok, ko) => { if (window.qrcode) return ok(window.qrcode); const sc = document.createElement("script"); sc.src = "https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"; sc.onload = () => ok(window.qrcode); sc.onerror = () => { qrLib = null; ko(new Error("qr")); }; document.head.appendChild(sc); }));
+const qrSvg = (url) => { const q = window.qrcode(0, "M"); q.addData(url); q.make(); return q.createImgTag(6, 2, "QR code"); };
+function formLienAnim(a) {
+  if (!a) return; const L = a.lienPublic || null, eqs = animEquipes(a);
+  const bloc = (titre, url, sous) => `<div class="qr-b"><div class="qr-img" data-qr="${esc(url)}"><span class="tirline">QR code…</span></div><div style="display:grid;gap:6px;min-width:0"><b>${esc(titre)}</b>${sous ? `<span class="tirline" style="margin:0">${esc(sous)}</span>` : ""}<a class="tirline qr-url" href="${esc(url)}" target="_blank" rel="noopener">${esc(url)}</a><div class="bar"><button type="button" class="btn" data-copier="${esc(url)}">Copier le lien</button></div></div></div>`;
+  sheet("Lien public et QR codes", L ? `
+    <label class="chk" style="display:flex;gap:8px;align-items:center;border:0"><input type="checkbox" name="actif" ${L.actif ? "checked" : ""}> Lien actif (décoche pour couper tous les QR codes)</label>
+    <label class="chk" style="display:flex;gap:8px;align-items:center;border:0"><input type="checkbox" name="scores" ${L.scores !== false ? "checked" : ""}> Montrer les scores${a.classement === false ? "" : " et le classement"} sur la page</label>
+    <div class="qr-zone">${bloc("Page de l'animation", animUrl(L.token), "Règles, jeux, équipes" + (L.scores !== false ? " et résultats" : "") + ". Sans compte, sans appli.")}
+    ${a.saisieChefs !== false && eqs.length ? `<h3 class="hub-h" style="margin-top:6px">Saisie des équipes</h3><span class="tirline">Un QR par équipe : la personne qui l'a compte les flèches de son équipe, comme un chef d'équipe. Tu valides ensuite les parties.</span>${eqs.map((e) => e.jeton ? bloc("Équipe " + e.nom, animUrl(L.token, e.jeton), e.membres.map((id) => S.archers.find((x) => x.id === id)?.prenom || "").filter(Boolean).join(", ")) : "").join("")}${eqs.some((e) => !e.jeton) ? `<span class="tirline">Nouvelles équipes sans QR : « Enregistrer » les crée.</span>` : ""}` : eqs.length ? `<span class="tirline">La saisie des chefs d'équipe est fermée : pas de QR de saisie.</span>` : `<span class="tirline">Pas d'équipes : la page sert à voir les règles et les résultats. Tu comptes les points depuis ton carnet.</span>`}</div>
+    <div class="bar"><button type="button" class="btn" data-act="qr-print">🖨 Imprimer les QR codes</button><span class="grow"></span><button type="button" class="btn ghost" data-act="qr-new">Changer les liens</button></div>
+    <span class="tirline">Les participants apparaissent en « Prénom N. ». Les points des zones ne sont jamais montrés.</span>` : `
+    <p style="margin:0">Crée un lien (et son QR code) pour les archers et le public qui n'ont pas l'appli : ils voient l'animation sans compte. Avec des équipes, chaque équipe a aussi son QR pour compter ses flèches.</p>
+    <span class="tirline">Tu peux couper le lien à tout moment.</span>`, {
+    saveLabel: L ? "Enregistrer" : "Créer le lien",
+    onSave(fd) {
+      const lien = L ? { ...L, actif: !!fd.get("actif"), scores: !!fd.get("scores") } : { token: jetonAlea() + jetonAlea().slice(0, 6), actif: true, scores: true };
+      const equipes = (a.equipes || []).map((e) => (e.membres || []).length && !e.jeton ? { ...e, jeton: jetonAlea() + jetonAlea().slice(0, 6) } : e);
+      Object.assign(a, { lienPublic: lien, equipes }); patch("animations", a.id, { lienPublic: lien, equipes, updatedAt: Date.now() });
+      toast(L ? (lien.actif ? "Lien enregistré" : "Lien coupé : les QR codes ne marchent plus") : "Lien créé"); render(); if (!L) setTimeout(() => formLienAnim(a), 60);
+    },
+  });
+  const f = $("#sheet-form"); if (!f) return;
+  chargerQr().then(() => f.querySelectorAll("[data-qr]").forEach((d) => { d.innerHTML = qrSvg(d.dataset.qr); })).catch(() => f.querySelectorAll("[data-qr]").forEach((d) => { d.innerHTML = `<span class="tirline">QR code indisponible sans internet : le lien marche quand même.</span>`; }));
+  f.addEventListener("click", (e) => {
+    const c = e.target.closest("[data-copier]"); if (c) { navigator.clipboard?.writeText(c.dataset.copier).then(() => toast("Lien copié"), () => toast("Copie impossible : appuie longuement sur le lien")); return; }
+    if (e.target.closest('[data-act="qr-print"]')) { document.body.classList.add("pr-qr"); setTimeout(() => { window.print(); setTimeout(() => document.body.classList.remove("pr-qr"), 500); }, 50); return; }
+    const n = e.target.closest('[data-act="qr-new"]'); if (n) { if (!n.dataset.ok) { n.dataset.ok = 1; n.textContent = "Les anciens QR ne marcheront plus. Confirmer ?"; return; }
+      const lien = { ...L, token: jetonAlea() + jetonAlea().slice(0, 6) }, equipes = (a.equipes || []).map((x) => (x.membres || []).length ? { ...x, jeton: jetonAlea() + jetonAlea().slice(0, 6) } : x);
+      Object.assign(a, { lienPublic: lien, equipes }); patch("animations", a.id, { lienPublic: lien, equipes, updatedAt: Date.now() }); toast("Nouveaux liens créés"); formLienAnim(a); }
+  });
 }
 function formEquipes(a) {
   const ars = animArchers(a); let eqs = JSON.parse(JSON.stringify(a.equipes || []));
@@ -7552,10 +7642,10 @@ async function runExport(mode, files) {
 }
 
 // ---------- Formulaires ----------
-function sheet(title, body, { onSave, onDelete, deleteLabel } = {}) {
+function sheet(title, body, { onSave, onDelete, deleteLabel, saveLabel } = {}) {
   const el = $("#sheet");
   el.innerHTML = `<div class="sheet-bg" data-close><form class="sheet" id="sheet-form" novalidate><h3>${esc(title)}</h3>${body}
-    <div class="acts">${onDelete ? `<button type="button" class="btn danger left" id="sheet-del">${esc(deleteLabel || "Supprimer")}</button>` : ""}<button type="button" class="btn" data-close>Annuler</button><button type="submit" class="btn primary">Enregistrer</button></div></form></div>`;
+    <div class="acts">${onDelete ? `<button type="button" class="btn danger left" id="sheet-del">${esc(deleteLabel || "Supprimer")}</button>` : ""}<button type="button" class="btn" data-close>Annuler</button><button type="submit" class="btn primary">${esc(saveLabel || "Enregistrer")}</button></div></form></div>`;
   const close = () => { el.innerHTML = ""; if (S.stale) { S.stale = false; render(); } };
   el.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", (e) => { if (e.target === b) close(); }));
   $("#sheet-form").addEventListener("submit", (e) => { e.preventDefault(); const fd = new FormData(e.target); if (onSave(fd, e.target) !== false) close(); });
@@ -7778,6 +7868,7 @@ document.addEventListener("click", (e) => {
     majEssais((d) => { d.essais[eid][jid] = (d.essais[eid]?.[jid] || []).filter((x) => x.id !== es); if (d.retenus[eid]?.[jid] === es) delete d.retenus[eid][jid]; if (d.choix?.[eid]?.[jid] === es) delete d.choix[eid][jid]; }); toast("Partie supprimée"); return; }
   if (t.dataset.act === "anim-new") { formAnimation(); return; }
   if (t.dataset.act === "anim-edit") { formAnimation(animCur()); return; }
+  if (t.dataset.act === "anim-lien") { formLienAnim(animCur()); return; }
   if (t.dataset.act === "anim-back") { S.anim = null; render(); return; }
   if (t.dataset.act === "anim-jeux") { listeJeux(); return; }
   if (t.dataset.act === "anim-ouvrir") { demanderCode(); return; }
@@ -7904,6 +7995,7 @@ document.addEventListener("click", (e) => {
     S.evaluation = null; S.seance = f.seance || null; S.suivi = f.suivi || null; S.archer = f.archer || null; render(); toast("Évaluation supprimée"); return;
   }
   if (t.dataset.suivi) { S.suivi = t.dataset.suivi; S.tirOpen = null; render(); window.scrollTo(0, 0); return; }
+  if (t.dataset.act === "fiche-seances-tout") { S.ficheSeancesTout = true; render(); return; }
   if (t.dataset.openSuivi) { S.seance = t.dataset.openSuivi; S.suivi = S.archer; S.from = "archer-suivi"; S.tirOpen = null; render(); window.scrollTo(0, 0); return; }
   if (t.dataset.arrow) { addArrow(t.dataset.arrow); return; }
   if (t.dataset.encEdit) { const e = (Array.isArray(encListe) ? encListe : []).find((x) => x.email === t.dataset.encEdit); if (e) formEncadrant(e); return; }

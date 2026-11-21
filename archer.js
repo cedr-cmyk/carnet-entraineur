@@ -935,6 +935,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
           ${C.svg({ id: "ar-tir", ...T, showAll: true, only: view ?? curIdx(), volees: T.volees.length ? T.volees : [[]] })}
           ${view != null ? `<span class="tirline">Tu regardes ${view === "all" ? "tout le tir" : "la volée " + (view + 1)}. Touche la cible pour continuer la volée en cours.</span>` : ""}</div>
           <div class="kp" role="group" aria-label="Valeur de la flèche">${keys.filter((k) => k === "X" || k === "M" || Number(k) >= minV).map((k) => `<button type="button" class="${cls(k)}" data-k="${k}">${k}</button>`).join("")}<button type="button" class="undo" id="tg-undo">↶ Annuler la flèche</button></div></div>
+        ${face.zones < 10 ? `<div class="notice tg-reduit"><b>${esc(T.blason)} : seules les zones de 10 à ${minV} comptent</b>, une flèche en dehors est manquée (M). Tu tires sur un blason complet ? <button type="button" class="lnk" id="tg-chg">Changer de blason</button></div>` : ""}
         <span class="tirline">${matchMedia("(pointer: coarse)").matches ? "Pose le doigt sur la cible, ajuste avec la loupe, puis lève le doigt pour placer la flèche" : "Touche la cible là où la flèche s'est plantée"} : la valeur se calcule toute seule. Tu peux aussi taper la valeur sans placer la flèche.</span>
         <div class="bar"><b>Volée en cours : ${Math.min(vcur, T.nbVolees)} / ${T.nbVolees}</b><span class="grow"></span><span>${n} / ${plan()} flèches${n ? ` · ${(total() / n).toFixed(2).replace(".", ",")} par flèche` : ""}</span></div>
         <div class="tgt-bar"><span style="width:${Math.min(100, (n / plan()) * 100)}%"></span></div>
@@ -946,8 +947,13 @@ window.CarnetArcherUI = (API, opts = {}) => {
       layer.querySelectorAll("[data-vv]").forEach((b) => b.addEventListener("click", () => { const x = b.dataset.vv; view = x === "cur" ? null : x === "all" ? "all" : Number(x) === curIdx() ? null : Number(x); draw(); }));
       $("#tg-undo").onclick = undo;
       const ts = $("#tg-set"); if (ts) ts.onclick = () => { setOpen = true; draw(); };
+      const tc = $("#tg-chg"); if (tc) tc.onclick = () => { setOpen = true; draw(); setTimeout(() => { const b = $("#tg-b"); if (b) { b.focus(); b.scrollIntoView({ block: "center" }); } }, 30); };
       if ($("#tg-d")) $("#tg-d").onchange = (ev) => { T.distance = ev.target.value; };
-      if ($("#tg-b")) $("#tg-b").onchange = (ev) => { T.blason = ev.target.value; T.volees.forEach((v, vi) => { T.impacts.filter((p) => p.v === vi).forEach((p) => { const i = v.indexOf(p.k); const nk = C.scoreAt(C.face(T), Math.hypot(p.x, p.y)); if (i >= 0) v[i] = nk; p.k = nk; }); }); draw(); };
+      if ($("#tg-b")) $("#tg-b").onchange = (ev) => {
+        // les flèches placées gardent leur place réelle sur le blason (ex. trispot → blason complet : une flèche dans le 6 reste dans le 6)
+        const f0 = C.face(T); T.blason = ev.target.value; const f1 = C.face(T), k = (f0.diam || 1) / (f1.diam || 1);
+        T.volees.forEach((v, vi) => { T.impacts.filter((p) => p.v === vi).forEach((p) => { p.x = +(p.x * k).toFixed(4); p.y = +(p.y * k).toFixed(4); const i = v.indexOf(p.k); const nk = C.scoreAt(f1, Math.hypot(p.x, p.y)); if (i >= 0) v[i] = nk; p.k = nk; }); });
+        if (shot()) toast("Blason changé : les flèches tapées au clavier gardent leur valeur, corrige-les avec ↶ si besoin"); draw(); };
       if ($("#tg-f")) $("#tg-f").onchange = (ev) => { if (shot()) { toast("Change le nombre de flèches par volée avant de commencer"); ev.target.value = T.fpv; return; } T.fpv = +ev.target.value; T.nbVolees = T.fpv === 6 ? 6 : 10; draw(); };
       if ($("#tg-v")) $("#tg-v").onchange = (ev) => { T.nbVolees = Math.max(Math.ceil(shot() / T.fpv) || 1, Math.min(40, +ev.target.value || 1)); draw(); };
       if ($("#tg-no")) $("#tg-no").onclick = () => layer.remove();
