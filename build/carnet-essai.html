@@ -930,7 +930,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
 <div id="toast" class="toast" hidden></div>
 <input type="file" id="file-in" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.mp4,.webm,.txt,.md,.csv,application/pdf,image/*,video/mp4,video/webm,text/plain,text/markdown,text/csv">
 
-<script>window.CARNET_VERSION = { v: "1.10.43", date: "2026-11-21", site: "1.9.87", test: true };</script>
+<script>window.CARNET_VERSION = { v: "1.10.44", date: "2026-11-23", site: "1.9.87", test: true };</script>
 <script>
 // Espace archer : l'archer (ou son parent) voit uniquement ses propres informations,
 // telles que les renvoie la base (fonction espace_archer), et remplit son carnet.
@@ -4271,6 +4271,44 @@ async function pdfToImages(pdf, max) {
   }
   return blobs;
 }
+// V.1.10 : lecture directe des classements en tableau (ex. résultats UFOLEP « Clas Dept. Nom Prénom Club Licence Année Catégorie 1er Tir 2ème Tir Total »),
+// sans passer par Claude. Renvoie null si le PDF n'a pas ce format (on passe alors par Claude).
+function lireClassementDirect(text, archers) {
+  if (!/\bClas\b/.test(text) || !/Cat[ée]gorie/i.test(text) || !/\bTotal\b/.test(text)) return null;
+  const re = /^(\d+)\s*(?:e|er|ère|ème|ex|eme)?\s+(\d{2,3}|2A|2B)\s+(.+?)\s+((?:19|20)\d{2})\s+([A-Z]{2,9})\s+(\d{1,4})(?:\s+(\d{1,4}))?(?:\s+(\d{1,4}))?(?:\s+\d{1,4})*\s*$/;
+  const L = text.split("\n").map((l) => l.trim()), rows = []; let cat = "";
+  L.forEach((l, i) => {
+    if (/^Clas\b/.test(l)) { // l'intitulé de la catégorie est juste au-dessus de l'en-tête (en sautant la fin de page, les lignes vides et les n° de licence)
+      let j = i - 1; while (j >= 0 && (!L[j] || /^---/.test(L[j]) || /^\S+$/.test(L[j]))) j--;
+      if (j >= 0 && !re.test(L[j])) cat = L[j].replace(/page\s*:\s*\d+/i, "").replace(/^-\s*/, "- ").replace(/^- (de \d)/, "Moins $1").trim();
+    }
+    const m = re.exec(l); if (!m) return;
+    const nums = [m[6], m[7], m[8]].filter(Boolean).map(Number), total = nums.length >= 3 ? nums[2] : nums[nums.length - 1];
+    rows.push({ place: m[1], cat, ident: m[3], catCode: m[5], total, series: nums.length >= 3 ? nums.slice(0, 2) : [] });
+  });
+  if (rows.length < 2) return null;
+  const nb = {}; rows.forEach((r) => { nb[r.cat] = (nb[r.cat] || 0) + 1; });
+  const pad = (x) => " " + normName(x) + " ", has = (r, x) => !!normName(x) && pad(r.ident).includes(pad(x));
+  const prenom1 = (a) => String(a.prenom || "").split(/[\s-]+/)[0];
+  const GEN = new Set(["archers", "archer", "club", "compagnie", "arc", "arcs", "tir", "les", "des", "de", "du", "la", "le", "sport", "sports", "association", "consulting"]);
+  const toks = S.clubs.map((k) => [k, normName(k.nom).split(" ").filter((w) => w.length >= 4 && !GEN.has(w))]);
+  const out = [];
+  rows.forEach((r) => {
+    const hit = archers.filter((a) => has(r, a.nom) && (has(r, a.prenom) || has(r, prenom1(a))));
+    const arc = (r.cat.match(/(classique|compound|poulies|barebow|arc nu|longbow|chasse|droit|traditionnel)(\s+(sans|avec)\s+viseur)?/i) || [""])[0];
+    const base = { nomLu: r.ident, categorie: [r.cat.replace(arc, "").replace(/\s+/g, " ").trim(), r.catCode].filter(Boolean).join(" · "), arc: arc || r.cat, distances: r.series.map((x) => ({ distance: null, score: x })), total: r.total, place: r.place, participants: nb[r.cat] || null };
+    if (hit.length === 1) { out.push({ archerId: hit[0].id, ...base }); return; }
+    const k = toks.find(([, t]) => t.some((w) => pad(r.ident).includes(" " + w + " ")));
+    if (!k) return;
+    // NOM (majuscules) puis Prénom, puis le club
+    const w = r.ident.split(/\s+/), nomW = [], preW = []; let i = 0;
+    while (i < w.length && /^[A-ZÀ-ÖØ-Þ'’-]{2,}$/.test(w[i])) nomW.push(w[i++]);
+    while (i < w.length && /[a-zà-öø-ÿ]/.test(w[i])) preW.push(w[i++]);
+    if (!nomW.length || !preW.length) return;
+    out.push({ archerId: null, nouveau: true, clubId: k[0].id, nom: nomW.join(" "), prenom: preW.join(" "), clubLu: w.slice(i).join(" "), ...base, nomLu: nomW.join(" ") + " " + preW.join(" ") });
+  });
+  return out;
+}
 const normName = (x) => String(x || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z]+/g, " ").trim();
 function openClassement(c, k) {
   const d = { assetId: k.assetId, nomFichier: k.nom || "classement.pdf" }, el = $("#sheet");
@@ -4317,6 +4355,9 @@ async function runImport(file) {
     const archers = S.archers.filter((a) => a.actif !== false || resOf(c).some(([id]) => id === a.id)).slice(0, 300);
     const liste = archers.map((a) => `- ${a.id} : ${a.nom || ""} ${a.prenom || ""} (${(a.clubIds || []).map(clubName).join(", ")}${(a.arcs || []).length ? " · " + a.arcs.join(", ") : ""})`).join("\n");
     const scanned = text.replace(/--- fin de la page \d+ ---/g, "").replace(/\s/g, "").length < 40;
+    // classement en tableau classique : lu directement, sans Claude
+    const direct = scanned ? null : lireClassementDirect(text, archers);
+    if (direct && direct.length) { reviewImport(c, direct, archers, stored); toast(`Classement lu directement : ${direct.length} archer${direct.length > 1 ? "s" : ""} trouvé${direct.length > 1 ? "s" : ""}, vérifie avant d'enregistrer`); return; }
     let images;
     if (scanned && sample) {
       const lim = await sample.limits().catch(() => null);
