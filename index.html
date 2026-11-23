@@ -876,7 +876,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
 <div id="toast" class="toast" hidden></div>
 <input type="file" id="file-in" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.mp4,.webm,.txt,.md,.csv,application/pdf,image/*,video/mp4,video/webm,text/plain,text/markdown,text/csv">
 
-<script>window.CARNET_VERSION = { v: "1.9.88", date: "2026-11-21", site: "1.9.88", test: false };</script>
+<script>window.CARNET_VERSION = { v: "1.9.89", date: "2026-11-23", site: "1.9.89", test: false };</script>
 <script>
 // Espace archer : l'archer (ou son parent) voit uniquement ses propres informations,
 // telles que les renvoie la base (fonction espace_archer), et remplit son carnet.
@@ -1936,6 +1936,8 @@ function write(path, fn) {
   });
   queues[path] = p; return p;
 }
+// Modifier un document par son formulaire sans perdre les champs rangés ailleurs (suivi d'une séance, espace et avatar d'un archer…)
+const garderChamps = (old, data) => { if (!old) return data; const { id, ...o } = old; return { ...JSON.parse(JSON.stringify(o)), ...data }; };
 const save = (col, id, data) => write(`${col}/${id}`, () => S.db.collection(col).doc(id).set(data));
 const patch = (col, id, data) => write(`${col}/${id}`, () => S.db.collection(col).doc(id).update(data));
 const remove = (col, id) => write(`${col}/${id}`, () => S.db.collection(col).doc(id).delete());
@@ -5504,7 +5506,7 @@ function formFiche(f = null) {
         quand: fiLignes(fd.get("quand")), vigilance: fiLignes(fd.get("vigilance")), adaptations: Object.fromEntries(FI_ADAPT.map(([a]) => [a, String(fd.get("ad-" + a) || "").trim()]).filter(([, x]) => x)),
         evaluation: String(fd.get("evaluation") || "").trim(), visibles: Object.fromEntries(FI_SECTIONS.map(([k]) => [k, visSet.has(k)])),
         createdAt: f?.createdAt || Date.now(), updatedAt: Date.now() };
-      const id = f?.id || newId("fiches"); save("fiches", id, data); toast(f ? "Fiche enregistrée" : "Fiche créée");
+      const id = f?.id || newId("fiches"); save("fiches", id, garderChamps(f, data)); toast(f ? "Fiche enregistrée" : "Fiche créée");
       setTimeout(() => { const n = S.fiches.find((x) => x.id === id); if (n && !$("#sheet").innerHTML) openFiche(n); }, 60);
     },
     onDelete: f ? () => { remove("fiches", f.id); toast("Fiche supprimée"); } : null, deleteLabel: "Supprimer la fiche",
@@ -5620,7 +5622,7 @@ function formFolder(f = null) {
       onSave(fd) {
         const nom = fd.get("nom").trim(); if (!nom) { toast("Indique un nom de dossier"); return false; }
         const id = f?.id || newId("dossiers");
-        save("dossiers", id, { nom, parentId: fd.get("parentId") || null, ordre: Number(fd.get("ordre")) || null, createdAt: f?.createdAt || Date.now() });
+        save("dossiers", id, garderChamps(f, { nom, parentId: fd.get("parentId") || null, ordre: Number(fd.get("ordre")) || null, createdAt: f?.createdAt || Date.now() }));
         if (!f) S.folder = id; toast(f ? "Dossier enregistré" : "Dossier créé"); render();
       },
       onDelete: f ? () => {
@@ -6478,7 +6480,7 @@ function formClub(c = null) {
           jour: r.querySelector(".j").value, debut: r.querySelector(".d").value, fin: r.querySelector(".fi").value, groupe: r.querySelector(".g").value.trim(),
         })).filter((k) => k.jour || k.debut || k.groupe);
         const data = { nom, lieu: fd.get("lieu").trim(), federations: fd.getAll("fed"), creneaux: cr, periodeId: fd.get("periodeId") || null, couleur: color, createdAt: c?.createdAt || Date.now() };
-        const id = c?.id || newId("clubs"); save("clubs", id, data); toast(c ? "Club enregistré" : "Club créé");
+        const id = c?.id || newId("clubs"); save("clubs", id, garderChamps(c, data)); toast(c ? "Club enregistré" : "Club créé");
       },
       onDelete: c ? () => {
         const used = S.seances.filter((s) => s.clubId === c.id);
@@ -6545,7 +6547,7 @@ function formArcher(a = null, presetClub = null) {
           licences: { FFTA: fe.includes("FFTA") ? fd.get("licFFTA").trim() : "", UFOLEP: fe.includes("UFOLEP") ? fd.get("licUFOLEP").trim() : "" },
           saisonsLicence: fd.getAll("saisonLic").sort(),
           actif: !fd.get("inactif"), role: fd.get("role") || "archer", notes: a?.notes || "", createdAt: a?.createdAt || Date.now() };
-        save("archers", a?.id || newId("archers"), data); toast(a ? "Archer enregistré" : "Archer ajouté");
+        save("archers", a?.id || newId("archers"), garderChamps(a, data)); toast(a ? "Archer enregistré" : "Archer ajouté");
       },
       onDelete: a ? () => {
         S.seances.filter((s) => (s.presents || []).includes(a.id)).forEach((s) => patch("seances", s.id, { presents: s.presents.filter((x) => x !== a.id) }));
@@ -6591,7 +6593,7 @@ function formSeance(s = null) {
         const id = s?.id || newId("seances");
         const data = { clubId: fd.get("clubId"), date, heure: fd.get("heure").trim(), groupe: fd.get("groupe").trim(), theme: fd.get("theme").trim(), lieu: fd.get("lieu").trim(), public: fd.get("public") || "", periodeId: fd.get("periodeId") || null, exercices: s?.exercices || [], presents: s?.presents || [], notes: s?.notes || "", createdAt: s?.createdAt || Date.now() };
         if (s && s.clubId !== data.clubId) data.presents = [];
-        save("seances", id, data); S.seance = id; S.archer = null; render(); toast(s ? "Séance enregistrée" : "Séance créée");
+        save("seances", id, garderChamps(s, data)); S.seance = id; S.archer = null; render(); toast(s ? "Séance enregistrée" : "Séance créée");
       },
       onDelete: s ? () => { remove("seances", s.id); S.seance = null; render(); toast("Séance supprimée"); } : null,
       deleteLabel: "Supprimer la séance",
