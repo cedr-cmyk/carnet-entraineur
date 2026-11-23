@@ -4633,7 +4633,7 @@ function formAnnonce(n = null) {
       const reste = /\[[^\]]+\]/.test(titre + " " + fd.get("texte"));
       if (reste && !$("#an-t").dataset.ok) { $("#an-t").dataset.ok = 1; toast("Il reste des passages entre [crochets] à compléter. Enregistre à nouveau pour publier quand même."); return false; }
       const id = n?.id || newId("annonces");
-      save("annonces", id, { titre, texte: fd.get("texte").trim(), clubIds: fd.getAll("club"), jusquau: fd.get("jusquau") || "", important: !!fd.get("important"), date: n?.date || todayISO(), createdAt: n?.createdAt || Date.now() });
+      save("annonces", id, garderChamps(n, { titre, texte: fd.get("texte").trim(), clubIds: fd.getAll("club"), jusquau: fd.get("jusquau") || "", important: !!fd.get("important"), date: n?.date || todayISO(), createdAt: n?.createdAt || Date.now() }));
       toast(n ? "Info enregistrée" : "Info publiée pour les archers"); render();
     },
     onDelete: n ? () => { remove("annonces", n.id); toast("Info supprimée"); render(); } : null, deleteLabel: "Supprimer l'info",
