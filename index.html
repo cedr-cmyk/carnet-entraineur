@@ -681,6 +681,8 @@ svg.chart .szl { stroke: var(--line-2, var(--line)); stroke-dasharray: 3 3; }
   .pz-logo { width: 34mm; } .pz-dt { font-size: 34pt; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #B8860B; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .pz-dn { font-size: 30pt; font-weight: 800; margin: 0; } .pz-dr { font-size: 20pt; margin: 0; } .pz-da { font-size: 14pt; margin: 0; } .pz-dp { font-size: 13pt; margin: 0; } .pz-ds { font-size: 12pt; margin-top: 10mm; }
 }
+.alerte-b { position: relative; z-index: 50; display: flex; gap: 10px; align-items: center; justify-content: center; padding: 10px 14px; background: #B45309; color: #fff; font-weight: 700; font-size: .92rem; }
+.alerte-b button { background: transparent; border: 0; color: #fff; font-size: 1.1rem; cursor: pointer; min-width: 36px; min-height: 36px; }
 .prog-s { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
 .rt-notif { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
 .rt-rep { border-left: 3px solid var(--accent); padding: 4px 0 4px 10px; margin-top: 6px; }
@@ -6374,6 +6376,73 @@ async function chargerMonAcces() { try { monAcces = (await window.carnetAcces.mo
 const estOrdi = () => matchMedia("(pointer: fine)").matches && innerWidth >= 1000;
 let maintEtat = null;
 async function chargerMaint() { maintEtat = { charge: true }; try { maintEtat = (await window.carnetMaintenance.etat()) || { actif: false }; } catch (e) { maintEtat = { erreur: e.message }; } if (S.tab === "parametres") render(); }
+// ---------- V.1.10 : prévenir les archers en cas de problème (SMS / WhatsApp préparés, bandeau d'alerte hors Supabase) ----------
+const telNorm = (t) => String(t || "").replace(/[^\d+]/g, "").replace(/^0033/, "+33");
+const PREV_MODELES = [
+  ["panne", "Panne", "Bonjour, le Carnet d'entraînement a un problème en ce moment. Notez vos séances sur papier, je vous préviens dès que c'est réparé. Cédric"],
+  ["maintenance", "Mise à jour prévue", "Bonjour, le Carnet d'entraînement sera en mise à jour [jour] de [heure] à [heure]. Pendant ce temps, l'appli marche hors ligne : vos notes partiront ensuite. Cédric"],
+  ["ok", "C'est réparé", "Bonjour, le Carnet d'entraînement remarche normalement. Fermez puis rouvrez l'appli. Merci de votre patience ! Cédric"],
+];
+const siteRepo = () => (/github\.io$/.test(location.hostname) && location.pathname.split("/")[1]) || "carnet-entraineur";
+function prevenirCard() {
+  const cl = S.prevClub || "all", par = S.prevPar || "les2", m = S.prevModele || "panne";
+  const ars = S.archers.filter((a) => a.actif !== false && (cl === "all" || (a.clubIds || []).includes(cl))).sort(byName);
+  const nums = [...new Set(ars.flatMap((a) => [par !== "parents" ? telNorm(a.tel) : "", par !== "archers" ? telNorm(a.tel2) : ""]).filter((x) => x.length >= 8))];
+  const sans = ars.filter((a) => !telNorm(a.tel) && !telNorm(a.tel2));
+  const txt = S.prevTexte ?? PREV_MODELES.find(([k]) => k === m)[2].replace(/Cédric$/, prm().nom || "Cédric");
+  return `<h2 class="sec">Prévenir mes archers</h2><div class="card">
+    <span class="tirline" style="margin:0">En cas de problème sur l'appli, un SMS ou un message WhatsApp prêt à envoyer. Ça marche même si l'appli ou Supabase sont en panne.</span>
+    <div class="chips" role="group" aria-label="Club">${[["all", "Tous les clubs"], ...S.clubs.map((c) => [c.id, c.nom])].map(([k, l]) => `<button class="chip" data-prevclub="${k}" aria-pressed="${cl === k}">${esc(l)}</button>`).join("")}</div>
+    <div class="chips" role="group" aria-label="Numéros">${[["les2", "Archers et parents"], ["archers", "Archers"], ["parents", "Parents"]].map(([k, l]) => `<button class="chip" data-prevpar="${k}" aria-pressed="${par === k}">${l}</button>`).join("")}</div>
+    <div class="chips" role="group" aria-label="Message">${PREV_MODELES.map(([k, l]) => `<button class="chip" data-prevmod="${k}" aria-pressed="${S.prevTexte == null && m === k}">${l}</button>`).join("")}</div>
+    <textarea id="prev-txt" rows="4" maxlength="600" aria-label="Message">${esc(txt)}</textarea>
+    <span class="tirline" style="margin:0"><b>${nums.length} numéro${nums.length > 1 ? "s" : ""}</b>${sans.length ? ` · ${sans.length} archer${sans.length > 1 ? "s" : ""} sans numéro : ${sans.slice(0, 8).map((a) => esc(a.prenom || fullName(a))).join(", ")}${sans.length > 8 ? "…" : ""} (à compléter sur leur fiche)` : ""}</span>
+    <div class="bar"><button class="btn primary" data-act="prev-sms" ${nums.length ? "" : "disabled"}>📱 Ouvrir les SMS</button><button class="btn" data-act="prev-wa">WhatsApp</button><button class="btn ghost" data-act="prev-copie-num" ${nums.length ? "" : "disabled"}>Copier les numéros</button><button class="btn ghost" data-act="prev-copie-txt">Copier le message</button></div>
+    <span class="tirline" style="margin:0">Le SMS s'ouvre sur ton téléphone avec tous les numéros : tu n'as plus qu'à envoyer. Avec beaucoup de numéros, certains téléphones envoient un message de groupe : tu peux aussi copier les numéros.</span>
+    <h3 class="hub-h" style="margin-top:8px">Bandeau d'alerte</h3>
+    <span class="tirline" style="margin:0">Un message en haut de l'appli, chez tous les archers, <b>même si Supabase est en panne</b> (il est rangé avec l'appli sur GitHub). <span id="alerte-etat"></span></span>
+    <div class="bar"><button class="btn" data-act="alerte-mettre">Préparer le bandeau avec ce message</button><button class="btn ghost" data-act="alerte-retirer">Préparer le retrait du bandeau</button></div>
+    <div id="alerte-prep"></div></div>`;
+}
+function alertePrep(actif) {
+  const msg = ($("#prev-txt")?.value || "").trim(), json = JSON.stringify(actif ? { actif: true, message: msg, date: todayISO() } : { actif: false, message: "", date: todayISO() }, null, 2);
+  const url = `https://github.com/cedr-cmyk/${siteRepo()}/edit/main/alerte.json`;
+  $("#alerte-prep").innerHTML = `<div class="notice" style="display:grid;gap:8px"><b>${actif ? "Mettre le bandeau" : "Retirer le bandeau"} en 3 gestes :</b>
+    <span>1. <button class="btn" data-act="alerte-copier">Copier le texte du bandeau</button></span>
+    <span>2. <a class="btn" href="${url}" target="_blank" rel="noopener">Ouvrir le fichier sur GitHub</a> : efface tout, colle le texte copié.</span>
+    <span>3. Clique sur <b>« Commit changes »</b> (deux fois). Le bandeau ${actif ? "apparaît" : "disparaît"} chez les archers dans la minute, à la prochaine ouverture de l'appli.</span>
+    <textarea readonly rows="5" id="alerte-json" style="font-family:monospace;font-size:.8rem">${esc(json)}</textarea>
+    <span class="tirline" style="margin:0">Tu peux aussi me demander de le faire pour toi.</span></div>`;
+}
+const copier = (t, ok) => navigator.clipboard?.writeText(t).then(() => toast(ok), () => toast("Copie impossible : sélectionne le texte à la main"));
+document.addEventListener("click", (e) => {
+  const t = e.target.closest("[data-prevclub],[data-prevpar],[data-prevmod],[data-act^='prev-'],[data-act^='alerte-']"); if (!t) return;
+  if (t.dataset.prevclub) { S.prevClub = t.dataset.prevclub; S.prevTexte = $("#prev-txt")?.value; render(); return; }
+  if (t.dataset.prevpar) { S.prevPar = t.dataset.prevpar; S.prevTexte = $("#prev-txt")?.value; render(); return; }
+  if (t.dataset.prevmod) { S.prevModele = t.dataset.prevmod; S.prevTexte = null; render(); return; }
+  const cl = S.prevClub || "all", par = S.prevPar || "les2", ars = S.archers.filter((a) => a.actif !== false && (cl === "all" || (a.clubIds || []).includes(cl)));
+  const nums = [...new Set(ars.flatMap((a) => [par !== "parents" ? telNorm(a.tel) : "", par !== "archers" ? telNorm(a.tel2) : ""]).filter((x) => x.length >= 8))], msg = ($("#prev-txt")?.value || "").trim();
+  const a = t.dataset.act;
+  if (a === "prev-sms") { const ios = /iPhone|iPad|Macintosh/.test(navigator.userAgent); location.href = ios ? `sms:/open?addresses=${nums.join(",")}&body=${encodeURIComponent(msg)}` : `sms:${nums.join(",")}?body=${encodeURIComponent(msg)}`; }
+  else if (a === "prev-wa") window.open("https://wa.me/?text=" + encodeURIComponent(msg), "_blank", "noopener");
+  else if (a === "prev-copie-num") copier(nums.join(", "), `${nums.length} numéros copiés`);
+  else if (a === "prev-copie-txt") copier(msg, "Message copié");
+  else if (a === "alerte-mettre") { if (!msg) { toast("Écris d'abord le message"); return; } alertePrep(true); }
+  else if (a === "alerte-retirer") alertePrep(false);
+  else if (a === "alerte-copier") copier($("#alerte-json")?.value || "", "Texte du bandeau copié");
+});
+// état actuel du bandeau (dans Paramètres)
+new MutationObserver(() => { const el = $("#alerte-etat"); if (!el || el.dataset.ok) return; el.dataset.ok = 1; lireAlerte().then((x) => { el.textContent = x === undefined ? "" : x?.actif ? `En ce moment : « ${x.message} »` : "En ce moment : pas de bandeau."; }); }).observe(document.documentElement, { childList: true, subtree: true });
+async function lireAlerte() { try { if (!/^https?:/.test(location.protocol)) return undefined; const r = await fetch("alerte.json?t=" + Date.now(), { cache: "no-store" }); return r.ok ? await r.json() : null; } catch (e) { return undefined; } }
+// au démarrage (entraîneur et archers) : bandeau d'alerte si le fichier alerte.json du site est actif
+lireAlerte().then((x) => {
+  if (!x?.actif || !x.message || (x.jusqu && x.jusqu < todayISO())) return;
+  try { if (sessionStorage.getItem("alerte-fermee") === x.date + x.message) return; } catch (e) {}
+  const b = document.createElement("div"); b.className = "alerte-b"; b.setAttribute("role", "alert");
+  b.innerHTML = `<span>⚠️ ${esc(x.message)}</span><button type="button" aria-label="Fermer le message">✕</button>`;
+  b.querySelector("button").onclick = () => { b.remove(); try { sessionStorage.setItem("alerte-fermee", x.date + x.message); } catch (e) {} };
+  document.body.prepend(b);
+});
 function maintenanceCard() {
   if (!window.carnetMaintenance) return "";
   // sur téléphone et tablette : seulement l'aperçu (l'interrupteur reste sur l'ordinateur)
@@ -7374,6 +7443,7 @@ function viewData() {
     <div class="card"><label class="f" for="pr-nom">Ton prénom ou nom (affiché en haut du carnet)<input type="text" id="pr-nom" data-prm="nom" value="${esc(p.nom)}" placeholder="Ex. Cédric" ${ro}></label></div>
     ${monEspaceCard()}
     ${maintenanceCard()}
+    ${ENC() ? "" : prevenirCard()}
     ${window.carnetLogout ? `<div class="card"><div class="bar"><span class="tirline">Connecté à ton compte du carnet sur cet appareil.</span><span class="grow"></span><button class="btn" data-act="logout">Se déconnecter</button></div></div>` : ""}
     <h2 class="sec">Affichage sur cet appareil</h2>
     <div class="card">
@@ -7945,6 +8015,9 @@ function formArcher(a = null, presetClub = null) {
     <div class="grid2"><label class="f" for="f-naiss">Date de naissance<input type="date" id="f-naiss" name="naissance" value="${esc(a?.naissance)}"></label>
       <label class="f" for="f-sexe">Sexe<select id="f-sexe" name="sexe"><option value="">Non renseigné</option><option value="F" ${a?.sexe === "F" ? "selected" : ""}>Femme</option><option value="H" ${a?.sexe === "H" ? "selected" : ""}>Homme</option></select></label></div>
     <span class="tirline" id="f-agehint"></span>
+    <div class="grid2"><label class="f" for="f-tel">Téléphone de l'archer<input type="tel" id="f-tel" name="tel" value="${esc(a?.tel || "")}" placeholder="06 12 34 56 78" autocomplete="off"></label>
+      <label class="f" for="f-tel2">Téléphone d'un parent<input type="tel" id="f-tel2" name="tel2" value="${esc(a?.tel2 || "")}" placeholder="Pour un archer mineur" autocomplete="off"></label></div>
+    <span class="tirline">Pour le prévenir par SMS en cas de problème sur l'appli (Paramètres › Prévenir mes archers). Visible par toi (et tes encadrants qui voient les archers), pas par les autres archers.</span>
     <div class="f">Club(s)<div class="checks">${S.clubs.map((c) => `<label><input type="checkbox" name="club" value="${c.id}" ${clubIds.includes(c.id) ? "checked" : ""}>${esc(c.nom)}</label>`).join("")}</div></div>
     <div class="f">Type(s) d'arc<div class="checks">${ARCS.map((x) => `<label><input type="checkbox" name="arc" value="${x}" ${(a?.arcs || []).includes(x) ? "checked" : ""}>${x}</label>`).join("")}</div></div>
     <div class="f">Fédération(s)<div class="checks" id="fed-pick">${FEDS.map((f) => `<label><input type="checkbox" name="fed" value="${f}" ${feds.includes(f) ? "checked" : ""}>${f}</label>`).join("")}</div></div>
@@ -7966,7 +8039,7 @@ function formArcher(a = null, presetClub = null) {
         const cl = fd.getAll("club"); if (!cl.length) { toast("Choisis au moins un club"); return false; }
         const fe = fd.getAll("fed");
         const data = { prenom, nom, clubIds: cl, arcs: fd.getAll("arc"), federations: fe,
-          naissance: fd.get("naissance") || "", sexe: fd.get("sexe") || "", viseur: fe.includes("UFOLEP") ? fd.get("viseur") || "" : "",
+          naissance: fd.get("naissance") || "", sexe: fd.get("sexe") || "", tel: String(fd.get("tel") || "").trim(), tel2: String(fd.get("tel2") || "").trim(), viseur: fe.includes("UFOLEP") ? fd.get("viseur") || "" : "",
           categorie: fe.includes("FFTA") ? fd.get("categorie") : "", categorieUfolep: fe.includes("UFOLEP") ? fd.get("categorieUfolep").trim() : "",
           licences: { FFTA: fe.includes("FFTA") ? fd.get("licFFTA").trim() : "", UFOLEP: fe.includes("UFOLEP") ? fd.get("licUFOLEP").trim() : "" },
           saisonsLicence: fd.getAll("saisonLic").sort(),
