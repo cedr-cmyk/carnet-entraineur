@@ -935,6 +935,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
       <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><path d="M21 3l-8 8M17 3h4v4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
       <h1>Carnet <em>d'entraînement</em></h1>
       <span class="sub" id="sync">Connexion…</span>
+      <button type="button" class="btn top-chrono" data-act="rafraichir" aria-label="Actualiser la page" title="Actualiser (recharge les données et cherche une mise à jour)">↻</button>
       <button type="button" class="btn top-chrono" data-act="chrono" aria-label="Ouvrir le chrono d'entraînement">⏱<span class="tc-l"> Chrono</span></button>
     </div>
     <nav class="tabs" role="tablist" id="tabs"></nav>
@@ -8293,6 +8294,8 @@ document.addEventListener("click", (e) => {
   if (a === "export") exportData();
   if (a === "restore") startRestore();
   if (a === "logout" && window.carnetLogout) window.carnetLogout();
+  // V.1.10 : actualiser (les modifications pas encore envoyées sont gardées sur l'appareil et repartent au rechargement)
+  if (a === "rafraichir") { $("#sync").textContent = "Actualisation…"; (async () => { try { const r = await navigator.serviceWorker?.getRegistration?.(); await Promise.race([r?.update?.(), new Promise((ok) => setTimeout(ok, 2500))]); } catch (e) {} location.reload(); })(); }
   if (a === "enc-new") formEncadrant();
   if (a === "move-mode") { S.moveSel = new Set(); S.moveTo = null; render(); }
   if (a === "move-cancel") { S.moveSel = null; render(); }
