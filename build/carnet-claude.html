@@ -6569,6 +6569,27 @@ function saisieAnim(a, aid, jid, eid = "", essaiId = "") {
   maj();
 }
 // Écrit un score : sur un essai d'équipe (créé au besoin) ou directement pour un archer sans équipe
+// V.1.10 (script 23) : une animation s'enregistre par morceaux (seulement ce qui a changé), appliqués sur la version à jour côté serveur.
+// Ainsi, un score noté par un marqueur (QR) ou une inscription sur place au même moment n'est pas écrasé. Sans réseau ou sans le script : enregistrement complet.
+const animDiff = (a, b, ch = [], out = []) => {
+  const isO = (v) => v && typeof v === "object" && !Array.isArray(v);
+  new Set([...Object.keys(a || {}), ...Object.keys(b || {})]).forEach((k) => {
+    if (!ch.length && k === "id") return; const x = a?.[k], y = b?.[k], c = [...ch, k];
+    if (y === undefined) { if (x !== undefined) out.push({ c, d: true }); return; }
+    if ((isO(x) || x === undefined) && isO(y) && c.length < 5) animDiff(x || {}, y, c, out); else if (JSON.stringify(x) !== JSON.stringify(y)) out.push({ c, v: y });
+  });
+  return out;
+};
+function animEnregistrer(f, data) {
+  const ops = animDiff(f, data); if (!ops.length) return;
+  if (window.carnetAnimMaj && navigator.onLine !== false && ops.length <= 400) {
+    Object.keys(f).forEach((k) => { if (k !== "id" && !(k in data)) delete f[k]; }); Object.assign(f, JSON.parse(JSON.stringify(data))); render();
+    window.carnetAnimMaj(f.id, ops).catch(() => save("animations", f.id, data));
+    return;
+  }
+  save("animations", f.id, data);
+}
+const sansId = (f) => { const { id, ...d } = JSON.parse(JSON.stringify(f)); return d; };
 function ecrireScore(aid, jid, eid, essaiId, c) {
   const f = animCur(); if (!f) return; const { id, ...data } = JSON.parse(JSON.stringify(f));
   if (eid) {
@@ -6580,9 +6601,9 @@ function ecrireScore(aid, jid, eid, essaiId, c) {
       L.push(es); }
     if (c) es.scores[aid] = c; else delete es.scores[aid];
   } else { data.scores = data.scores || {}; data.scores[aid] = data.scores[aid] || {}; if (c) data.scores[aid][jid] = c; else delete data.scores[aid][jid]; }
-  save("animations", f.id, { ...data, updatedAt: Date.now() });
+  animEnregistrer(f, { ...data, updatedAt: Date.now() });
 }
-function majEssais(fn) { const f = animCur(); if (!f) return; const { id, ...data } = JSON.parse(JSON.stringify(f)); data.essais = data.essais || {}; data.retenus = data.retenus || {}; fn(data); save("animations", f.id, { ...data, updatedAt: Date.now() }); }
+function majEssais(fn) { const f = animCur(); if (!f) return; const { id, ...data } = JSON.parse(JSON.stringify(f)); data.essais = data.essais || {}; data.retenus = data.retenus || {}; fn(data); animEnregistrer(f, { ...data, updatedAt: Date.now() }); }
 // Ce que reçoit l'espace archer (même forme que la fonction Supabase archer_animations) : jamais les points des zones
 function animPourArcher(n, aid) {
   const eqs = animEquipes(n), autorise = arModules(S.archers.find((x) => x.id === aid), nbConcoursOf(aid)).has("animations");
@@ -6628,17 +6649,20 @@ function formAnimation(a = null) {
       // un jeu déjà choisi garde ses points ; sa règle suit « Mes jeux »
       const ids = fd.getAll("jeu"), jeux = ids.map((id) => { const old = (a?.jeux || []).find((j) => j.id === id), l = lib.find((j) => j.id === id);
         return old ? { ...old, ...(l ? { regle: l.regle || "", regleDoc: l.regleDoc || "" } : {}) } : l ? JSON.parse(JSON.stringify(l)) : null; }).filter(Boolean);
-      const garde = a ? (({ id, ...r }) => r)(a) : {};
-      const invites = invLire(), invIds = invites.map((g) => g.id), parts = [...fd.getAll("part"), ...invIds];
+      const fr = a ? S.animations.find((x) => x.id === a.id) || a : null; // version à jour (QR, inscriptions arrivées pendant que le formulaire était ouvert)
+      const garde = fr ? (({ id, ...r }) => r)(JSON.parse(JSON.stringify(fr))) : {};
+      const invites = invLire();
+      (fr?.invites || []).forEach((g) => { if (!invOrig.has(g.id) && !invites.some((x) => x.id === g.id)) invites.push({ ...g }); }); // inscrits sur place entre-temps
+      const invIds = invites.map((g) => g.id), parts = [...fd.getAll("part"), ...invIds];
       const data = { ...garde, invites, regles: String(fd.get("regles") || "").trim(), reglesDoc: fd.get("reglesDoc") || "", nom, date: fd.get("date"), lieu: fd.get("lieu").trim(), clubId: fd.get("clubId") || null, jeux, participants: parts, classement: !!fd.get("classement"), partage: !!fd.get("partage"), parEquipe: Number(fd.get("parEquipe")) || null, fleches: Number(fd.get("fleches")) || null,
-        scores: a?.scores || {}, equipes: (a?.equipes || []).map((e) => ({ ...e, membres: (e.membres || []).filter((m) => parts.includes(m)), chefId: fd.getAll("part").includes(e.chefId) ? e.chefId : null })), saisieChefs: a?.saisieChefs !== false, createdAt: a?.createdAt || Date.now(), updatedAt: Date.now() };
-      const id = a?.id || newId("animations"); save("animations", id, data); toast(a ? "Animation enregistrée" : "Animation créée"); S.anim = id; S.animVue = null; render();
+        scores: fr?.scores || {}, equipes: (fr?.equipes || []).map((e) => ({ ...e, membres: (e.membres || []).filter((m) => parts.includes(m)), chefId: fd.getAll("part").includes(e.chefId) ? e.chefId : null })), saisieChefs: a?.saisieChefs !== false, createdAt: a?.createdAt || Date.now(), updatedAt: Date.now() };
+      const id = a?.id || newId("animations"); if (fr) animEnregistrer(fr, data); else save("animations", id, data); toast(a ? "Animation enregistrée" : "Animation créée"); S.anim = id; S.animVue = null; render();
     },
     onDelete: a ? () => { remove("animations", a.id); S.anim = null; toast("Animation supprimée"); render(); } : null, deleteLabel: "Supprimer l'animation",
   });
   brancherRegleDepot("an-regd");
   // invités : une ligne par personne (prénom, nom, groupe)
-  let inv = JSON.parse(JSON.stringify(a?.invites || []));
+  let inv = JSON.parse(JSON.stringify(a?.invites || [])); const invOrig = new Set(inv.map((g) => g.id));
   const invBox = $("#an-inv"), gid = () => "g" + Math.random().toString(36).slice(2, 10);
   const invDraw = () => { invBox.innerHTML = inv.map((g, i) => `<div class="an-invr"><input type="text" data-inv="${i}|prenom" value="${esc(g.prenom || "")}" placeholder="Prénom" aria-label="Prénom"><input type="text" data-inv="${i}|nom" value="${esc(g.nom || "")}" placeholder="Nom (facultatif)" aria-label="Nom"><input type="text" data-inv="${i}|groupe" list="an-grl" value="${esc(g.groupe || "")}" placeholder="Groupe" aria-label="Groupe"><button type="button" class="btn ghost" data-invdel="${i}" aria-label="Retirer">✕</button></div>`).join("")
     + `<datalist id="an-grl">${[...new Set([...inv.map((g) => g.groupe), "Enfants", "Adultes", "Famille"].filter(Boolean))].map((x) => `<option value="${esc(x)}">`).join("")}</datalist>`; };
@@ -6685,8 +6709,8 @@ function formLienAnim(a) {
       const lien = L ? { ...L, actif: !!fd.get("actif"), scores: !!fd.get("scores"), inscription: !!fd.get("inscription") } : { token: jetonAlea() + jetonAlea().slice(0, 6), actif: true, scores: true, inscription: false };
       const equipes = (a.equipes || []).map((e) => (e.membres || []).length && !e.jeton ? { ...e, jeton: jetonAlea() + jetonAlea().slice(0, 6) } : e);
       const cibles = (a.cibles || []).map((c) => (c.membres || []).length && !c.jeton ? { ...c, jeton: jetonAlea() + jetonAlea().slice(0, 6) } : c);
-      Object.assign(a, { lienPublic: lien, equipes, cibles }); patch("animations", a.id, { lienPublic: lien, equipes, cibles, updatedAt: Date.now() });
-      toast(L ? (lien.actif ? "Lien enregistré" : "Lien coupé : les QR codes ne marchent plus") : "Lien créé"); render(); if (!L) setTimeout(() => formLienAnim(a), 60);
+      animEnregistrer(a, { ...sansId(a), lienPublic: lien, equipes, cibles, updatedAt: Date.now() });
+      toast(L ? (lien.actif ? "Lien enregistré" : "Lien coupé : les QR codes ne marchent plus") : "Lien créé"); render(); if (!L) setTimeout(() => formLienAnim(S.animations.find((x) => x.id === a.id) || a), 150);
     },
   });
   const f = $("#sheet-form"); if (!f) return;
@@ -6696,7 +6720,7 @@ function formLienAnim(a) {
     if (e.target.closest('[data-act="qr-print"]')) { document.body.classList.add("pr-qr"); setTimeout(() => { window.print(); setTimeout(() => document.body.classList.remove("pr-qr"), 500); }, 50); return; }
     const n = e.target.closest('[data-act="qr-new"]'); if (n) { if (!n.dataset.ok) { n.dataset.ok = 1; n.textContent = "Les anciens QR ne marcheront plus. Confirmer ?"; return; }
       const lien = { ...L, token: jetonAlea() + jetonAlea().slice(0, 6) }, equipes = (a.equipes || []).map((x) => (x.membres || []).length ? { ...x, jeton: jetonAlea() + jetonAlea().slice(0, 6) } : x), cibles = (a.cibles || []).map((x) => (x.membres || []).length ? { ...x, jeton: jetonAlea() + jetonAlea().slice(0, 6) } : x);
-      Object.assign(a, { lienPublic: lien, equipes, cibles }); patch("animations", a.id, { lienPublic: lien, equipes, cibles, updatedAt: Date.now() }); toast("Nouveaux liens créés"); formLienAnim(a); }
+      animEnregistrer(a, { ...sansId(a), lienPublic: lien, equipes, cibles, updatedAt: Date.now() }); toast("Nouveaux liens créés"); setTimeout(() => formLienAnim(S.animations.find((x) => x.id === a.id) || a), 150); }
   });
 }
 // V.1.10 (script 22) : cibles, pour faire compter les flèches sans équipe — un QR par cible
@@ -6716,7 +6740,7 @@ function formCibles(a) {
     <div id="cb-box"></div>`, {
     onSave() {
       const out = cb.map((c, i) => ({ ...c, membres: ars.filter((x) => aff[x.id] === i).map((x) => x.id) })).map((c) => ({ ...c, marqueurId: c.membres.includes(c.marqueurId) ? c.marqueurId : null }));
-      Object.assign(a, { cibles: out }); patch("animations", a.id, { cibles: out, updatedAt: Date.now() });
+      animEnregistrer(a, { ...sansId(a), cibles: out, updatedAt: Date.now() });
       const sans = ars.filter((x) => aff[x.id] == null).length; toast(["Cibles enregistrées", sans ? `${sans} sans cible` : ""].filter(Boolean).join(" · ")); render();
     },
   });
@@ -6799,7 +6823,7 @@ function formEquipes(a) {
     <p id="eq-sans"></p><div id="eq-box"></div><div class="bar"><button type="button" class="btn" id="eq-add">+ Ajouter une équipe</button><button type="button" class="btn" id="eq-hasard">🎲 Répartir au hasard</button><button type="button" class="btn ghost" id="eq-groupes">Une équipe par groupe</button></div>`, {
     onSave() {
       const out = eqs.map((e) => ({ ...e, nom: e.nom.trim() || "Équipe" })).filter((e) => e.membres.length);
-      const f = animCur() || a, { id, ...data } = f; save("animations", a.id, { ...data, equipes: out, updatedAt: Date.now() });
+      const f = animCur() || a; animEnregistrer(f, { ...sansId(f), equipes: out, updatedAt: Date.now() });
       const sansChef = out.filter((e) => !e.chefId).length, sans = ars.filter((x) => !out.some((e) => e.membres.includes(x.id))).length;
       toast(["Équipes enregistrées", sansChef ? `${sansChef} sans chef` : "", sans ? `${sans} archer${sans > 1 ? "s" : ""} sans équipe` : ""].filter(Boolean).join(" · "));
     },
@@ -8160,7 +8184,7 @@ document.addEventListener("click", (e) => {
   if (t.dataset.act === "mode-archer") { window.carnetAcces.basculer("archer"); return; }
   if (t.dataset.act === "maint-apercu") { try { sessionStorage.setItem("apercu-maint", "1"); } catch (e) { /* rien */ } window.carnetAcces.basculer("archer"); return; }
   if (t.dataset.act === "anim-equipes") { formEquipes(animCur()); return; }
-  if (t.dataset.act === "anim-saisie-chefs") { const a = animCur(); if (a) { const { id, ...data } = a; save("animations", a.id, { ...data, saisieChefs: a.saisieChefs === false, updatedAt: Date.now() }); toast(a.saisieChefs === false ? "Saisie rouverte aux chefs d'équipe" : "Saisie close : les scores ne bougent plus"); } return; }
+  if (t.dataset.act === "anim-saisie-chefs") { const a = animCur(); if (a) { const avant = a.saisieChefs; animEnregistrer(a, { ...sansId(a), saisieChefs: avant === false, updatedAt: Date.now() }); toast(avant === false ? "Saisie rouverte aux chefs d'équipe" : "Saisie close : les scores ne bougent plus"); } return; }
   if (t.dataset.exmode) { S.exMode = t.dataset.exmode; try { localStorage.setItem("carnet-exmode", S.exMode); } catch (e) {} render(); return; }
   if (t.dataset.ftheme) { S.fTheme = t.dataset.ftheme; render(); return; }
   if (t.dataset.fiche) { const f = S.fiches.find((x) => x.id === t.dataset.fiche); if (f) openFiche(f); return; }

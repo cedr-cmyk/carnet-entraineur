@@ -279,6 +279,8 @@
   // ---------- Accès des archers (côté entraîneur) ----------
   const rpc = async (fn, args) => { const r = await sb.rpc(fn, args); if (r.error) throw new Error(r.error.message); return r.data; };
   // Mode maintenance (V.1.7.7) : l'entraîneur met l'appli en pause pendant une mise à jour (script maintenance.sql)
+  // V.1.10 (script 23) : modifier une animation par morceaux, sans écraser ce que les QR codes viennent d'enregistrer
+  window.carnetAnimMaj = (id, ops) => rpc("anim_coach_maj", { p_id: id, p_ops: ops });
   window.carnetMaintenance = { etat: () => rpc("etat_maintenance"), basculer: (on) => rpc("basculer_maintenance", { p_actif: !!on }) };
   window.carnetAcces = {
     inviter: (archerId) => rpc("creer_invitation", { p_archer: archerId }),
