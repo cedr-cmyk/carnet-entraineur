@@ -933,7 +933,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
 <div id="toast" class="toast" hidden></div>
 <input type="file" id="file-in" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.mp4,.webm,.txt,.md,.csv,application/pdf,image/*,video/mp4,video/webm,text/plain,text/markdown,text/csv">
 
-<script>window.CARNET_VERSION = { v: "1.10.48", date: "2026-11-23", site: "1.9.87", test: true };</script>
+<script>window.CARNET_VERSION = { v: "1.10.49", date: "2026-11-23", site: "1.9.87", test: true };</script>
 <script>
 // Espace archer : l'archer (ou son parent) voit uniquement ses propres informations,
 // telles que les renvoie la base (fonction espace_archer), et remplit son carnet.
@@ -5763,7 +5763,7 @@ function formAnnonce(n = null) {
       if (reste && !$("#an-t").dataset.ok) { $("#an-t").dataset.ok = 1; toast("Il reste des passages entre [crochets] à compléter. Enregistre à nouveau pour publier quand même."); return false; }
       const id = n?.id || newId("annonces"), pub = fd.get("publieLe") || "", prog = pub > todayISO();
       if (fd.get("jusquau") && pub && fd.get("jusquau") < pub) { toast("La date de fin est avant la date de publication"); return false; }
-      save("annonces", id, { titre, texte: fd.get("texte").trim(), clubIds: fd.getAll("club"), jusquau: fd.get("jusquau") || "", important: !!fd.get("important"), publieLe: prog ? pub : "", date: prog ? pub : n?.date && !n.publieLe ? n.date : todayISO(), createdAt: n?.createdAt || Date.now() });
+      save("annonces", id, garderChamps(n, { titre, texte: fd.get("texte").trim(), clubIds: fd.getAll("club"), jusquau: fd.get("jusquau") || "", important: !!fd.get("important"), publieLe: prog ? pub : "", date: prog ? pub : n?.date && !n.publieLe ? n.date : todayISO(), createdAt: n?.createdAt || Date.now() }));
       toast(prog ? `Info programmée : les archers la verront le ${dObj(pub).toLocaleDateString("fr-FR")}` : n ? "Info enregistrée" : "Info publiée pour les archers"); render();
     },
     onDelete: n ? () => { remove("annonces", n.id); toast("Info supprimée"); render(); } : null, deleteLabel: "Supprimer l'info",

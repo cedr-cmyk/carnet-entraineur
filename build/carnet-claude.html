@@ -5759,7 +5759,7 @@ function formAnnonce(n = null) {
       if (reste && !$("#an-t").dataset.ok) { $("#an-t").dataset.ok = 1; toast("Il reste des passages entre [crochets] à compléter. Enregistre à nouveau pour publier quand même."); return false; }
       const id = n?.id || newId("annonces"), pub = fd.get("publieLe") || "", prog = pub > todayISO();
       if (fd.get("jusquau") && pub && fd.get("jusquau") < pub) { toast("La date de fin est avant la date de publication"); return false; }
-      save("annonces", id, { titre, texte: fd.get("texte").trim(), clubIds: fd.getAll("club"), jusquau: fd.get("jusquau") || "", important: !!fd.get("important"), publieLe: prog ? pub : "", date: prog ? pub : n?.date && !n.publieLe ? n.date : todayISO(), createdAt: n?.createdAt || Date.now() });
+      save("annonces", id, garderChamps(n, { titre, texte: fd.get("texte").trim(), clubIds: fd.getAll("club"), jusquau: fd.get("jusquau") || "", important: !!fd.get("important"), publieLe: prog ? pub : "", date: prog ? pub : n?.date && !n.publieLe ? n.date : todayISO(), createdAt: n?.createdAt || Date.now() }));
       toast(prog ? `Info programmée : les archers la verront le ${dObj(pub).toLocaleDateString("fr-FR")}` : n ? "Info enregistrée" : "Info publiée pour les archers"); render();
     },
     onDelete: n ? () => { remove("annonces", n.id); toast("Info supprimée"); render(); } : null, deleteLabel: "Supprimer l'info",
