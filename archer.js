@@ -443,6 +443,228 @@ window.CarnetRun = (() => {
   const enCours = (cle) => { try { return !!localStorage.getItem("carnet-run:" + cle); } catch (e) { return false; } };
   return { FORMATS, est, ouvert, stats, libelle, resume, feuille, saisir, enCours, mmss, etapes, ouVont };
 })();
+// V.1.10 : fléchettes (discipline de test) — cible classique (20 secteurs, doubles, triples, bull 25 et 50), à 2,37 m.
+// Réservé aux archers Testeur (ou Partenaire) à qui l'entraîneur a ouvert la discipline sur la fiche (espace.flechettes).
+// Le tir est rangé avec les autres : t.discipline = "flechettes", t.volees = [["T20", "S5", "M"], …],
+// t.fl = { jeu: "libre" | "501" | "301" | "cricket", nbVolees, visee: "bull" | "t20" | "", doubleSortie, imp: [[[x, y] | null, …], …] }
+// (x, y : point d'impact, 1 = bord extérieur du double ; null = fléchette notée au clavier).
+window.CarnetFlechettes = (() => {
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  const ORDRE = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5];
+  const MM = 170; // rayon extérieur du double, en mm
+  const RB = 6.35, RO = 15.9, T1 = 99, T2 = 107, D1 = 162; // bull 50, bull 25, anneau triple, anneau double (mm)
+  const JEUX = { libre: "Entraînement libre", 501: "501", 301: "301", cricket: "Cricket" };
+  const VISEES = { bull: "le centre (bull)", t20: "le triple 20", "": "" };
+  const CRICKET = [20, 19, 18, 17, 16, 15, 25];
+  const est = (t) => !!(t && t.discipline === "flechettes" && t.fl);
+  const badge = (a) => a?.espace?.badges?.testeur === true || a?.espace?.badges?.partenaire === true;
+  const ouvert = (a) => a?.espace?.flechettes === true && badge(a); // ouvert par l'entraîneur, et seulement aux testeurs
+  // valeur d'une fléchette : "S20", "D20", "T20", "25", "50", "M"
+  const val = (c) => { if (!c || c === "M") return 0; if (c === "25") return 25; if (c === "50") return 50; const n = Number(c.slice(1)) || 0; return c[0] === "T" ? 3 * n : c[0] === "D" ? 2 * n : n; };
+  const estDouble = (c) => c === "50" || (c || "")[0] === "D";
+  const lib = (c) => (c === "M" ? "—" : c === "50" ? "Bull" : c === "25" ? "25" : c[0] === "S" ? c.slice(1) : c);
+  const kcls = (c) => (!c || c === "M" ? "k-miss" : c === "50" || c[0] === "T" ? "k-gold" : c[0] === "D" || c === "25" ? "k-red" : "k-black");
+  // point (x, y) normalisé → fléchette
+  function code(x, y) {
+    const r = Math.hypot(x, y) * MM; if (r <= RB) return "50"; if (r <= RO) return "25"; if (r > MM) return "M";
+    const th = (Math.atan2(x, -y) * 180) / Math.PI, n = ORDRE[Math.floor((((th + 360) % 360) + 9) % 360 / 18)];
+    return (r >= T1 && r <= T2 ? "T" : r >= D1 ? "D" : "S") + n;
+  }
+  // ---------- dessin de la cible ----------
+  const C = 250, K = 200 / MM; // centre et échelle du SVG (le double extérieur fait 200 de rayon)
+  const pt = (r, a) => [C + r * K * Math.sin((a * Math.PI) / 180), C - r * K * Math.cos((a * Math.PI) / 180)];
+  const secteur = (r1, r2, a1, a2, fill) => {
+    const [x1, y1] = pt(r2, a1), [x2, y2] = pt(r2, a2), [x3, y3] = pt(r1, a2), [x4, y4] = pt(r1, a1);
+    return `<path d="M${x1.toFixed(1)} ${y1.toFixed(1)}A${(r2 * K).toFixed(1)} ${(r2 * K).toFixed(1)} 0 0 1 ${x2.toFixed(1)} ${y2.toFixed(1)}L${x3.toFixed(1)} ${y3.toFixed(1)}A${(r1 * K).toFixed(1)} ${(r1 * K).toFixed(1)} 0 0 0 ${x4.toFixed(1)} ${y4.toFixed(1)}Z" fill="${fill}" stroke="#9CA3AF" stroke-width=".6"/>`;
+  };
+  let FOND = "";
+  function fond() {
+    if (FOND) return FOND;
+    let s = `<circle cx="${C}" cy="${C}" r="248" fill="#111827"/>`;
+    ORDRE.forEach((n, i) => {
+      const a1 = i * 18 - 9, a2 = a1 + 18, pair = i % 2 === 0, simple = pair ? "#1F2937" : "#F3E9D2", fort = pair ? "#DC2626" : "#16A34A";
+      s += secteur(RO, T1, a1, a2, simple) + secteur(T1, T2, a1, a2, fort) + secteur(T2, D1, a1, a2, simple) + secteur(D1, MM, a1, a2, fort);
+      const [tx, ty] = pt(MM + 21, i * 18);
+      s += `<text x="${tx.toFixed(1)}" y="${(ty + 7).toFixed(1)}" text-anchor="middle" font-size="20" font-weight="700" fill="#F9FAFB" font-family="system-ui,sans-serif">${n}</text>`;
+    });
+    s += `<circle cx="${C}" cy="${C}" r="${(RO * K).toFixed(1)}" fill="#16A34A" stroke="#9CA3AF" stroke-width=".6"/><circle cx="${C}" cy="${C}" r="${(RB * K).toFixed(1)}" fill="#DC2626" stroke="#9CA3AF" stroke-width=".6"/>`;
+    return (FOND = s);
+  }
+  // o : { attr, zoom: [cx, cy], moyenne, taille, dernier, petit }
+  function cibleSvg(imps, o = {}) {
+    const l = (imps || []).filter(Boolean), z = o.zoom, vb = z ? `${(z[0] - 80).toFixed(1)} ${(z[1] - 80).toFixed(1)} 160 160` : "0 0 500 500", rr = (o.petit ? 5 : 8) * (z ? 0.4 : 1);
+    const pts = l.map(([x, y], k) => `<circle cx="${(C + x * 200).toFixed(1)}" cy="${(C + y * 200).toFixed(1)}" r="${rr}" fill="${o.dernier && k === l.length - 1 ? "#FACC15" : "#06B6D4"}" stroke="#0B0F19" stroke-width="${z ? 0.8 : 2}"/>`).join("");
+    let moy = "";
+    if (o.moyenne && l.length >= 2) {
+      const [mx, my] = l.reduce((a, [x, y]) => [a[0] + x, a[1] + y], [0, 0]).map((v) => v / l.length), cx = C + mx * 200, cy = C + my * 200, d = disp(l) * 200;
+      moy = `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${Math.max(4, d).toFixed(1)}" fill="none" stroke="#FACC15" stroke-width="3" stroke-dasharray="8 6"/><path d="M${cx - 10} ${cy}h20M${cx} ${cy - 10}v20" stroke="#FACC15" stroke-width="4"/>`;
+    }
+    return `<svg viewBox="${vb}" class="fl-cible" ${o.attr || ""} style="width:min(100%,${o.taille || 380}px);height:auto;display:block;margin:0 auto;touch-action:manipulation;${o.attr ? "cursor:crosshair" : ""}" role="img" aria-label="Cible de fléchettes">${fond()}${moy}${pts}</svg>`;
+  }
+  // dispersion : distance moyenne au centre du groupement (normalisée)
+  function disp(l) {
+    if (l.length < 2) return 0;
+    const [mx, my] = l.reduce((a, [x, y]) => [a[0] + x, a[1] + y], [0, 0]).map((v) => v / l.length);
+    return l.reduce((s, [x, y]) => s + Math.hypot(x - mx, y - my), 0) / l.length;
+  }
+  const cm = (v) => ((v * MM) / 10).toFixed(1).replace(".", ",");
+  // ---------- calcul des parties ----------
+  function stats(t) {
+    const f = t.fl || {}, vs = t.volees || [], darts = vs.flat(), n = darts.length;
+    const r = { n, volees: vs.filter((v) => v.length).length, total: darts.reduce((s, c) => s + val(c), 0), lignes: [], fini: false };
+    if (f.jeu === "501" || f.jeu === "301") {
+      let reste = Number(f.jeu), marque = 0;
+      vs.forEach((v) => {
+        let cur = reste, bust = false, sortie = false;
+        for (const c of v) { const nv = cur - val(c); if (nv < 0 || (f.doubleSortie && nv === 1) || (nv === 0 && f.doubleSortie && !estDouble(c))) { bust = true; break; } cur = nv; if (nv === 0) { sortie = true; break; } }
+        const pts = bust ? 0 : reste - cur; marque += pts; reste = bust ? reste : cur;
+        r.lignes.push({ pts, bust, reste, sortie });
+      });
+      Object.assign(r, { reste, fini: reste === 0, marque, moy3: n ? (marque / n) * 3 : 0 });
+    } else if (f.jeu === "cricket") {
+      const m = Object.fromEntries(CRICKET.map((k) => [k, 0])); let marques = 0;
+      vs.forEach((v) => {
+        let mv = 0;
+        v.forEach((c) => { const k = c === "50" || c === "25" ? 25 : Number(String(c).slice(1)); if (!(k in m) || c === "M") return; const q = c === "50" ? 2 : c === "25" ? 1 : c[0] === "T" ? 3 : c[0] === "D" ? 2 : 1, u = Math.min(q, 3 - m[k]); m[k] += u; mv += u; });
+        marques += mv; r.lignes.push({ pts: mv, fermes: CRICKET.filter((k) => m[k] >= 3).length });
+      });
+      Object.assign(r, { marques: m, fermes: CRICKET.filter((k) => m[k] >= 3).length, fini: CRICKET.every((k) => m[k] >= 3), mpr: r.volees ? marques / r.volees : 0 });
+    } else {
+      vs.forEach((v) => r.lignes.push({ pts: v.reduce((s, c) => s + val(c), 0) }));
+      Object.assign(r, { fini: r.volees >= (Number(f.nbVolees) || 10) && vs.slice(0, Number(f.nbVolees) || 10).every((v) => v.length >= 3), moy3: n ? (r.total / n) * 3 : 0 });
+    }
+    return r;
+  }
+  // la volée en cours est-elle close (3 fléchettes, ou bust / sortie en 501, ou cricket fermé) ?
+  function voleeClose(t, i) {
+    const v = t.volees[i] || []; if (v.length >= 3) return true;
+    const l = stats({ ...t, volees: t.volees.slice(0, i + 1) }).lignes[i]; return !!(l && (l.bust || l.sortie)) || (t.fl.jeu === "cricket" && stats({ ...t, volees: t.volees.slice(0, i + 1) }).fini);
+  }
+  const f1 = (x) => (Math.round(x * 10) / 10).toString().replace(".", ",");
+  const libelle = (t) => `Fléchettes · ${JEUX[t.fl?.jeu] || "Partie"}${t.fl?.jeu === "libre" ? ` · ${t.fl.nbVolees || 10} volées` : ""}${(t.fl?.jeu === "501" || t.fl?.jeu === "301") ? (t.fl.doubleSortie ? " · sortie double" : " · sortie simple") : ""}`;
+  function resume(t) {
+    const s = stats(t), j = t.fl?.jeu;
+    if (j === "501" || j === "301") return s.fini ? `fini en ${s.n} fléchettes · ${f1(s.moy3)} de moyenne par volée` : `reste ${s.reste} · ${s.n} fléchettes · ${f1(s.moy3)} par volée`;
+    if (j === "cricket") return s.fini ? `fermé en ${s.volees} volées · ${f1(s.mpr)} marques par volée` : `${s.fermes}/7 fermés · ${s.volees} volées · ${f1(s.mpr)} marques par volée`;
+    return `${s.total} pts · ${s.volees} volée${s.volees > 1 ? "s" : ""} · ${f1(s.moy3)} par volée`;
+  }
+  function feuille(t, o = {}) {
+    const s = stats(t), j = t.fl?.jeu, x01 = j === "501" || j === "301";
+    const col = x01 ? "Reste" : j === "cricket" ? "Marques" : "Points";
+    const rows = (t.volees || []).map((v, i) => {
+      const l = s.lignes[i] || {}, droite = x01 ? (l.bust ? `<span style="color:var(--danger)">Trop</span> · ${l.reste}` : l.reste) : j === "cricket" ? `${l.pts} · ${l.fermes}/7` : l.pts;
+      return `<tr${o.clic ? ` data-fv="${i}" class="sc-click"` : ""}${o.courante === i ? ' style="outline:2px solid var(--accent)"' : ""}><th>${i + 1}</th>${[0, 1, 2].map((k) => `<td>${v[k] != null ? esc(lib(v[k])) : ""}</td>`).join("")}<td><b>${droite}</b></td></tr>`;
+    }).join("");
+    return rows ? `<div class="scroll"><table class="vol cp-feuille"><thead><tr><th>Volée</th><th>1</th><th>2</th><th>3</th><th>${col}</th></tr></thead><tbody>${rows}</tbody></table></div>` : "";
+  }
+  // où vont les fléchettes : groupement, taille en cm, décalage par rapport au point visé (entraînement libre)
+  function ouVont(t) {
+    const imps = (t.fl?.imp || []).flat().filter(Boolean); if (!imps.length) return "";
+    const vis = t.fl?.jeu === "libre" ? t.fl.visee || "" : "", ref = vis === "t20" ? [0, -((T1 + T2) / 2) / MM] : [0, 0];
+    const tc = vis && window.CarnetCampagne ? window.CarnetCampagne.tendance(imps.map(([x, y]) => [(x - ref[0]) * 3, (y - ref[1]) * 3])) : "";
+    return `<div class="card" style="gap:8px"><b>Où vont les fléchettes</b>${cibleSvg(imps, { petit: true, moyenne: true, taille: 300 })}<span class="tirline">${imps.length} fléchette${imps.length > 1 ? "s" : ""} placée${imps.length > 1 ? "s" : ""}.${imps.length >= 2 ? ` Groupement : ${cm(disp(imps))} cm en moyenne autour de son centre (cercle jaune).` : ""}${vis ? ` Visée : ${VISEES[vis]}. ${tc}` : ""}</span></div>`;
+  }
+  // ---------- saisie ----------
+  // o : { tir, cle, titre, impacts (false : clavier seul), surFermer } ; fini(t) reçoit la partie
+  function saisir(o, fini) {
+    const el = document.querySelector("#sheet"), LSK = o.cle ? "carnet-flechettes:" + o.cle : null;
+    const lire = () => { try { return LSK ? JSON.parse(localStorage.getItem(LSK) || "null") : null; } catch (e) { return null; } };
+    const garder = () => { try { if (LSK) localStorage.setItem(LSK, JSON.stringify(t)); } catch (e) { /* plein ou privé */ } };
+    const oublier = () => { try { if (LSK) localStorage.removeItem(LSK); } catch (e) { /* rien */ } };
+    let t = o.tir ? JSON.parse(JSON.stringify(o.tir)) : lire();
+    let i = 0, vueFeuille = false, zoom = null, mult = "S", ferme = false;
+    const derniere = () => { const k = (t.volees || []).findIndex((v, j) => !voleeClose(t, j)); return k >= 0 ? k : Math.max(0, t.volees.length - 1); };
+    if (est(t)) i = derniere();
+    const fermer = () => { ferme = true; el.innerHTML = ""; };
+    function reglage() {
+      el.innerHTML = `<div class="sheet-bg" data-close><form class="sheet" id="fl-set"><h3>${esc(o.titre || "Fléchettes")}</h3>
+        <div class="f">Partie<div class="radio">${Object.entries(JEUX).map(([k, l]) => `<label><input type="radio" name="jeu" value="${k}" ${k === "libre" ? "checked" : ""}> ${l}</label>`).join("")}</div>
+          <span class="tirline">501 et 301 : tu pars de 501 (ou 301) et tu descends à 0. Cricket : ferme le 15 au 20 et le bull, 3 marques chacun (double = 2, triple = 3).</span></div>
+        <div id="fl-libre"><div class="f">Nombre de volées (3 fléchettes)<div class="radio">${[5, 10, 20].map((n) => `<label><input type="radio" name="nb" value="${n}" ${n === 10 ? "checked" : ""}> ${n}</label>`).join("")}</div></div>
+          <div class="f">Ce que tu vises<div class="radio"><label><input type="radio" name="visee" value="bull" checked> Le centre</label><label><input type="radio" name="visee" value="t20"> Le triple 20</label><label><input type="radio" name="visee" value=""> Libre</label></div>
+          <span class="tirline">L'appli te dira vers où part ton groupement par rapport à ce point.</span></div></div>
+        <label class="f" id="fl-dbl" hidden><span><input type="checkbox" name="dbl" checked> Finir sur un double (ou le bull)</span></label>
+        <div class="acts"><button type="button" class="btn" data-close>Annuler</button><button class="btn primary">Commencer</button></div></form></div>`;
+      el.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", (ev) => { if (ev.target === b) fermer(); }));
+      const f = el.querySelector("#fl-set");
+      f.addEventListener("change", () => { const j = f.jeu.value; el.querySelector("#fl-libre").hidden = j !== "libre"; el.querySelector("#fl-dbl").hidden = !(j === "501" || j === "301"); });
+      f.addEventListener("submit", (ev) => {
+        ev.preventDefault(); const j = f.jeu.value;
+        t = { id: o.id || "f" + Date.now().toString(36), type: "compte", discipline: "flechettes", distance: "2.37", blason: "Fléchettes", volees: [[]],
+          fl: { jeu: j, nbVolees: j === "libre" ? Number(f.nb.value) : null, visee: j === "libre" ? f.visee.value : "", doubleSortie: (j === "501" || j === "301") && f.dbl.checked, imp: [[]] } };
+        i = 0; garder(); jeu();
+      });
+    }
+    function poser(c, xy) {
+      const v = t.volees[i] || (t.volees[i] = []), im = t.fl.imp[i] || (t.fl.imp[i] = []);
+      if (voleeClose(t, i) || stats(t).fini) return;
+      im[v.length] = xy; v.push(c); zoom = null; garder();
+      const s = stats(t);
+      if (voleeClose(t, i) && !s.fini && !(t.fl.jeu === "libre" && i + 1 >= (t.fl.nbVolees || 10))) {
+        jeu(); setTimeout(() => { if (!ferme && voleeClose(t, i) && t.volees[i] === v) { i++; t.volees[i] = t.volees[i] || []; t.fl.imp[i] = t.fl.imp[i] || []; garder(); jeu(); } }, 600); return;
+      }
+      jeu();
+    }
+    function jeu() {
+      const v = t.volees[i] || (t.volees[i] = []), im = t.fl.imp[i] || (t.fl.imp[i] = []), s = stats(t), j = t.fl.jeu, x01 = j === "501" || j === "301";
+      const l = s.lignes[i] || {}, clos = voleeClose(t, i) || s.fini, surCible = o.impacts !== false && t.fl.surCible !== false;
+      const tete = x01 ? `<b>${s.reste}</b><span>reste · ${f1(s.moy3)} par volée${l.bust ? ` · <b style="color:var(--danger)">trop : volée annulée</b>` : ""}</span>`
+        : j === "cricket" ? `<b>${s.fermes}/7</b><span>fermés · ${f1(s.mpr)} marques par volée</span>`
+        : `<b>${s.total}</b><span>pts · ${f1(s.moy3)} par volée</span>`;
+      const cri = j === "cricket" ? `<div class="chips" style="justify-content:center">${CRICKET.map((k) => `<span class="chip" aria-pressed="${s.marques[k] >= 3}">${k === 25 ? "Bull" : k} ${"✕".repeat(Math.min(3, s.marques[k])) || "·"}</span>`).join("")}</div>` : "";
+      el.innerHTML = `<div class="sheet-bg"><div class="sheet fl-sheet" role="dialog" aria-label="Fléchettes">
+        <div class="bar"><b style="font-size:1.2rem">Volée ${i + 1}${j === "libre" ? " / " + (t.fl.nbVolees || 10) : ""}</b><span class="grow"></span><span class="tirline">${esc(libelle(t))}</span></div>
+        <div class="score">${tete}</div>${cri}
+        ${s.fini ? `<p class="notice">🎉 ${j === "libre" ? "Toutes les volées sont tirées." : j === "cricket" ? "Tout est fermé !" : "Partie finie !"} ${esc(resume(t))}</p>` : ""}
+        ${vueFeuille ? feuille(t, { clic: true, courante: i }) + `<span class="tirline">Touche une volée pour y revenir.</span>` : `
+        ${o.impacts !== false ? `<div class="seg-mode" role="group" aria-label="Façon de noter"><button type="button" data-fmode="cible" aria-pressed="${surCible}">Sur la cible</button><button type="button" data-fmode="touches" aria-pressed="${!surCible}">Touches</button></div>` : ""}
+        ${surCible ? `${cibleSvg(im, { attr: "data-fcible", zoom, dernier: true })}<span class="tirline">${zoom ? "Touche l'endroit exact de la fléchette." : "Touche la cible pour zoomer, puis place ta fléchette. En dehors du double = manquée."}</span>${zoom ? `<button type="button" class="btn" data-fdezoom>Dézoomer</button>` : ""}` : `
+          <div class="seg-mode" role="group" aria-label="Simple, double ou triple">${[["S", "Simple"], ["D", "Double"], ["T", "Triple"]].map(([k, lb]) => `<button type="button" data-fm="${k}" aria-pressed="${mult === k}">${lb}</button>`).join("")}</div>
+          <div class="pad" style="grid-template-columns:repeat(5,minmax(0,1fr))">${[...Array(20)].map((_, k) => `<button type="button" class="key k-black" data-fk="${mult}${k + 1}" ${clos ? "disabled" : ""}>${k + 1}</button>`).join("")}
+            <button type="button" class="key k-red" data-fk="25" ${clos ? "disabled" : ""}>25</button><button type="button" class="key k-gold" data-fk="50" ${clos ? "disabled" : ""} style="grid-column:span 2">Bull 50</button><button type="button" class="key k-miss" data-fk="M" ${clos ? "disabled" : ""} style="grid-column:span 2">Manquée</button></div>`}
+        <div class="cp-fl" style="display:flex;gap:8px;justify-content:center">${[0, 1, 2].map((k) => `<span class="key ${v[k] !== undefined ? kcls(v[k]) : "k-miss"}" style="display:grid;place-items:center;width:64px;min-height:56px">${v[k] !== undefined ? esc(lib(v[k])) : "·"}</span>`).join("")}<span class="key" style="display:grid;place-items:center;min-width:64px;min-height:56px">${x01 ? (l.bust ? "0" : l.pts || 0) : j === "cricket" ? (l.pts || 0) + " m" : v.reduce((a, c) => a + val(c), 0)}</span></div>`}
+        <div style="display:grid;grid-template-columns:auto 1fr 1fr auto;gap:8px"><button type="button" class="btn" data-fnav="-1" ${i ? "" : "disabled"} aria-label="Volée précédente">‹</button><button type="button" class="btn" data-fundo ${v.length || i ? "" : "disabled"}>↶ Annuler</button>
+          <button type="button" class="btn" data-ffeuille>${vueFeuille ? "Saisie" : "Feuille de marque"}</button><button type="button" class="btn" data-fnav="1" ${i < t.volees.length - 1 ? "" : "disabled"} aria-label="Volée suivante">›</button></div>
+        <div class="acts"><button type="button" class="btn danger left" data-fabandon>${o.tir ? "Annuler les modifications" : "Abandonner"}</button>${o.cle ? `<button type="button" class="btn" data-fquit>Plus tard</button>` : ""}<button type="button" class="btn primary" data-ffin ${s.n ? "" : "disabled"}>${s.fini ? "Enregistrer la partie" : "Terminer ici"}</button></div>
+        <span class="tirline">« Terminer ici » enregistre ce qui est déjà tiré. ${o.cle ? "« Plus tard » garde la partie sur cet appareil. " : ""}« ${o.tir ? "Annuler les modifications" : "Abandonner"} » ${o.tir ? "ferme sans rien changer" : "efface la partie"}.</span></div></div>`;
+      el.querySelector("[data-fcible]")?.addEventListener("click", (ev) => {
+        if (clos) return; const sv = ev.currentTarget, p = sv.createSVGPoint(); p.x = ev.clientX; p.y = ev.clientY;
+        const q = p.matrixTransform(sv.getScreenCTM().inverse());
+        if (!zoom) { zoom = [Math.min(420, Math.max(80, q.x)), Math.min(420, Math.max(80, q.y))]; return jeu(); }
+        const x = Math.round(((q.x - C) / 200) * 1000) / 1000, y = Math.round(((q.y - C) / 200) * 1000) / 1000;
+        poser(code(x, y), [x, y]);
+      });
+      el.querySelector(".fl-sheet").addEventListener("click", (ev) => {
+        const b = ev.target.closest("button,[data-fv]"); if (!b) return;
+        if (b.dataset.fmode) { t.fl.surCible = b.dataset.fmode === "cible"; zoom = null; garder(); return jeu(); }
+        if (b.hasAttribute("data-fdezoom")) { zoom = null; return jeu(); }
+        if (b.dataset.fm) { mult = b.dataset.fm; return jeu(); }
+        if (b.dataset.fk) { let c = b.dataset.fk; if (c === "D25" || c === "T25") c = "50"; return poser(c, null); }
+        if (b.dataset.fv != null) { i = Number(b.dataset.fv); vueFeuille = false; return jeu(); }
+        if (b.hasAttribute("data-fundo")) {
+          zoom = null;
+          if (!v.length && i) { t.volees.splice(i, 1); t.fl.imp.splice(i, 1); i--; }
+          const vv = t.volees[i], ii = t.fl.imp[i] || []; if (vv.length) { vv.pop(); ii.length = vv.length; }
+          garder(); return jeu();
+        }
+        if (b.dataset.fnav) { i = Math.min(t.volees.length - 1, Math.max(0, i + Number(b.dataset.fnav))); zoom = null; return jeu(); }
+        if (b.hasAttribute("data-ffeuille")) { vueFeuille = !vueFeuille; return jeu(); }
+        if (b.hasAttribute("data-fabandon")) {
+          if (!b.dataset.sur) { b.dataset.sur = "1"; b.textContent = o.tir ? "Sûr ? Rien ne sera changé" : "Sûr ? La partie sera effacée"; setTimeout(() => { if (b.isConnected) { delete b.dataset.sur; b.textContent = o.tir ? "Annuler les modifications" : "Abandonner"; } }, 4000); return; }
+          oublier(); fermer(); if (o.surFermer) o.surFermer(); return;
+        }
+        if (b.hasAttribute("data-fquit")) { garder(); fermer(); if (o.surFermer) o.surFermer(); return; }
+        if (b.hasAttribute("data-ffin")) {
+          while (t.volees.length && !t.volees[t.volees.length - 1].length) { t.volees.pop(); t.fl.imp.length = Math.min(t.fl.imp.length, t.volees.length); }
+          const r = JSON.parse(JSON.stringify(t)); oublier(); fermer(); fini(r);
+        }
+      });
+    }
+    if (est(t)) jeu(); else reglage();
+  }
+  const enCours = (cle) => { try { return !!localStorage.getItem("carnet-flechettes:" + cle); } catch (e) { return false; } };
+  return { est, ouvert, badge, code, val, stats, resume, libelle, feuille, ouVont, cibleSvg, saisir, enCours, JEUX };
+})();
 window.CarnetArcherUI = (API, opts = {}) => {
   const API0 = API;
   const PREVIEW = !!opts.preview && !opts.testWrite, TESTW = !!opts.testWrite, BLOB = window.CARNET_BLOB_BASE || "/_blob/";
@@ -745,7 +967,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     const ent = St.data.entrainements, prenom = St.data.archer?.prenom || "";
     const tousMots = motsListe(), mots = tousMots.filter((x) => !x.archive), motsArch = tousMots.filter((x) => x.archive);
     const nouv = nouveautes();
-    const m = M(), q = [TC() ? `<button class="btn primary ar-big" data-act="tc-new">${tirEnCours() ? "🎯 Reprendre mon tir en cours" : "🎯 Nouveau tir compté"}</button>` : "", CAMP() ? `<button class="btn ar-big" data-act="cp-new">${window.CarnetCampagne?.enCours(cpCle()) ? "⛰ Reprendre mon parcours campagne" : "⛰ Parcours campagne"}</button>` : "", RUN() ? `<button class="btn ar-big" data-act="run-new">${window.CarnetRun.enCours(runCle()) ? "🏃 Reprendre mon run-archery" : "🏃 Run-archery"}</button>` : "", window.CarnetChrono && m.has("chrono") ? `<button class="btn ar-big" data-act="chrono">⏱ Chrono</button>` : ""].filter(Boolean);
+    const m = M(), q = [TC() ? `<button class="btn primary ar-big" data-act="tc-new">${tirEnCours() ? "🎯 Reprendre mon tir en cours" : "🎯 Nouveau tir compté"}</button>` : "", CAMP() ? `<button class="btn ar-big" data-act="cp-new">${window.CarnetCampagne?.enCours(cpCle()) ? "⛰ Reprendre mon parcours campagne" : "⛰ Parcours campagne"}</button>` : "", RUN() ? `<button class="btn ar-big" data-act="run-new">${window.CarnetRun.enCours(runCle()) ? "🏃 Reprendre mon run-archery" : "🏃 Run-archery"}</button>` : "", FLE() ? `<button class="btn ar-big" data-act="fl-new">${window.CarnetFlechettes.enCours(flCle()) ? "🎯 Reprendre ma partie de fléchettes" : "🎯 Fléchettes"}</button>` : "", window.CarnetChrono && m.has("chrono") ? `<button class="btn ar-big" data-act="chrono">⏱ Chrono</button>` : ""].filter(Boolean);
     const RE = St.data.reglagesEspace || {}, fk = window.CarnetFete ? window.CarnetFete.jour(RE.fetes) : "";
     let h = fk ? `<div class="ar-fete">${window.CarnetFete.banniere(fk, RE.fetes, BLOB, RE.fetesMessage !== false)}</div>` : "";
     h += q.length ? `<div class="ar-quick${q.length === 1 ? " one" : ""}">${q.join("")}</div>` : "";
@@ -837,7 +1059,8 @@ window.CarnetArcherUI = (API, opts = {}) => {
       ${li("Date", d.date ? dObj(d.date).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : "")}
       ${li("Flèches", fl.map(([l, v]) => `${l} ${v}`).join(" · "))}${li("Tir compté", sc != null ? `${sc} pts${d.tcDistance ? ` à ${d.tcDistance} m` : ""}` : "")}${li("Score du concours", sp != null && d.concoursId ? `${sp} pts` : "")}
       ${li("Objectif atteint", d.atteint === "O" ? "Oui" : d.atteint === "N" ? "Non" : "")}${li("Ressenti", num(d.note) != null ? `${d.note} / 10` : "")}${li("Émotion", d.emotion)}${li("Mes commentaires", d.commentaire)}
-      ${window.CarnetRun.est(d.tcTir) ? `<div class="ar-pts-big">${window.CarnetRun.mmss(window.CarnetRun.stats(d.tcTir).temps)}<span>${esc(window.CarnetRun.resume(d.tcTir))}</span></div>` + window.CarnetRun.feuille(d.tcTir) + window.CarnetRun.ouVont(d.tcTir) : window.CarnetCampagne.est(d.tcTir) ? window.CarnetCampagne.feuille(d.tcTir) + window.CarnetCampagne.ouVont(d.tcTir) : d.tcTir && window.CarnetCible?.carte ? (() => { try { return window.CarnetCible.carte(d.tcTir); } catch (err) { return ""; } })() : ""}
+      ${window.CarnetFlechettes.est(d.tcTir) ? `<div class="ar-pts-big" style="font-size:1.3rem">${esc(window.CarnetFlechettes.libelle(d.tcTir))}<span>${esc(window.CarnetFlechettes.resume(d.tcTir))}</span></div>` + window.CarnetFlechettes.feuille(d.tcTir) + window.CarnetFlechettes.ouVont(d.tcTir) : ""}
+      ${window.CarnetFlechettes.est(d.tcTir) ? "" : window.CarnetRun.est(d.tcTir) ? `<div class="ar-pts-big">${window.CarnetRun.mmss(window.CarnetRun.stats(d.tcTir).temps)}<span>${esc(window.CarnetRun.resume(d.tcTir))}</span></div>` + window.CarnetRun.feuille(d.tcTir) + window.CarnetRun.ouVont(d.tcTir) : window.CarnetCampagne.est(d.tcTir) ? window.CarnetCampagne.feuille(d.tcTir) + window.CarnetCampagne.ouVont(d.tcTir) : d.tcTir && window.CarnetCible?.carte ? (() => { try { return window.CarnetCible.carte(d.tcTir); } catch (err) { return ""; } })() : ""}
       ${d.commentaireCoach ? `<div class="coach-mot"><b>💬 Le mot de ton entraîneur</b><p style="margin:4px 0 0;color:var(--ink)">${esc(d.commentaireCoach)}</p></div>` : ""}
       ${fl.length || sc != null || d.note || d.commentaire || d.emotion ? "" : `<p class="tirline">Rien n'a été noté pour cette séance.</p>`}
       <div class="acts"><button type="button" class="btn primary" data-close>Fermer</button></div></div></div>`;
@@ -1029,6 +1252,25 @@ window.CarnetArcherUI = (API, opts = {}) => {
       St.saison = saisonOf(date); load();
     });
   }
+  // Fléchettes (V.1.10, test) : réservé aux testeurs à qui l'entraîneur a ouvert la discipline ; ne compte pas dans le volume de flèches ni dans les tirs comptés
+  const FLE = () => !!window.CarnetFlechettes?.ouvert(St.data?.archer);
+  const flCle = () => "ar:" + (who()?.archer_id || "");
+  const flData = (t) => ({ tcDistance: "2.37", tcBlason: "Fléchettes", compte: "", scoreCompte: "", tcTir: t });
+  function flFini(t, res) {
+    const F = window.CarnetFlechettes, el = $("#sheet");
+    el.innerHTML = `<div class="sheet-bg" data-close><div class="sheet" role="dialog" aria-label="Partie enregistrée"><h3>Partie de fléchettes enregistrée dans ton carnet</h3>${res?.enAttente ? `<p class="notice">📴 Pas de réseau : ta partie est gardée sur ce téléphone et partira toute seule dès que le réseau revient.</p>` : ""}
+      <div class="ar-pts-big" style="font-size:1.3rem">${esc(F.libelle(t))}<span>${esc(F.resume(t))}</span></div>${F.feuille(t)}${F.ouVont(t)}
+      <div class="acts"><button type="button" class="btn primary" data-close>Fermer</button></div></div></div>`;
+    el.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", (ev) => { if (ev.target === b) el.innerHTML = ""; }));
+  }
+  function tirFlechettes() {
+    window.CarnetFlechettes.saisir({ cle: flCle(), titre: "Fléchettes", surFermer: render }, async (t) => {
+      if (PREVIEW) { toast("Aperçu : l'archer enregistrera cette partie, pas toi"); return; }
+      const date = today(), data = { date, saison: `${saisonOf(date) - 1}-${saisonOf(date)}`, objectif: "Fléchettes", ...flData(t) };
+      let res; try { res = await API.ecrire(who(), "a_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), data); } catch (err) { toast("Enregistrement impossible : " + err.message); return; }
+      flFini(t, res); St.saison = saisonOf(date); load();
+    });
+  }
   function tirDirect() { if (!M().has("impacts")) return tirSimple(); return tirCible(); }
   // Tir compté sans cible : distance, blason, flèches et score, puis la moyenne et la comparaison avec le tir précédent
   function tirSimple() {
@@ -1119,9 +1361,10 @@ window.CarnetArcherUI = (API, opts = {}) => {
           <label class="f" style="font-weight:500">Flèches<input type="number" inputmode="numeric" min="0" name="compte" id="ar-tcn" value="${esc(d.compte)}" placeholder="${d.auto?.compte ? "+" + d.auto.compte : "ex. 30"}"></label>
           <label class="f" style="font-weight:500">Score<input type="number" inputmode="numeric" min="0" name="scoreCompte" id="ar-tcs" value="${esc(d.scoreCompte)}" placeholder="${esc(d.auto?.scoreCompte ?? "")}"></label></div>
         <span class="tirline" id="ar-tcm"></span>
+        ${window.CarnetFlechettes.est(d.tcTir) ? `<button type="button" class="btn primary" id="ar-fl">🎯 Voir / modifier ma partie de fléchettes</button>${window.CarnetFlechettes.feuille(d.tcTir)}` : ""}
         ${window.CarnetRun.est(d.tcTir) ? `<button type="button" class="btn primary" id="ar-run">🏃 Voir / modifier mon run-archery</button>${window.CarnetRun.feuille(d.tcTir)}` : ""}
-        ${window.CarnetRun.est(d.tcTir) ? "" : window.CarnetCampagne.est(d.tcTir) ? `<button type="button" class="btn primary" id="ar-cp">⛰ Voir / modifier mon parcours campagne</button>${window.CarnetCampagne.feuille(d.tcTir)}` : `${CAMP() ? `<button type="button" class="btn" id="ar-cp">⛰ Noter un parcours campagne</button>` : ""}${RUN() ? `<button type="button" class="btn" id="ar-run">🏃 Noter un run-archery</button>` : ""}`}
-        ${window.CarnetCible && M().has("impacts") && !window.CarnetCampagne.est(d.tcTir) && !window.CarnetRun.est(d.tcTir) ? `<button type="button" class="btn primary" id="ar-cible">🎯 ${tirEnCours(e?.id) ? "Reprendre mon tir en cours" : d.tcTir ? "Voir / modifier mon tir sur la cible" : "Saisir mon tir sur la cible"}</button>` : ""}
+        ${window.CarnetRun.est(d.tcTir) || window.CarnetFlechettes.est(d.tcTir) ? "" : window.CarnetCampagne.est(d.tcTir) ? `<button type="button" class="btn primary" id="ar-cp">⛰ Voir / modifier mon parcours campagne</button>${window.CarnetCampagne.feuille(d.tcTir)}` : `${CAMP() ? `<button type="button" class="btn" id="ar-cp">⛰ Noter un parcours campagne</button>` : ""}${RUN() ? `<button type="button" class="btn" id="ar-run">🏃 Noter un run-archery</button>` : ""}`}
+        ${window.CarnetCible && M().has("impacts") && !window.CarnetCampagne.est(d.tcTir) && !window.CarnetRun.est(d.tcTir) && !window.CarnetFlechettes.est(d.tcTir) ? `<button type="button" class="btn primary" id="ar-cible">🎯 ${tirEnCours(e?.id) ? "Reprendre mon tir en cours" : d.tcTir ? "Voir / modifier mon tir sur la cible" : "Saisir mon tir sur la cible"}</button>` : ""}
         <input type="hidden" name="tcTir" id="ar-tctir" value="${esc(d.tcTir ? JSON.stringify(d.tcTir) : "")}"></div>
       <input type="hidden" name="scoreCompet" value="${esc(d.scoreCompet)}">`}
       <div class="f">Objectif atteint<div class="radio">${[["", "Je ne sais pas"], ["O", "Oui"], ["N", "Non"]].map(([v, l]) => `<label><input type="radio" name="atteint" value="${v}" ${(d.atteint || "") === v ? "checked" : ""}> ${l}</label>`).join("")}</div></div>
@@ -1130,7 +1373,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
       ${hyb ? "</details>" : ""}
       ${d.commentaireCoach ? `<div class="coach-mot"><b>💬 Le mot de ton entraîneur</b><p style="margin:4px 0 0;color:var(--ink)">${esc(d.commentaireCoach)}</p></div>` : ""}
       ${hyb ? "" : `<label class="f">Mes commentaires<textarea name="commentaire">${esc(d.commentaire)}</textarea></label>`}
-      <div class="acts">${e && !e.__new && String(e.id).startsWith("a_") ? `<button type="button" class="btn danger left" id="ar-del">${e.objectif === "Tir compté" ? "Supprimer ce tir" : e.objectif === "Parcours campagne" ? "Supprimer ce parcours" : e.objectif === "Run-archery" ? "Supprimer ce run" : "Supprimer la séance"}</button>` : ""}${e && !e.__new && !e.concoursId && !(String(e.id).startsWith("a_") && e.objectif === "Tir compté") && (num(e.scoreCompte) != null || e.tcTir) ? `<button type="button" class="btn danger left" id="ar-tcdel">Effacer le tir compté</button>` : ""}<button type="button" class="btn" data-close>Annuler</button><button class="btn primary">Enregistrer</button></div></form></div>`;
+      <div class="acts">${e && !e.__new && String(e.id).startsWith("a_") ? `<button type="button" class="btn danger left" id="ar-del">${e.objectif === "Tir compté" ? "Supprimer ce tir" : e.objectif === "Parcours campagne" ? "Supprimer ce parcours" : e.objectif === "Run-archery" ? "Supprimer ce run" : e.objectif === "Fléchettes" ? "Supprimer cette partie" : "Supprimer la séance"}</button>` : ""}${e && !e.__new && !e.concoursId && !(String(e.id).startsWith("a_") && e.objectif === "Tir compté") && (num(e.scoreCompte) != null || e.tcTir) ? `<button type="button" class="btn danger left" id="ar-tcdel">Effacer le tir compté</button>` : ""}<button type="button" class="btn" data-close>Annuler</button><button class="btn primary">Enregistrer</button></div></form></div>`;
     el.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", (ev) => { if (ev.target === b) el.innerHTML = ""; }));
     el.querySelectorAll("[data-humf]").forEach((b) => b.addEventListener("click", () => { $("#ar-note").value = b.dataset.humf; el.querySelectorAll("[data-humf]").forEach((x) => x.setAttribute("aria-pressed", x === b)); }));
     const tcm = () => { const n = Number($("#ar-tcn")?.value), sc = Number($("#ar-tcs")?.value), o = $("#ar-tcm"); if (!o) return; o.textContent = n > 0 && sc > 0 ? `Moyenne : ${(sc / n).toFixed(2).replace(".", ",")} point${sc / n >= 2 ? "s" : ""} par flèche` : ""; };
@@ -1143,6 +1386,11 @@ window.CarnetArcherUI = (API, opts = {}) => {
         const st = window.CarnetCampagne.stats(t);
         formEntry({ ...(e || {}), ...valeurs, tcDistance: "", tcBlason: "Campagne", compte: String(st.n), scoreCompte: String(st.total), tcTir: t, objectif: valeurs.objectif || "Parcours campagne", __new: e?.__new });
       });
+    });
+    $("#ar-fl")?.addEventListener("click", () => {
+      const f = $("#ar-form"); let prev = null; try { prev = f.tcTir.value ? JSON.parse(f.tcTir.value) : null; } catch (err) { prev = null; }
+      const valeurs = Object.fromEntries([...new FormData(f)].map(([k, v]) => [k, v]));
+      window.CarnetFlechettes.saisir({ tir: prev, titre: "Fléchettes" }, (t) => formEntry({ ...(e || {}), ...valeurs, ...flData(t), objectif: valeurs.objectif || "Fléchettes", __new: e?.__new }));
     });
     $("#ar-run")?.addEventListener("click", () => {
       const f = $("#ar-form"); let prev = null; try { prev = f.tcTir.value ? JSON.parse(f.tcTir.value) : null; } catch (err) { prev = null; }
@@ -1241,7 +1489,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
         const ligne = ([k, l, d]) => `<div class="bar" style="align-items:flex-start"><div style="min-width:0;flex:1"><b>${l}</b><span class="tirline" style="display:block">${d}</span></div>
           ${esp[k] === true ? `<span class="tag ar-app">Ouvert</span>` : dm[k]?.statut === "attente" ? `<span class="tag">Demande envoyée</span>` : `<button class="btn" data-demande="${k}">${dm[k]?.statut === "refusee" ? "Redemander" : "Demander l'accès"}</button>`}</div>
           ${dm[k]?.statut === "refusee" && esp[k] !== true ? `<span class="tirline">Ton entraîneur n'a pas ouvert cette discipline pour l'instant.</span>` : ""}`;
-        return `<section class="card"><h3 class="hub-h">Mes disciplines</h3>${[["campagne", "⛰ Parcours campagne", "Noter tes parcours cible par cible, avec ta feuille de marque."], ["run", "🏃 Run-archery", "Chrono de ton run et tes tirs à l'arrivée."]].map(ligne).join("")}
+        return `<section class="card"><h3 class="hub-h">Mes disciplines</h3>${[["campagne", "⛰ Parcours campagne", "Noter tes parcours cible par cible, avec ta feuille de marque."], ["run", "🏃 Run-archery", "Chrono de ton run et tes tirs à l'arrivée."], ...(window.CarnetFlechettes?.badge(a) ? [["flechettes", "🎯 Fléchettes (test)", "Pose tes fléchettes sur la cible : entraînement, 501, 301 ou Cricket, avec ton groupement."]] : [])].map(ligne).join("")}
           <span class="tirline">Ton entraîneur ouvre ces disciplines. Tu peux lui en demander l'accès ici.</span></section>`;
       })() : ""}
       <section class="card"><h3 class="hub-h">Accueil</h3>
@@ -1413,6 +1661,7 @@ window.CarnetArcherUI = (API, opts = {}) => {
     if (t.dataset.act === "tc-new") { tirDirect(); return; }
     if (t.dataset.act === "cp-new") { tirCampagne(); return; }
     if (t.dataset.act === "run-new") { tirRun(); return; }
+    if (t.dataset.act === "fl-new") { tirFlechettes(); return; }
     if (t.dataset.demande) {
       if (PREVIEW) { toast("Aperçu : c'est l'archer qui fait la demande"); return; }
       const k = t.dataset.demande; t.disabled = true;

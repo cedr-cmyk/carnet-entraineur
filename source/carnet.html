@@ -1268,7 +1268,7 @@ function nouveautes(aid) {
 }
 function nouvFicheCard(a) {
   const l = S.nouvFiche?.aid === a.id ? S.nouvFiche.list : []; if (!l.length) return "";
-  const quoi = (e) => RA.est(e.tcTir) ? `Run-archery · ${RA.resume(e.tcTir)}` : CC.est(e.tcTir) ? `Parcours campagne · ${CC.resume(e.tcTir)}`
+  const quoi = (e) => FL.est(e.tcTir) ? `Fléchettes · ${FL.resume(e.tcTir)}` : RA.est(e.tcTir) ? `Run-archery · ${RA.resume(e.tcTir)}` : CC.est(e.tcTir) ? `Parcours campagne · ${CC.resume(e.tcTir)}`
     : e.objectif === "Tir compté" || e.tcTir ? `Tir compté${e.scoreCompte ? " · " + e.scoreCompte + " pts" : ""}${e.compte ? " · " + e.compte + " flèches" : ""}` : `Séance notée${e.objectif ? " · " + e.objectif : ""}${e.compte ? " · " + e.compte + " flèches" : ""}`;
   return `<div class="card" style="border-color:color-mix(in srgb,#DC2626 55%,var(--line));gap:8px"><div class="bar"><b>🔔 Nouveau depuis ta dernière visite</b><span class="grow"></span><button class="btn ghost" data-act="nouv-ok">OK, vu</button></div>
     <span class="tirline">${esc(a.prenom || fullName(a))} a noté ${l.length > 1 ? `ces ${l.length} éléments` : "ceci"} dans son carnet :</span>
@@ -1785,6 +1785,7 @@ const linkId = (sid, aid) => `s_${sid}_${aid}`;
 const saisonOfDate = (d) => { const y = Number(d.slice(0, 4)), m = Number(d.slice(5, 7)); return m >= 9 ? y + 1 : y; };
 const CC = window.CarnetCampagne; // tir en campagne (archer.js, V.1.10)
 const RA = window.CarnetRun; // run-archery (archer.js, V.1.10)
+const FL = window.CarnetFlechettes; // fléchettes, discipline de test (archer.js, V.1.10)
 const TIR_TYPES = [["blason", "Blason (entraînement)"], ["compte", "Tir compté"], ["compet", "Compétition"]];
 const tirType = (t) => t.type || "compte";
 function computeAuto(s, aid) {
@@ -2312,9 +2313,10 @@ function formEntree(e = null) {
       ${e?.seanceId ? `<span class="tirline">Ligne liée à une séance du club : les flèches et scores des feuilles de marque s'ajoutent automatiquement.</span>` : ""}</div>
     <div class="grid2"><label class="f" for="ce-sc">Score tir compté<input type="number" inputmode="numeric" min="0" id="ce-sc" name="scoreCompte" value="${esc(e?.scoreCompte)}" placeholder="${e?.auto?.scoreCompte ?? ""}"></label>
       <label class="f" for="ce-scc">Score compétition<input type="number" inputmode="numeric" min="0" id="ce-scc" name="scoreCompet" value="${esc(e?.scoreCompet)}" placeholder="${e?.auto?.scoreCompet ?? ""}"></label></div>
+    ${FL.est(e?.tcTir) ? `<details class="card" open><summary><b>Fléchettes</b> <span class="tirline">noté par l'archer · ${esc(FL.resume(e.tcTir))}</span></summary>${FL.feuille(e.tcTir)}${FL.ouVont(e.tcTir)}</details>` : ""}
     ${RA.est(e?.tcTir) ? `<details class="card" open><summary><b>Run-archery</b> <span class="tirline">noté par l'archer · ${esc(RA.resume(e.tcTir))}</span></summary>${RA.feuille(e.tcTir)}${RA.ouVont(e.tcTir)}</details>` : ""}
     ${CC.est(e?.tcTir) ? `<details class="card" open><summary><b>Parcours campagne</b> <span class="tirline">noté par l'archer · ${esc(CC.resume(e.tcTir))}</span></summary>${CC.feuille(e.tcTir)}${CC.ouVont(e.tcTir)}</details>` : ""}
-    ${e?.tcTir && !CC.est(e.tcTir) && !RA.est(e.tcTir) && (e.tcTir.volees || []).some((v) => v.length) ? `<details class="card"><summary><b>Tir compté sur la cible</b> <span class="tirline">noté par l'archer · ${esc(e.tcTir.distance || "")} m · ${esc(e.tcTir.blason || "")}</span></summary><div id="ce-tv">${tirViewer(e.tcTir, "all", "data-tv", S.centrees.filter((x) => x.id !== e.id && x.date <= e.date))}</div></details>` : ""}
+    ${e?.tcTir && !CC.est(e.tcTir) && !RA.est(e.tcTir) && !FL.est(e.tcTir) && (e.tcTir.volees || []).some((v) => v.length) ? `<details class="card"><summary><b>Tir compté sur la cible</b> <span class="tirline">noté par l'archer · ${esc(e.tcTir.distance || "")} m · ${esc(e.tcTir.blason || "")}</span></summary><div id="ce-tv">${tirViewer(e.tcTir, "all", "data-tv", S.centrees.filter((x) => x.id !== e.id && x.date <= e.date))}</div></details>` : ""}
     <div class="grid2"><label class="f" for="ce-tcd">Distance du tir compté (m)<input type="number" inputmode="numeric" min="0" id="ce-tcd" name="tcDistance" list="ce-dl" value="${esc(e?.tcDistance)}" placeholder="${esc(e?.auto?.tcDistance ?? "")}"><datalist id="ce-dl">${DISTANCES.map((d) => `<option value="${d}">`).join("")}</datalist></label>
       <label class="f" for="ce-tcb">Blason du tir compté<select id="ce-tcb" name="tcBlason"><option value="">—</option>${blasonOpts(e?.tcBlason || "")}</select></label></div>
     <div class="f">Objectif atteint<div class="radio">${[["", "Non renseigné"], ["O", "Oui"], ["N", "Non"]].map(([v, l]) => `<label><input type="radio" name="atteint" value="${v}" ${(e?.atteint || "") === v ? "checked" : ""}> ${l}</label>`).join("")}</div></div>
@@ -3536,13 +3538,13 @@ function profilOptions(cur, withAuto = true, a = null, court = false) {
   return `${withAuto ? `<option value="auto" ${cur === "auto" ? "selected" : ""}>Automatique${auto}</option>` : ""}${profilsList().map((p) => `<option value="${p.id}" ${cur === p.id ? "selected" : ""}>${esc(p.nom)}</option>`).join("")}${a ? `<option value="perso" ${cur === "perso" ? "selected" : ""}>Personnalisé</option>` : ""}`;
 }
 // V.1.10 : disciplines ouvertes à l'archer (parcours campagne, run-archery) et ses demandes d'accès (script 11)
-const DISCIPLINES = [["campagne", "⛰ Parcours campagne", "Noter ses parcours cible par cible (feuille de marque, piquet, où vont les flèches)"], ["run", "🏃 Run-archery", "Chrono du run et tirs à l'arrivée"]];
+const DISCIPLINES = [["campagne", "⛰ Parcours campagne", "Noter ses parcours cible par cible (feuille de marque, piquet, où vont les flèches)"], ["run", "🏃 Run-archery", "Chrono du run et tirs à l'arrivée"], ["flechettes", "🎯 Fléchettes (test)", "Réservé aux testeurs : placement des fléchettes, entraînement, 501, 301 ou Cricket, groupement"]];
 const demandesDe = (a) => DISCIPLINES.filter(([k]) => a.espace?.demandes?.[k]?.statut === "attente" && a.espace?.[k] !== true);
 function disciplinesHtml(a, dis) {
   const e = a.espace || {};
-  return `<div class="f">Disciplines<div class="esp-mods">${DISCIPLINES.map(([k, l, d]) => `<label class="esp-m${e[k] === true ? " on" : ""}"><input type="checkbox" data-espdisc="${k}" ${e[k] === true ? "checked" : ""} ${dis}><span><b>${l}</b><small>${d}</small></span></label>`).join("")}</div></div>
+  return `<div class="f">Disciplines<div class="esp-mods">${DISCIPLINES.filter(([k]) => k !== "flechettes" || FL.badge(a) || e[k] === true).map(([k, l, d]) => `<label class="esp-m${e[k] === true ? " on" : ""}"><input type="checkbox" data-espdisc="${k}" ${e[k] === true ? "checked" : ""} ${dis}><span><b>${l}</b><small>${d}</small></span></label>`).join("")}</div></div>
     ${demandesDe(a).map(([k, l]) => `<div class="notice bar" style="align-items:center"><span>${esc(a.prenom || fullName(a))} demande l'accès à <b>${l}</b> (le ${esc(fmtDateL(a.espace.demandes[k].date))}).</span><span class="grow"></span>${S.canWrite ? `<button class="btn primary" data-disc-ok="${k}" data-aid="${a.id}">Accepter</button><button class="btn" data-disc-non="${k}" data-aid="${a.id}">Refuser</button>` : ""}</div>`).join("")}
-    <span class="tirline">Ces disciplines ne s'ouvrent qu'aux archers qui les pratiquent (avec le tir compté). L'archer peut en demander l'accès depuis ses paramètres.</span>`;
+    <span class="tirline">Ces disciplines ne s'ouvrent qu'aux archers qui les pratiquent (avec le tir compté). L'archer peut en demander l'accès depuis ses paramètres.${FL.badge(a) ? " Fléchettes : seulement pour les testeurs et partenaires." : ""}</span>`;
 }
 function majDiscipline(aid, k, ouvrir) {
   const a = S.archers.find((x) => x.id === aid); if (!a || !S.canWrite) return;
@@ -4443,12 +4445,19 @@ function tcRecentCard(a) {
     <span class="main"><span class="t">${esc(p.label)}${p.e.tcTir ? " 🎯" : ""}</span><span class="m">${[p.e.saisiParArcher ? "noté par l'archer" : "", p.e.commentaireCoach ? "💬 mot de l'entraîneur" : ""].filter(Boolean).join(" · ")}</span></span>
     <span class="count">${p.score}<small> pts${p.n ? ` · ${f2(p.score / p.n)}/fl.` : ""}</small></span></button>`).join("")}</div>`;
 }
+// V.1.10 : dernières parties de fléchettes (discipline de test), à côté des tirs comptés
+function flRecentCard(a) {
+  const l = (tcCache.aid === a.id ? tcCache.list : []).filter((e) => e.date && FL.est(e.tcTir)).sort((p, q) => q.date.localeCompare(p.date)).slice(0, 5);
+  if (!l.length) return "";
+  return `<h2 class="sec">🎯 Fléchettes</h2><div class="list">${l.map((e) => `<button class="row" data-tcopen="${esc(e.id)}"><span class="date"><span class="d">${dObj(e.date).getDate()}</span><span class="mo">${dObj(e.date).toLocaleDateString("fr-FR", { month: "short" }).replace(".", "")}</span></span>
+    <span class="main"><span class="t">${esc(FL.libelle(e.tcTir).replace("Fléchettes · ", ""))}</span><span class="m">${esc(FL.resume(e.tcTir))}${e.commentaireCoach ? " · 💬 mot de l'entraîneur" : ""}</span></span></button>`).join("")}</div>`;
+}
 function coachTir(id) {
   const e = tcCache.list.find((x) => x.id === id); if (!e) return;
   const others = tcCache.list.filter((x) => x.id !== e.id && x.date <= e.date);
-  sheet(`Tir compté du ${fmtLong(e.date)}`, `
-    <span class="tirline">${esc(tirLab(e))} · ${esc(e.scoreCompte)} pts${e.compte ? ` en ${esc(e.compte)} flèches` : ""}${e.saisiParArcher ? " · noté par l'archer" : ""}</span>
-    ${RA.est(e.tcTir) ? `<span class="tirline">${esc(RA.libelle(e.tcTir))} · ${esc(RA.resume(e.tcTir))}</span>${RA.feuille(e.tcTir)}${RA.ouVont(e.tcTir)}` : CC.est(e.tcTir) ? `<span class="tirline">${esc(CC.libelle(e.tcTir))} · ${esc(CC.resume(e.tcTir))}</span>${CC.feuille(e.tcTir)}${CC.ouVont(e.tcTir)}` : e.tcTir ? `<div id="ct-tv">${tirViewer(e.tcTir, "all", "data-tv", others)}</div>` : ""}
+  sheet(`${FL.est(e.tcTir) ? "Fléchettes" : "Tir compté"} du ${fmtLong(e.date)}`, `
+    ${FL.est(e.tcTir) ? `<span class="tirline">${esc(FL.libelle(e.tcTir))} · ${esc(FL.resume(e.tcTir))}${e.saisiParArcher ? " · noté par l'archer" : ""}</span>${FL.feuille(e.tcTir)}${FL.ouVont(e.tcTir)}` : `<span class="tirline">${esc(tirLab(e))} · ${esc(e.scoreCompte)} pts${e.compte ? ` en ${esc(e.compte)} flèches` : ""}${e.saisiParArcher ? " · noté par l'archer" : ""}</span>`}
+    ${FL.est(e.tcTir) ? "" : RA.est(e.tcTir) ? `<span class="tirline">${esc(RA.libelle(e.tcTir))} · ${esc(RA.resume(e.tcTir))}</span>${RA.feuille(e.tcTir)}${RA.ouVont(e.tcTir)}` : CC.est(e.tcTir) ? `<span class="tirline">${esc(CC.libelle(e.tcTir))} · ${esc(CC.resume(e.tcTir))}</span>${CC.feuille(e.tcTir)}${CC.ouVont(e.tcTir)}` : e.tcTir ? `<div id="ct-tv">${tirViewer(e.tcTir, "all", "data-tv", others)}</div>` : ""}
     ${e.commentaire ? `<div class="f">Ressenti de l'archer<p class="prev" style="color:var(--ink)">${esc(e.commentaire)}</p></div>` : ""}
     <label class="f" for="ct-com">Mot de l'entraîneur (l'archer le lit dans son espace)<textarea id="ct-com" name="commentaireCoach" placeholder="Ex. Beau groupement, garde ce placement d'épaule.">${esc(e.commentaireCoach)}</textarea></label>${motRepHtml(e)}`, {
     onSave(fd) { const v = (fd.get("commentaireCoach") || "").trim(); const chg = v !== (e.commentaireCoach || ""), up = chg ? { commentaireCoach: v, motArchive: false } : { commentaireCoach: v }; Object.assign(e, up); patch("carnetEntrees", e.id, up); toast(v ? "Mot envoyé à l'archer" : "Mot retiré"); render(); },
@@ -4528,8 +4537,8 @@ function viewArcher() {
       const todo = S.attributions.filter((x) => x.archerId === a.id && !x.fait).sort((p, q) => {
         const dp = S.seances.find((y) => y.id === p.seanceId)?.date || "9999", dq = S.seances.find((y) => y.id === q.seanceId)?.date || "9999"; return dp.localeCompare(dq);
       });
-      if (!todo.length) return motsCard(a) + tcRecentCard(a);
-      return motsCard(a) + tcRecentCard(a) + `<h2 class="sec">Exercices à faire</h2><div class="list">${todo.map((x) => {
+      if (!todo.length) return motsCard(a) + tcRecentCard(a) + flRecentCard(a);
+      return motsCard(a) + tcRecentCard(a) + flRecentCard(a) + `<h2 class="sec">Exercices à faire</h2><div class="list">${todo.map((x) => {
         const d = docOf(x.documentId), s = S.seances.find((y) => y.id === x.seanceId);
         return `<div class="row"><span class="main"><span class="t">${d ? `<button class="lnk" data-doc="${d.id}">${esc(d.titre || d.nomFichier)}</button>` : "Fiche supprimée"}</span>
           <span class="m">${s ? `${esc(fmtLong(s.date))} · ${esc(clubName(s.clubId))}` : "Sans séance précise"}${x.remarque ? ` · ${esc(x.remarque.slice(0, 90))}` : ""}</span></span>
