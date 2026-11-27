@@ -283,6 +283,8 @@
   window.carnetAnimMaj = (id, ops) => rpc("anim_coach_maj", { p_id: id, p_ops: ops });
   // V.1.10 (script 24) : comptes créés sur le carnet, pour prévenir l'entraîneur sur son accueil
   window.carnetComptes = () => rpc("comptes_recents");
+  // envoie tout de suite les modifications en attente (avant de demander quelque chose au serveur qui les lit)
+  window.carnetEnvoyer = () => withTimeout(flush(), 10000);
   window.carnetMaintenance = { etat: () => rpc("etat_maintenance"), basculer: (on) => rpc("basculer_maintenance", { p_actif: !!on }) };
   window.carnetAcces = {
     inviter: (archerId) => rpc("creer_invitation", { p_archer: archerId }),

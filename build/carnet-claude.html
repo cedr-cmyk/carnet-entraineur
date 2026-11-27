@@ -929,7 +929,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
 <div id="toast" class="toast" hidden></div>
 <input type="file" id="file-in" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.mp4,.webm,.txt,.md,.csv,application/pdf,image/*,video/mp4,video/webm,text/plain,text/markdown,text/csv">
 
-<script>window.CARNET_VERSION = { v: "1.10.53", date: "2026-11-27", site: "1.10.53", test: false };</script>
+<script>window.CARNET_VERSION = { v: "1.10.54", date: "2026-11-27", site: "1.10.54", test: false };</script>
 <script>
 // Espace archer : l'archer (ou son parent) voit uniquement ses propres informations,
 // telles que les renvoie la base (fonction espace_archer), et remplit son carnet.
@@ -7575,7 +7575,10 @@ function formDoc(d) {
     <label class="f" for="f-dtit">Titre<input type="text" id="f-dtit" name="titre" value="${esc(d.titre)}"></label>
     <label class="f" for="f-ddesc">Description, consignes<textarea id="f-ddesc" name="description" placeholder="Objectif de l'exercice, matériel, déroulé…">${esc(d.description)}</textarea></label>
     <label class="f" for="f-ddos">Dossier<select id="f-ddos" name="dossierId">${folderOptions(d.dossierId)}</select></label>
-    <span class="tirline">Fichier : ${esc(d.nomFichier)} · ${fmtSize(d.taille || 0)}${d.canva?.designId ? " · relié à Canva : le PDF est remplacé à chaque mise à jour de la fiche" : ""}</span>`,
+    <span class="tirline">Fichier : ${esc(d.nomFichier)} · ${fmtSize(d.taille || 0)}${d.canva?.designId ? " · relié à Canva : le PDF est remplacé à chaque mise à jour de la fiche" : ""}</span>
+    ${CANVA() && S.canWrite ? `<div class="f">Source Canva<div class="bar" style="align-items:center"><span class="tirline" style="margin:0;flex:1">${d.canva?.designId ? `🎨 ${esc(d.canva.titre || "Fiche Canva")}` : "Pas reliée à Canva (fichier déposé à la main)"}</span>
+      <button type="button" class="btn" id="f-dcv">${d.canva?.designId ? "Changer de fiche Canva" : "Relier à une fiche Canva"}</button>${d.canva?.designId ? `<button type="button" class="btn ghost" id="f-dcv-off">Ne plus relier</button>` : ""}</div>
+      <span class="tirline">Le document garde son titre, son dossier et ses partages ; seul le PDF est remplacé par celui de la fiche choisie.</span></div>` : ""}`,
     {
       onSave(fd) { patch("documents", d.id, { titre: fd.get("titre").trim() || d.nomFichier, description: fd.get("description").trim(), dossierId: fd.get("dossierId") || null }); toast("Document enregistré"); },
       onDelete: async () => {
@@ -7586,6 +7589,46 @@ function formDoc(d) {
       },
       deleteLabel: "Supprimer le document",
     });
+  $("#f-dcv")?.addEventListener("click", () => choisirSourceCanva(d));
+  $("#f-dcv-off")?.addEventListener("click", (ev) => {
+    const b = ev.currentTarget; if (!b.dataset.sur) { b.dataset.sur = "1"; b.textContent = "Sûr ? Le PDF actuel reste"; return; }
+    patch("documents", d.id, { canva: null }); d.canva = null; toast("Le document n'est plus relié à Canva (le PDF actuel reste)"); formDoc(S.documents.find((x) => x.id === d.id) || d);
+  });
+}
+// V.1.10 : changer la fiche Canva d'où vient un document (ou relier à Canva un document déposé à la main)
+function choisirSourceCanva(d) {
+  const el = $("#sheet"); let liste = null, suite = null, busy = "", q = "";
+  const lies = () => new Map(canvaDocs().map((x) => [x.canva.designId, x]));
+  const draw = () => {
+    const L = lies();
+    el.innerHTML = `<div class="sheet-bg"><div class="sheet" role="dialog" aria-label="Choisir la fiche Canva"><h3>Fiche Canva de « ${esc(d.titre || d.nomFichier)} »</h3>
+      ${CV.etat && !CV.etat.connecte ? `<p class="notice">Canva n'est pas relié : ouvre d'abord « 🎨 Fiches Canva » dans Documents pour le connecter.</p>` : ""}
+      <div class="bar"><input type="search" id="scv-q" placeholder="Nom de la fiche dans Canva" value="${esc(q)}" style="flex:1;min-width:0"><button type="button" class="btn" id="scv-find" ${busy ? "disabled" : ""}>${busy === "find" ? "Recherche…" : "Chercher"}</button></div>
+      ${liste ? (liste.length ? `<div class="list" style="margin-top:8px">${liste.map((x) => { const autre = L.get(x.id); return `<div class="row">${x.vignette ? `<img class="thumb" src="${esc(x.vignette)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : `<span class="thumb">CANVA</span>`}
+        <span class="main"><span class="t">${esc(x.titre)}</span><span class="m">${x.modifieLe ? "modifiée le " + esc(fmtDT(x.modifieLe)) : ""}${autre && autre.id !== d.id ? ` · déjà reliée à « ${esc(autre.titre || autre.nomFichier)} »` : ""}</span></span>
+        ${autre?.id === d.id ? `<span class="tag">fiche actuelle</span>` : `<button type="button" class="btn" data-scv="${esc(x.id)}" ${busy ? "disabled" : ""}>${busy === "set:" + x.id ? "Mise à jour…" : "Choisir"}</button>`}</div>`; }).join("")}</div>
+        ${suite ? `<div class="bar"><button type="button" class="btn" id="scv-more" ${busy ? "disabled" : ""}>Voir plus</button></div>` : ""}` : `<p class="tirline">Aucune fiche trouvée dans Canva.</p>`) : `<p class="tirline">Cherche la fiche par son nom (ou laisse vide pour voir les dernières modifiées).</p>`}
+      <div class="acts"><button type="button" class="btn" id="scv-back">Retour</button></div></div></div>`;
+    const find = (more) => { q = el.querySelector("#scv-q").value.trim(); busy = "find"; draw();
+      CANVA()("designs", { recherche: q, suite: more ? suite : null }).then((r) => { liste = more ? [...(liste || []), ...r.designs] : r.designs; suite = r.suite; }).catch((e) => toast(canvaErr(e))).finally(() => { busy = ""; draw(); }); };
+    el.querySelector("#scv-find").addEventListener("click", () => find(false));
+    el.querySelector("#scv-more")?.addEventListener("click", () => find(true));
+    el.querySelector("#scv-q").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); find(false); } });
+    el.querySelector("#scv-back").addEventListener("click", () => formDoc(S.documents.find((x) => x.id === d.id) || d));
+    el.querySelectorAll("[data-scv]").forEach((b) => b.addEventListener("click", async () => {
+      const x = liste.find((y) => y.id === b.dataset.scv), autre = L.get(x.id);
+      if (autre && autre.id !== d.id && !b.dataset.sur) { b.dataset.sur = "1"; b.textContent = "Choisir quand même"; return; }
+      busy = "set:" + x.id; draw();
+      try {
+        const cv = { designId: x.id, titre: x.titre, modifieLe: 0, majLe: d.canva?.majLe || 0 };
+        patch("documents", d.id, { canva: cv }); d.canva = cv;
+        if (window.carnetEnvoyer) await window.carnetEnvoyer();
+        const r = await CANVA()("sync", { ids: [d.id], forcer: true }); canvaBilan(r, true);
+        const nd = S.documents.find((y) => y.id === d.id); el.innerHTML = ""; render(); if (nd) openDoc(nd);
+      } catch (e) { toast(canvaErr(e)); busy = ""; draw(); }
+    }));
+  };
+  draw(); if (!CV.etat) canvaEtat(true).then(draw);
 }
 
 // ---------- Données ----------
