@@ -24,3 +24,6 @@ Dans cette appli : Paramètres › Données › Restaurer une sauvegarde.
 Toute modification se fait dans `source/carnet.html` (source unique), puis `python3 source/build.py` régénère :
 `index.html` (cette appli), `build/carnet-claude.html` et `build/carnet-essai.html` (versions Claude).
 Les règles de la base sont dans `supabase/` : un nouveau script n'est à exécuter dans Supabase › SQL Editor que s'il est ajouté.
+
+## Droits
+© 2026 Dumoulin Consulting – Tous droits réservés. Le code est consultable mais sa réutilisation est interdite sans accord écrit (voir le fichier `LICENSE`).
