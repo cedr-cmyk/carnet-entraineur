@@ -1,8 +1,9 @@
-# Carnet de l'entraîneur
+# Carnet d'entraînement
 
 Application de suivi des entraînements de tir à l'arc, pour un entraîneur qui intervient dans plusieurs clubs (FFTA et UFOLEP) :
 séances et pointage, suivi individuel et feuilles de marque, évaluations techniques, carnets d'entraînement des archers,
-bibliothèque d'exercices, concours et résultats, matériel prêté.
+bibliothèque d'exercices, concours et résultats, matériel prêté, parcours campagne et run-archery,
+animations (avec lien public et QR codes), espace des archers (badges Testeur et Archer partenaire).
 
 ## Installation sur la tablette ou l'ordinateur
 Ouvre l'adresse de l'appli dans Chrome, connecte-toi, puis menu ⋮ › « Installer l'application » (ou « Ajouter à l'écran d'accueil »).
@@ -14,7 +15,10 @@ L'appli fonctionne aussi sans réseau : les modifications sont envoyées dès qu
 - `sw.js` : fonctionnement hors connexion et accès aux fichiers (`_blob/<id>`).
 - `config.js` : adresse du projet Supabase et clé publique « anon ».
 
-L'import des classements PDF se fait avec Claude : l'appli prépare un texte à coller dans une conversation Claude, puis on recolle la réponse.
+- `anim.html` : page publique d'une animation (lien et QR codes, sans compte).
+- `alerte.json` : message d'alerte affiché aux archers en cas de problème (lu même si Supabase est en panne).
+
+L'import des classements PDF lit directement les classements en tableau ; sinon l'appli prépare un texte à coller dans une conversation Claude, puis on recolle la réponse.
 
 ## Reprise des données
 Dans le carnet Claude : Paramètres › Données › Télécharger la sauvegarde (ZIP « Données et fichiers »).
