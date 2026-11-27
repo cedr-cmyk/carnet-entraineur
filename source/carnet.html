@@ -3839,6 +3839,27 @@ function retourRow(r) {
     <span class="m">${esc(fmtLong(r.date))}</span><span class="m" style="white-space:pre-wrap;color:var(--ink)">${esc(r.texte)}</span>${r.reponse ? `<span class="m rt-rep">Ta réponse : ${esc(r.reponse)}</span>` : ""}</span>
     <span class="bar">${S.canWrite && r.type === "stage" ? `<button class="btn primary" data-stage-perso="${esc(r.id)}">Créer le stage</button>` : ""}${S.canWrite ? `<button class="btn" data-retour="${esc(r.id)}">${r.reponse ? "Modifier" : "Répondre"}</button>` : ""}</span></div>`;
 }
+// V.1.10 (script 24) : nouveaux comptes créés sur le carnet depuis la dernière fois que l'entraîneur les a vus
+let comptesL = null;
+async function loadComptes() {
+  if (!window.carnetComptes || comptesL) return; comptesL = [];
+  try { comptesL = (await window.carnetComptes()) || []; if (S.tab === "accueil" && !S.seance && !S.archer) render(); } catch (e) { comptesL = []; }
+}
+const comptesVu = () => Number(LS.get("carnet-comptes-vu", 0)) || Date.now() - 30 * 864e5;
+function compteEtat(c) {
+  const ar = (c.archers || []).map((id) => S.archers.find((a) => a.id === id)).filter(Boolean);
+  if (ar.length) return `<span class="tag">Archer</span> relié à la fiche de ${ar.map((a) => esc(fullName(a))).join(", ")}`;
+  if (c.encadrant) return `<span class="tag">Encadrant</span> un de tes encadrants`;
+  return `<span class="tag today">Pas relié</span> ni archer ni encadrant : ce compte ne voit rien de ton carnet${c.confirme ? "" : " (adresse pas encore confirmée)"}`;
+}
+function comptesCard() {
+  if (!comptesL) { loadComptes(); return ""; }
+  const vu = comptesVu(), n = comptesL.filter((c) => (c.creeLe || 0) > vu); if (!n.length) return "";
+  const d = (ms) => new Date(ms).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+  return `<div class="card rt-notif" data-carte="comptes"><div class="hub-bar"><h3 class="hub-h">👤 ${n.length} nouveau${n.length > 1 ? "x" : ""} compte${n.length > 1 ? "s" : ""} créé${n.length > 1 ? "s" : ""}</h3><button class="btn" data-act="comptes-vu">C'est vu</button></div>
+    <div class="list">${n.map((c) => `<div class="row"><span class="main"><span class="t">${esc(c.email || "(sans adresse)")}</span><span class="m">Créé le ${d(c.creeLe)}${c.derniere ? ` · dernière connexion le ${d(c.derniere)}` : " · jamais connecté"}</span><span class="m">${compteEtat(c)}</span></span></div>`).join("")}</div>
+    ${n.some((c) => !(c.archers || []).length && !c.encadrant) ? `<span class="tirline">Un compte « Pas relié » ne voit rien. C'est souvent un archer qui n'a pas encore entré son code. Si personne ne le connaît, tu peux le supprimer dans Supabase › Authentication › Users.</span>` : ""}</div>`;
+}
 // Accueil : simple rappel quand il y a des retours pas encore lus
 function retoursCard() {
   const n = rtNouveaux(), fl = filNonLus(); if (!n.length && !fl.length) return "";
@@ -3977,6 +3998,7 @@ function viewAccueil() {
     </div>
     ${ENC() ? "" : (() => { const l = S.archers.filter((x) => !x.archive).flatMap((x) => demandesDe(x).map((d) => [x, d])).sort((p, q) => byName(p[0], q[0]));
       return l.length ? `<div class="card" data-carte="demandes"><div class="hub-bar"><h3 class="hub-h">🙋 Demandes d'accès des archers</h3></div><div class="list">${l.map(([x, [k, lib]]) => `<div class="row" style="flex-wrap:wrap"><span class="main"><span class="t">${esc(fullName(x))}</span><span class="m">demande ${lib}</span></span>${S.canWrite ? `<button class="btn primary" data-disc-ok="${k}" data-aid="${x.id}">Accepter</button><button class="btn" data-disc-non="${k}" data-aid="${x.id}">Refuser</button>` : ""}</div>`).join("")}</div></div>` : ""; })()}
+    ${ENC() || !S.canWrite ? "" : comptesCard()}
     ${ENC() ? "" : retoursCard()}
     ${ENC() ? "" : espaceArchersCard(inC)}
     ${todoL.length ? `<details class="card hub-todo"><summary><i class="hub-ico c-cyan">${ICON.list}</i><b>${todoL.length} exercice${todoL.length > 1 ? "s" : ""} attribué${todoL.length > 1 ? "s" : ""} pas encore fait${todoL.length > 1 ? "s" : ""}</b><span class="grow"></span><span class="hub-chev" aria-hidden="true">›</span></summary>
@@ -6909,6 +6931,7 @@ document.addEventListener("click", (e) => {
   if (a === "restore") startRestore();
   if (a === "logout" && window.carnetLogout) window.carnetLogout();
   // V.1.10 : actualiser (les modifications pas encore envoyées sont gardées sur l'appareil et repartent au rechargement)
+  if (a === "comptes-vu") { LS.set("carnet-comptes-vu", String(Math.max(Date.now(), ...(comptesL || []).map((c) => c.creeLe || 0)))); render(); }
   if (a === "rafraichir") { $("#sync").textContent = "Actualisation…"; (async () => { try { const r = await navigator.serviceWorker?.getRegistration?.(); await Promise.race([r?.update?.(), new Promise((ok) => setTimeout(ok, 2500))]); } catch (e) {} location.reload(); })(); }
   if (a === "enc-new") formEncadrant();
   if (a === "move-mode") { S.moveSel = new Set(); S.moveTo = null; render(); }
